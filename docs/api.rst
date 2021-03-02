@@ -42,8 +42,26 @@ Once a simulation has finished we need to collect the statistics recorded
 while it was running. The simplest way to report results is via a results
 object. QuESt can be responsible for analysis and presentation of the data.
 
-API
----
+Device API
+----------
+
+ssim.storage
+^^^^^^^^^^^^
+
+.. automodule:: ssim.storage
+   :members:
+
+OpenDSS API
+-----------
+
+These modules provide an API for interacting with devices in an OpenDSS
+model.
+
+ssim.opendss
+^^^^^^^^^^^^
+
+.. automodule:: ssim.opendss
+   :members:
 
 ssim.dssutil
 ^^^^^^^^^^^^

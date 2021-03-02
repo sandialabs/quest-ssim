@@ -6,8 +6,11 @@ import enum
 @enum.unique
 class StorageState(enum.Enum):
     """Enumeration of the states a storage device can be in."""
+    #: Device is in the charging state.
     CHARGING = "charging"
+    #: Device is in the discharging state.
     DISCHARGING = "discharging"
+    #: Device is neither charging nor discharging.
     IDLE = "idling"
 
     def __str__(self):
