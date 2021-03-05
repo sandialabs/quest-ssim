@@ -56,6 +56,13 @@ def run_command(command: str, warn: bool = False) -> str:
     return _check_result(dssdirect.run_command(command), warn)
 
 
+def get_property(property) -> str:
+    result = dssdirect.run_command(f"? {property}")
+    if result == "Property Unknown":
+        raise OpenDSSError(f"Property Unknown: {property}")
+    return result
+
+
 def load_model(file):
     """Load the OpenDSS model described in `file`.
 

@@ -1,4 +1,5 @@
 """Interface for devices that are part of an OpenDSS model."""
+from typing import Any
 from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
 
@@ -18,7 +19,7 @@ class Storage(StorageDevice):
         sensitive
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
-    initila_soc : float, default 1.0
+    initial_soc : float, default 1.0
         Initial state of charge as a fraction of the total capacity.
     """
     def __init__(self, name, bus, device_parameters,
@@ -46,29 +47,42 @@ class Storage(StorageDevice):
     def get_state(self) -> StorageState:
         return self.state
 
-    def _edit(self, option_str):
-        """Edit the storage object in OpenDSS.
+    def set_state(self, state: StorageState):
+        self._set('state', state)
+        self.state = state
+
+    def _set(self, property: str, value: Any):
+        """Set `property` to `value` in OpenDSS.
 
         Parameters
         ----------
-        option_str : str
-            Options to pass to the OpenDSS "Edit" command. For example,
-            to set the active power and power factor pass "kw=2.1 pf=0.3".
-        """
-        dssutil.run_command(
-            f"Edit Storage.{self.name} {option_str}"
-        )
+        property : str
+            Name of the property.
+        value : Any
+            New value.
 
-    def set_state(self, state: StorageState):
-        self._edit(f"state={state}")
-        self.state = state
+        Raises
+        ------
+        OpenDSSError
+            If the property could not be set.
+        """
+        dssutil.run_command(f"storage.{self.name}.{property}={value}")
+
+    def _get(self, property: str) -> str:
+        return dssutil.get_property(f"storage.{self.name}.{property}")
 
     def set_power(self, kw: float, kvar: float = None, pf: float = None):
-        kvar_str = f" kvar={kvar}" if kvar is not None else ""
-        pf_str = f" pf={pf}" if pf is not None else ""
-        self._edit(
-            f"kW={kw}" + kvar_str + pf_str
-        )
+        # TODO prevent impossible states
+        #      (e.g. kw > 0, soc == 0/min, state=discharging)
+        self._set('kW', kw)
+        if pf is not None:
+            self._set('pf', pf)
+        if kvar is not None:
+            self._set('kvar', kvar)
+        # XXX risk that these could get out of sync if an OpenDSSError is
+        #     raised when one of these is set. It may be a good idea to
+        #     query OpenDSS when these params are needed, rather than keeping
+        #     them cached here.
         self.kw = kw
         self.kvar = kvar
         self.pf = pf
@@ -79,7 +93,11 @@ class Storage(StorageDevice):
 
     @soc.setter
     def soc(self, new_soc):
-        # TODO set the SOC in OpenDSS
-        # QUESTION Should we update the power output if the SOC
-        # drops to 0 (when discharging) or rises to 1 (when charging)?
         self._soc = new_soc
+
+    def get_kw_rated(self, state: StorageState) -> float:
+        return float(self._get("kwrated"))
+
+    @property
+    def kwh_rated(self) -> float:
+        return float(self._get("kwhrated"))

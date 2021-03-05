@@ -42,7 +42,7 @@ class StorageDevice(ABC):
         """Return the rated kWh of the device."""
 
     @abstractmethod
-    def kw_rated(self, state: StorageState) -> float:
+    def get_kw_rated(self, state: StorageState) -> float:
         """Return kW rating of the device when in `state`."""
 
     @abstractmethod
