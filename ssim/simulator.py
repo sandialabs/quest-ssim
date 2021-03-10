@@ -11,7 +11,7 @@ from ssim.federates import storage, opendss
 _BROKER_NAME = "ssimbroker"
 
 
-def helics_broker():
+def _helics_broker():
     """Start the helics broker"""
     logging.basicConfig(format="[broker] %(levelname)s - %(message)s",
                         level=logging.DEBUG)
@@ -41,7 +41,7 @@ def run_simulation(opendss_file, storage_name, storage_bus,
     storage_kwh_rated : float
         rated capacity of the storage device. [kWh]
     """
-    broker_process = Process(target=helics_broker, name="broker")
+    broker_process = Process(target=_helics_broker, name="broker")
     grid_process = Process(
         target=opendss.run_opendss_federate,
         args=(opendss_file, storage_name, storage_bus,
@@ -64,3 +64,4 @@ def run_simulation(opendss_file, storage_name, storage_bus,
     broker_process.join()
     grid_process.join()
     storage_process.join()
+    logging.info("done.")

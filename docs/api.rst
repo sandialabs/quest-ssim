@@ -35,6 +35,9 @@ If possible, we should also provide and API that supports querying the
 simulation progress. At the very least this could just be the something that
 returns the simulation clock to indicate that progress is being made.
 
+.. automodule:: ssim.simulator
+   :members:
+
 Reporting Results
 -----------------
 
