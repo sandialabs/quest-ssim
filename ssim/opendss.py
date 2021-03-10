@@ -42,7 +42,8 @@ class Storage(StorageDevice):
 
     @staticmethod
     def _make_dss_args(device_parameters):
-        " ".join(f"{param}={value}" for param, value in device_parameters)
+        return " ".join(f"{param}={value}"
+                        for param, value in device_parameters.items())
 
     def get_state(self) -> StorageState:
         return self.state
