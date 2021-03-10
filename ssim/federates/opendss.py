@@ -6,7 +6,6 @@ import opendssdirect as dssdirect
 from helics import (
     HelicsValueFederate,
     HelicsDataType,
-    helics_time_maxtime,
     helicsCreateFederateInfo,
     helicsCreateValueFederate
 )
@@ -143,7 +142,7 @@ def run_opendss_federate(dss_file, storage_name, storage_bus, storage_params,
     federate.enter_executing_mode()
     time = 0
     while time < 10000:
-        logging.debug(f"stepping grid model")
+        logging.debug("stepping grid model")
         dss_federate.step()
         time = dss_federate.wait()
         logging.debug(f"granted time {time}")
