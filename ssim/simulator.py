@@ -25,7 +25,8 @@ def _helics_broker():
 
 
 def run_simulation(opendss_file, storage_name, storage_bus,
-                   storage_kw_rated, storage_kwh_rated):
+                   storage_kw_rated, storage_kwh_rated,
+                   loglevel=logging.WARN):
     """Simulate the performance of the grid with attached storage.
 
     Parameters
@@ -46,12 +47,12 @@ def run_simulation(opendss_file, storage_name, storage_bus,
         target=opendss.run_opendss_federate,
         args=(opendss_file, storage_name, storage_bus,
               {'kwrated': storage_kw_rated, 'kwhrated': storage_kwh_rated},
-              logging.DEBUG),
+              loglevel),
         name="grid_federate"
     )
     storage_process = Process(
         target=storage.run_storage_federate,
-        args=(storage_name, storage_kwh_rated, storage_kw_rated),
+        args=(storage_name, storage_kwh_rated, storage_kw_rated, loglevel),
         name="storage_federate"
     )
     logging.info("starting broker")

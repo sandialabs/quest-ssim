@@ -143,14 +143,14 @@ class StorageFederate:
         Parameters
         ----------
         time : float
-            Current time in hours.
+            Current time in seconds.
         """
         logging.debug(f"stepping @ {time}")
         granted_time = self._federate.request_time_advance(
-            self._model.time_to_change()
+            self._model.time_to_change() * 3600
         )
         state = self._model.state
-        self._model.step(granted_time - time)
+        self._model.step((granted_time - time) / 3600)
         if self._model.state is not state:
             logging.debug(f"state: {self._model.state}")
             self._state_pub.publish(str(self._model.state))
@@ -158,9 +158,9 @@ class StorageFederate:
         return granted_time
 
 
-def run_storage_federate(storage_name, kwh_rated, kw_rated):
+def run_storage_federate(storage_name, kwh_rated, kw_rated, loglevel):
     logging.basicConfig(format="[storage] %(levelname)s - %(message)s",
-                        level=logging.WARN)
+                        level=loglevel)
     fedinfo = helicsCreateFederateInfo()
     fedinfo.core_name = storage_name
     fedinfo.core_type = "zmq"
@@ -173,7 +173,7 @@ def run_storage_federate(storage_name, kwh_rated, kw_rated):
     logging.debug("entering executing mode")
     federate.enter_executing_mode()
     logging.debug("in executing mode")
-    while time < 1000:
+    while time < 1000 * 3600:
         time = storage.step(time)
     logging.debug("finalizing")
     federate.finalize()

@@ -1,5 +1,6 @@
 """Federate for OpenDSS grid simulation."""
 import logging
+import math
 from os import PathLike
 
 import opendssdirect as dssdirect
@@ -31,6 +32,7 @@ class OpenDSS:
         self._storage_subs = {}
         self._voltage_pubs = {}
         dssutil.load_model(dss_file)
+        dssutil.run_command("set mode=time loadshapeclass=daily")
         self._total_power_pub = self._federate.register_publication(
             "total_power",
             HelicsDataType.COMPLEX,
@@ -90,10 +92,33 @@ class OpenDSS:
             dssdirect.Circuit.SetActiveBus(device.bus)
             self._voltage_pubs[device.bus].publish(node_voltages[device.bus])
 
-    def step(self):
+    def _set_time(self, time):
+        """Update the time in OpenDSS.
+
+        Parameters
+        ----------
+        time : float
+            New time in seconds.
+        """
+        hours = math.floor(time) // 3600
+        seconds = time - (hours * 3600)
+        dssdirect.Solution.Hour(hours)
+        dssdirect.Solution.Seconds(seconds)
+
+    def step(self, time):
+        """Step the opendss model to `time`.
+
+        Parameters
+        ----------
+        time : float
+            Time in seconds.
+        """
+        self._set_time(time)
         self._update_loads()
         self._update_storage()
         dssdirect.Solution.Solve()
+        # ensure that monitors and controls are sampled
+        dssdirect.Circuit.SaveSample()
         self._publish_power()
         self._publish_node_voltages()
 
@@ -101,7 +126,9 @@ class OpenDSS:
         # requesting `helics_time_maxtime` causes the sim to hang, so we
         # request one less than the max. The idea is to be interrupted
         # when the loads or the storage device(s) change state.
-        return self._federate.request_time(10000)
+        hour = dssdirect.Solution.Hour()
+        next_time = hour * 3600 + dssdirect.Solution.Seconds()
+        return self._federate.request_time(next_time)
 
 
 def run_opendss_federate(dss_file, storage_name, storage_bus, storage_params,
@@ -141,9 +168,9 @@ def run_opendss_federate(dss_file, storage_name, storage_bus, storage_params,
     dss_federate.add_storage(storage_device)
     federate.enter_executing_mode()
     time = 0
-    while time < 10000:
+    while time < 1000 * 3600:
         logging.debug("stepping grid model")
-        dss_federate.step()
+        dss_federate.step(time)
         time = dss_federate.wait()
         logging.debug(f"granted time {time}")
     federate.finalize()
