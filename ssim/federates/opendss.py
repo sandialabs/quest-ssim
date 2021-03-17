@@ -35,7 +35,7 @@ class GridFederate:
         self._total_power_pub = self._federate.register_publication(
             "total_power",
             HelicsDataType.COMPLEX,
-            units="W"
+            units="kW"
         )
         self._load_multiplier_sub = self._federate.register_subscription(
             "load_multiplier",
