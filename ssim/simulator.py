@@ -55,9 +55,9 @@ def run_simulation(opendss_file, storage_name, storage_bus,
         name="storage_federate"
     )
     power_logger = Process(
-        target=logger.run_power_logger,
-        args=(loglevel, True),
-        name="power_logger"
+        target=logger.run_logger,
+        args=(loglevel, {storage_bus}, True),
+        name="logger_federate"
     )
     logging.info("starting broker")
     broker_process.start()
