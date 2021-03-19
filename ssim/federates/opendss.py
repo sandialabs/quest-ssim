@@ -1,6 +1,5 @@
 """Federate for OpenDSS grid simulation."""
 import logging
-from os import PathLike
 
 from helics import (
     HelicsValueFederate,
