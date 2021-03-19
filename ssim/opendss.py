@@ -44,6 +44,7 @@ class Storage(StorageDevice):
             f" phases={phases}"
             f" dispmode=external"
             f" {self._make_dss_args(device_parameters)}"
+            f" %stored={initial_soc *  100}"
             f" state={state}"
         )
 
@@ -137,21 +138,31 @@ class LoadShapeClass(enum.Enum):
     YEARLY = 'yearly'
     DUTY = 'duty'
 
+    def __str__(self):
+        return self.value
+
+    @classmethod
+    def from_str(cls, value: str):
+        return cls(value.lower())
+
 
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
-    def __init__(self, dss_file):
+    def __init__(self, dss_file, loadshape_class=LoadShapeClass.DAILY):
         dssutil.load_model(dss_file)
         dssutil.run_command(
-            "set mode=time controlmode=time number=1 loadshapeclass=daily"
+            "set mode=time controlmode=time number=1"
         )
+        self.loadshapeclass = loadshape_class
         self._last_solution_time = None
         self._storage = {}
 
     @property
     def loadshapeclass(self) -> LoadShapeClass:
         """The OpenDSS LoadShape class used for loads and generators."""
-        return LoadShapeClass(dssdirect.run_command('get loadshapeclass'))
+        return LoadShapeClass.from_str(
+            dssdirect.run_command('get loadshapeclass')
+        )
 
     @loadshapeclass.setter
     def loadshapeclass(self, lsclass: LoadShapeClass):
@@ -235,6 +246,8 @@ class DSSModel:
             Rated voltage of the bus [kV].
         kva_rating : float
             Rated kVA of the PV system [kVA].
+        connection_type : str
+            Connection type between the inverter and the grid.
         irrad_scale : float
             Irradiance scale factor.
         pmpp_kw : float
