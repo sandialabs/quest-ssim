@@ -14,6 +14,8 @@ def simple_circuit():
     dssutil.run_command("new line.line2 phases=3 bus1=lb1 bus2=lb2")
     dssutil.run_command("new load.load1 bus1=lb1 kw=2.3 kvar=0 kv=0.240")
     dssutil.run_command("solve")
+    yield
+    dssutil.run_command("clear")
 
 
 def test_missing_file():
