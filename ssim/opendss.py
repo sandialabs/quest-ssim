@@ -338,7 +338,7 @@ class DSSModel:
             Active power output from the device. A negative value indicates
             the device is charging, while a positive value indicates the device
             is discharging. [kW]
-        q_var : float
+        q_kvar : float
             Reactive power from the device. [kVAR]
         """
         self._storage[name].set_power(p_kw, q_kvar)
