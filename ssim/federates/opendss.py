@@ -52,7 +52,8 @@ class GridFederate:
         """Configure the HELICS inputs for the storage device."""
         self._storage_subs[device.name] = {
             'power': self._federate.register_subscription(
-                f"{device.name}/power", "kW"
+                f"storage.{device.name}.power",
+                "kW"
             )
         }
 

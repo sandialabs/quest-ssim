@@ -28,7 +28,7 @@ class IdealStorageModel:
     soc_min : float, default 0.2
         Minimum state of charge for normal operation. Float between 0 and 1.
     """
-    def __init__(self, kwh_rated: float, kw_rated: float,
+    def __init__(self, name: str, kwh_rated: float, kw_rated: float,
                  initial_soc: float = None, soc_min: float = 0.2):
         if initial_soc is not None and 1 < initial_soc < 0:
             raise ValueError(f"`initial_soc` must be between 0 and 1"
@@ -44,6 +44,7 @@ class IdealStorageModel:
         self._soc_min = soc_min
         self.state = StorageState.IDLE
         self.power = 0.0
+        self.name = name
         self._charging_power = -kw_rated
         self._discharging_power = kw_rated
 
@@ -60,7 +61,7 @@ class IdealStorageModel:
             logging.info(f"CHARGING: charge_remaining={charge_remaining} kWh, "
                          f"time_remaining={time_remaining} h")
             return time_remaining
-        elif self.state is StorageState.DISCHARGING:
+        if self.state is StorageState.DISCHARGING:
             capacity_remaining = self._kwh_rated * (self._soc - self._soc_min)
             time_remaining = capacity_remaining / abs(self.power)
             logging.info(f"DISCHARGING: "
@@ -116,7 +117,7 @@ class IdealStorageModel:
             self._step_discharging(delta_t)
 
 
-class StorageFederate:
+class StorageControllerFederate:
     """Simple storage device federate.
 
     Has a kWh rating and a maximum kW rating. Currently there
@@ -125,14 +126,10 @@ class StorageFederate:
     def __init__(self, federate: HelicsValueFederate,
                  storage_model: IdealStorageModel):
         self._model = storage_model
-        self._power_pub = federate.register_publication(
-            "power",
+        self._power_pub = federate.register_global_publication(
+            f"storage.{storage_model.name}.power",
             HelicsDataType.COMPLEX,
             units="kW"
-        )
-        self._state_pub = federate.register_publication(
-            "state",
-            HelicsDataType.STRING
         )
         self._federate = federate
         logging.debug("federate initialized")
@@ -153,7 +150,6 @@ class StorageFederate:
         self._model.step((granted_time - time) / 3600)
         if self._model.state is not state:
             logging.debug(f"state: {self._model.state}")
-            self._state_pub.publish(str(self._model.state))
             self._power_pub.publish(self._model.complex_power)
         return granted_time
 
@@ -166,8 +162,8 @@ def run_storage_federate(storage_name, kwh_rated, kw_rated, loglevel):
     fedinfo.core_type = "zmq"
     fedinfo.core_init = "-f1"
     federate = helicsCreateValueFederate(storage_name, fedinfo)
-    storage = StorageFederate(
-        federate, IdealStorageModel(kwh_rated, kw_rated)
+    storage = StorageControllerFederate(
+        federate, IdealStorageModel(storage_name, kwh_rated, kw_rated)
     )
     time = 0
     logging.debug("entering executing mode")
