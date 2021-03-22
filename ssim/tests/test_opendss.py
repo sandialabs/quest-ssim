@@ -88,3 +88,15 @@ def test_DSSModel_add_pvsystem(test_circuit, data_dir):
     assert dssdirect.PVsystems.kW() == pytest.approx(0.0)
     test_circuit.solve(3600 * 12)
     assert dssdirect.PVsystems.kW() == pytest.approx(12)
+
+
+def test_DSSModel_add_xycurve(test_circuit):
+    with pytest.raises(
+            ValueError,
+            match="`x_values` and `y_values` must be the same length"):
+        test_circuit.add_xycurve("TestXY", [0, 0.5, 1.0], [1.0, 1.5])
+    test_circuit.add_xycurve("TestXY", [0, 0.5, 1.0], [1.0, 1.5, 2.0])
+    dssdirect.XYCurves.Name("TestXY")
+    assert dssdirect.XYCurves.Npts() == 3
+    assert dssdirect.XYCurves.XArray() == [0, 0.5, 1.0]
+    assert dssdirect.XYCurves.YArray() == [1.0, 1.5, 2.0]
