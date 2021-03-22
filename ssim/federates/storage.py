@@ -1,17 +1,46 @@
 """Storage device federate"""
+from abc import ABC, abstractmethod
 import logging
 
 from helics import (
     HelicsValueFederate,
     HelicsDataType,
-    helicsCreateFederateInfo, helicsCreateValueFederate
+    helicsCreateFederateInfo,
+    helicsCreateValueFederate
 )
 
 from ssim.storage import StorageState
 
 
-class IdealStorageModel:
-    """Model of an idea storage device.
+class StorageController(ABC):
+    """Base class for storage controllers."""
+    @abstractmethod
+    def step(self, time: float) -> complex:
+        """Step the model to `time`.
+
+        Parameters
+        ----------
+        time : float
+            Current time in seconds.
+
+        Returns
+        -------
+        complex
+            Active and reactive power as a complex number. [kW]
+        """
+
+    @abstractmethod
+    def next_update(self) -> float:
+        """Return the time of the next controller action in seconds."""
+
+    @property
+    @abstractmethod
+    def device_name(self) -> str:
+        """The name of the device being controlled"""
+
+
+class IdealStorageModel(StorageController):
+    """A device that cycles between charging and discharging.
 
     The device is 100% efficient and has linear charging
     and discharging profiles.
@@ -44,31 +73,35 @@ class IdealStorageModel:
         self._soc_min = soc_min
         self.state = StorageState.IDLE
         self.power = 0.0
-        self.name = name
+        self._last_step = 0.0
+        self._name = name
         self._charging_power = -kw_rated
         self._discharging_power = kw_rated
+
+    @property
+    def device_name(self):
+        return self._name
 
     @property
     def complex_power(self):
         return complex(self.power, 0.0)
 
-    def time_to_change(self):
-        """Return how long until the device changes state. [hours]"""
+    def next_update(self) -> float:
         logging.debug(f"getting time to charge: state={self.state}")
         if self.state is StorageState.CHARGING:
             charge_remaining = self._kwh_rated * (1.0 - self._soc)
             time_remaining = charge_remaining / abs(self.power)
             logging.info(f"CHARGING: charge_remaining={charge_remaining} kWh, "
                          f"time_remaining={time_remaining} h")
-            return time_remaining
+            return self._last_step + time_remaining * 3600
         if self.state is StorageState.DISCHARGING:
             capacity_remaining = self._kwh_rated * (self._soc - self._soc_min)
             time_remaining = capacity_remaining / abs(self.power)
             logging.info(f"DISCHARGING: "
                          f"capacity_remaining={capacity_remaining} kWh, "
                          f"time_remaining={time_remaining} h")
-            return time_remaining
-        return 0.0001
+            return self._last_step + time_remaining * 3600
+        return 1.0
 
     def _step_charging(self, delta_t_hours):
         previous_charge = self._soc * self._kwh_rated
@@ -90,20 +123,7 @@ class IdealStorageModel:
             self.state = StorageState.CHARGING
             self.power = self._charging_power
 
-    def step(self, delta_t):
-        """Advance the model `delta_t` hours.
-
-        Parameters
-        ----------
-        delta_t : float
-            Time to advance [hours]
-
-        Returns
-        -------
-        float
-            Hours until the battery must change state (i.e. until it is
-            full or depleted).
-        """
+    def step(self, time):
         if self.state is StorageState.IDLE:
             if self._soc <= self._soc_min:
                 self.state = StorageState.CHARGING
@@ -112,9 +132,11 @@ class IdealStorageModel:
                 self.state = StorageState.CHARGING
                 self.power = self._discharging_power
         elif self.state is StorageState.CHARGING:
-            self._step_charging(delta_t)
+            self._step_charging((time - self._last_step) / 3600)
         elif self.state is StorageState.DISCHARGING:
-            self._step_discharging(delta_t)
+            self._step_discharging((time - self._last_step) / 3600)
+        self._last_step = time
+        return self.complex_power
 
 
 class StorageControllerFederate:
@@ -124,34 +146,29 @@ class StorageControllerFederate:
     are no losses modeled (100% efficiency).
     """
     def __init__(self, federate: HelicsValueFederate,
-                 storage_model: IdealStorageModel):
+                 storage_model: StorageController):
         self._model = storage_model
         self._power_pub = federate.register_global_publication(
-            f"storage.{storage_model.name}.power",
+            f"storage.{storage_model.device_name}.power",
             HelicsDataType.COMPLEX,
             units="kW"
         )
         self._federate = federate
         logging.debug("federate initialized")
 
-    def step(self, time):
+    def run(self, hours):
         """Step the federate.
 
         Parameters
         ----------
-        time : float
-            Current time in seconds.
+        hours : float
+            Number of hours to run.
         """
-        logging.debug(f"stepping @ {time}")
-        granted_time = self._federate.request_time_advance(
-            self._model.time_to_change() * 3600
-        )
-        state = self._model.state
-        self._model.step((granted_time - time) / 3600)
-        if self._model.state is not state:
-            logging.debug(f"state: {self._model.state}")
-            self._power_pub.publish(self._model.complex_power)
-        return granted_time
+        time = 0
+        while time < hours * 3600:
+            time = self._federate.request_time(self._model.next_update())
+            power = self._model.step(time)
+            self._power_pub.publish(power)
 
 
 def run_storage_federate(storage_name, kwh_rated, kw_rated, loglevel):
@@ -165,12 +182,10 @@ def run_storage_federate(storage_name, kwh_rated, kw_rated, loglevel):
     storage = StorageControllerFederate(
         federate, IdealStorageModel(storage_name, kwh_rated, kw_rated)
     )
-    time = 0
     logging.debug("entering executing mode")
     federate.enter_executing_mode()
     logging.debug("in executing mode")
-    while time < 1000 * 3600:
-        time = storage.step(time)
+    storage.run(1000)
     logging.debug("finalizing")
     federate.finalize()
     logging.debug("done")
