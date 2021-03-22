@@ -197,10 +197,13 @@ def run_logger(loglevel, bus_voltage, show_plots=False):
     logging_federate.run(1000)
     if show_plots:
         plt.figure()
-        plt.plot(power_logger.time, power_logger.active_power)
-        plt.plot(power_logger.time, power_logger.reactive_power)
+        plt.plot(power_logger.time, power_logger.active_power,
+                 label="active power")
+        plt.plot(power_logger.time, power_logger.reactive_power,
+                 label="reactive power")
         plt.ylabel("Power (kW)")
         plt.xlabel("time (s)")
+        plt.legend()
         plt.figure()
         for bus in voltage_logger.bus_voltage:
             plt.plot(voltage_logger.time,
