@@ -23,7 +23,7 @@ def _helics_broker():
         time.sleep(1)
 
 
-def run_simulation(opendss_file, storage_devices,
+def run_simulation(opendss_file, storage_devices, hours,
                    loglevel=logging.WARN):
     """Simulate the performance of the grid with attached storage.
 
@@ -36,6 +36,8 @@ def run_simulation(opendss_file, storage_devices,
         keys 'kwhrated', 'kwrated', and 'bus' which specify the kWh rating,
         the maximum kW rating, and the bus where the device is connected
         respectively.
+    hours : float
+        Number of hours to simulate.
     """
     broker_process = Process(target=_helics_broker, name="broker")
     grid_process = Process(
@@ -46,6 +48,7 @@ def run_simulation(opendss_file, storage_devices,
                    'params': {'kwrated': specs['kwrated'],
                               'kwhrated': specs['kwhrated']}}
                for storage_name, specs in storage_devices.items()},
+              hours,
               loglevel),
         name="grid_federate"
     )
@@ -54,6 +57,7 @@ def run_simulation(opendss_file, storage_devices,
         args=({storage_name: {'kwhrated': specs['kwhrated'],
                               'kwrated': specs['kwrated']}
                for storage_name, specs in storage_devices.items()},
+              hours,
               loglevel),
         name="storage_federate"
     )
@@ -62,6 +66,7 @@ def run_simulation(opendss_file, storage_devices,
         args=(loglevel,
               {specs['bus'] for specs in storage_devices.values()},
               set(storage_devices.keys()),
+              hours,
               True),
         name="logger_federate"
     )

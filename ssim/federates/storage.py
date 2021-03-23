@@ -187,7 +187,7 @@ class StorageControllerFederate:
             self._step(time)
 
 
-def run_storage_federate(devices, loglevel):
+def run_storage_federate(devices, hours, loglevel):
     logging.basicConfig(format="[storage] %(levelname)s - %(message)s",
                         level=loglevel)
     fedinfo = helicsCreateFederateInfo()
@@ -202,7 +202,7 @@ def run_storage_federate(devices, loglevel):
     logging.debug("entering executing mode")
     federate.enter_executing_mode()
     logging.debug("in executing mode")
-    storage.run(1000)
+    storage.run(hours)
     logging.debug("finalizing")
     federate.finalize()
     logging.debug("done")

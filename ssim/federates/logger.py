@@ -237,7 +237,7 @@ class StorageLogger(HelicsLogger):
         pass
 
 
-def run_logger(loglevel, bus_voltage, devices, show_plots=False):
+def run_logger(loglevel, bus_voltage, devices, hours, show_plots=False):
     logging.basicConfig(format="[HelicsLogger] %(levelname)s - %(message)s",
                         level=loglevel)
     logging.info("starting federate")
@@ -256,7 +256,7 @@ def run_logger(loglevel, bus_voltage, devices, show_plots=False):
     logging_federate.add_logger("voltage", voltage_logger)
     logging_federate.add_logger("storage", storage_logger)
     logging_federate.initialize()
-    logging_federate.run(1000)
+    logging_federate.run(hours)
     if show_plots:
         plt.figure()
         plt.plot(power_logger.time, power_logger.active_power,

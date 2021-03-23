@@ -129,7 +129,7 @@ class GridFederate:
             self.step(current_time)
 
 
-def run_opendss_federate(dss_file, storage_devices,
+def run_opendss_federate(dss_file, storage_devices, hours,
                          loglevel=logging.INFO):
     """Start the OpenDSS federate.
 
@@ -141,6 +141,10 @@ def run_opendss_federate(dss_file, storage_devices,
         Dictionary keys are device names. Values are dictionaries with
         two keys: 'bus' (the bus where the device is connected), and
         'params' storage device parameters.
+    hours : float
+        Amount of time to simulate. [hours]
+    loglevel : logging.Level
+        Log level.
     """
     logging.basicConfig(format="[OpenDSS] %(levelname)s - %(message)s",
                         level=loglevel)
@@ -164,5 +168,5 @@ def run_opendss_federate(dss_file, storage_devices,
 
     grid_federate = GridFederate(federate, model)
     federate.enter_executing_mode()
-    grid_federate.run(1000)
+    grid_federate.run(hours)
     federate.finalize()
