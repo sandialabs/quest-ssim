@@ -61,6 +61,7 @@ def run_simulation(opendss_file, storage_devices,
         target=logger.run_logger,
         args=(loglevel,
               {specs['bus'] for specs in storage_devices.values()},
+              set(storage_devices.keys()),
               True),
         name="logger_federate"
     )

@@ -34,8 +34,6 @@ class Storage(StorageDevice):
         self.bus = bus
         self._device_parameters = device_parameters
         self.state = state
-        self.kw = 0
-        self.kvar = 0
         self.pf = 0
         self._soc = initial_soc
         dssutil.run_command(
@@ -81,28 +79,27 @@ class Storage(StorageDevice):
         return dssutil.get_property(f"storage.{self.name}.{property}")
 
     def set_power(self, kw: float, kvar: float = None, pf: float = None):
-        # TODO prevent impossible states
-        #      (e.g. kw > 0, soc == 0/min, state=discharging)
         self._set('kW', kw)
         if pf is not None:
             self._set('pf', pf)
         if kvar is not None:
             self._set('kvar', kvar)
-        # XXX risk that these could get out of sync if an OpenDSSError is
-        #     raised when one of these is set. It may be a good idea to
-        #     query OpenDSS when these params are needed, rather than keeping
-        #     them cached here.
-        self.kw = kw
-        self.kvar = kvar
-        self.pf = pf
 
     @property
-    def soc(self):
-        return self._soc
+    def soc(self) -> float:
+        return float(self._get("%stored")) / 100.0
 
     @soc.setter
-    def soc(self, new_soc):
-        self._soc = new_soc
+    def soc(self, new_soc: float):
+        self._set("%stored", new_soc * 100)
+
+    @property
+    def kw(self):
+        return float(self._get("kw"))
+
+    @property
+    def kvar(self):
+        return float(self._get("kvar"))
 
     def get_kw_rated(self, state: StorageState) -> float:
         return float(self._get("kwrated"))
@@ -176,7 +173,8 @@ class DSSModel:
         dssdirect.Solution.Hour(hours)
         dssdirect.Solution.Seconds(seconds)
 
-    def next_update(self) -> float:
+    @staticmethod
+    def next_update() -> float:
         """Return the time of the next simulation step in seconds."""
         hour = dssdirect.Solution.Hour()
         return hour * 3600 + dssdirect.Solution.Seconds()
@@ -228,7 +226,8 @@ class DSSModel:
         self._storage[name] = device
         return device
 
-    def add_pvsystem(self, name: str, bus: str, phases: int,
+    @staticmethod
+    def add_pvsystem(name: str, bus: str, phases: int,
                      bus_kv: float, kva_rating: float, connection_type: str,
                      irrad_scale, pmpp_kw: float, temperature: float,
                      pf: float, profile_name: str):
@@ -273,7 +272,8 @@ class DSSModel:
             f" daily={profile_name}"
         )
 
-    def add_loadshape(self, name: str, file: PathLike,
+    @staticmethod
+    def add_loadshape(name: str, file: PathLike,
                       interval: float, npts: int):
         """Create a Load Shape in OpenDSS.
 
@@ -295,8 +295,8 @@ class DSSModel:
             f" csvfile={file}"
         )
 
-    def add_xycurve(self, name: str,
-                    x_values: List[float], y_values: List[float]):
+    @staticmethod
+    def add_xycurve(name: str, x_values: List[float], y_values: List[float]):
         """Create an XY curve in OpenDSS.
 
         Parameters
@@ -353,13 +353,15 @@ class DSSModel:
         """
         return self._storage.values()
 
-    def node_voltage(self, node):
+    @staticmethod
+    def node_voltage(node):
         """Return the voltage at `node` [pu]."""
         node_voltages = dict(zip(dssdirect.Circuit.AllNodeNames(),
                                  dssdirect.Circuit.AllBusMagPu()))
         return node_voltages[node]
 
-    def total_power(self):
+    @staticmethod
+    def total_power():
         """Return the total power on the circuit.
 
         Returns

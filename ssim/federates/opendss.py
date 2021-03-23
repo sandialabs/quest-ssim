@@ -28,6 +28,8 @@ class GridFederate:
         self._federate = federate
         self._storage_subs = {}
         self._voltage_pubs = {}
+        self._power_pubs = {}
+        self._soc_pubs = {}
         self._storage_devices = {}
         self._grid_model = model
         self._total_power_pub = self._federate.register_publication(
@@ -63,6 +65,16 @@ class GridFederate:
             HelicsDataType.DOUBLE,
             units="pu"
         )
+        self._power_pubs[device.name] = self._federate.register_publication(
+            f"power.{device.name}",
+            HelicsDataType.COMPLEX,
+            units="kW"
+        )
+        self._soc_pubs[device.name] = self._federate.register_publication(
+            f"soc.{device.name}",
+            HelicsDataType.DOUBLE,
+            units=""
+        )
 
     def _update_storage(self):
         for device, subs in self._storage_subs.items():
@@ -83,6 +95,16 @@ class GridFederate:
                 self._grid_model.node_voltage(device.bus)
             )
 
+    def _publish_storage_state(self):
+        """Publish power and state of charge for each storage device."""
+        for device in self._grid_model.storage_devices:
+            self._power_pubs[device.name].publish(
+                complex(device.kw, device.kvar)
+            )
+            self._soc_pubs[device.name].publish(
+                device.soc
+            )
+
     def step(self, time: float):
         """Step the opendss model to `time`.
 
@@ -95,6 +117,7 @@ class GridFederate:
         self._grid_model.solve(time)
         self._publish_power()
         self._publish_node_voltages()
+        self._publish_storage_state()
 
     def run(self, hours: float):
         """Run the simulation for `hours`."""
@@ -123,9 +146,6 @@ def run_opendss_federate(dss_file, storage_devices,
                         level=loglevel)
     logging.info("starting federate")
     logging.info(f"  {dss_file}")
-    # logging.info(f"  {storage_name}")
-    # logging.info(f"  {storage_bus}")
-    # logging.info(f"  {storage_params}")
     fedinfo = helicsCreateFederateInfo()
     fedinfo.core_name = "grid"
     fedinfo.core_type = "zmq"

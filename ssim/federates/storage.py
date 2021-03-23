@@ -189,7 +189,7 @@ class StorageControllerFederate:
 
 def run_storage_federate(devices, loglevel):
     logging.basicConfig(format="[storage] %(levelname)s - %(message)s",
-                        level=logging.DEBUG)
+                        level=loglevel)
     fedinfo = helicsCreateFederateInfo()
     fedinfo.core_name = "storage_controller"
     fedinfo.core_type = "zmq"

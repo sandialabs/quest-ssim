@@ -177,8 +177,68 @@ class VoltageLogger(HelicsLogger):
         pass
 
 
-def run_logger(loglevel, bus_voltage, show_plots=False):
-    logging.basicConfig(format="[PowerLogger] %(levelname)s - %(message)s",
+class StorageLogger(HelicsLogger):
+    """Logger for storage device state.
+
+    Records charging power, discharging power, and state of charge.
+
+    Parameters
+    ----------
+    device_names : Set[str]
+        Names of the devices to monitor.
+    """
+    def __init__(self, device_names):
+        self.device_names = device_names
+        self._soc_subs = None
+        self._power_subs = None
+        self.time = []
+        self.power_out = {device: [] for device in device_names}
+        self.power_in = {device: [] for device in device_names}
+        self.reactive_power = {device: [] for device in device_names}
+        self.soc = {device: [] for device in device_names}
+
+    def initialize(self, federate: HelicsValueFederate):
+        self._soc_subs = {
+            device: federate.register_subscription(
+                f"grid/soc.{device}"
+            )
+            for device in self.device_names
+        }
+        self._power_subs = {
+            device: federate.register_subscription(
+                f"grid/power.{device}",
+                "kW"
+            )
+            for device in self.device_names
+        }
+
+    def _log_soc(self):
+        for device, soc in self.soc.items():
+            soc.append(self._soc_subs[device].double)
+
+    def _log_power(self):
+        for device in self.device_names:
+            reactive_power = self._power_subs[device].complex.imag
+            active_power = self._power_subs[device].complex.real
+            self.power_in[device].append(
+                0 if active_power >= 0 else abs(active_power)
+            )
+            self.power_out[device].append(
+                0 if active_power <= 0 else active_power
+            )
+            self.reactive_power[device].append(reactive_power)
+
+    def log(self, time):
+        self.time.append(time)
+        self._log_soc()
+        self._log_power()
+
+    def finalize(self):
+        pass
+
+
+def run_logger(loglevel, bus_voltage, devices, show_plots=False):
+    logging.basicConfig(format="[HelicsLogger] %(levelname)s - %(message)s",
                         level=loglevel)
     logging.info("starting federate")
     fedinfo = helicsCreateFederateInfo()
@@ -191,8 +251,10 @@ def run_logger(loglevel, bus_voltage, show_plots=False):
     logging_federate = LoggingFederate(federate)
     power_logger = PowerLogger()
     voltage_logger = VoltageLogger(bus_voltage)
+    storage_logger = StorageLogger(devices)
     logging_federate.add_logger("power", power_logger)
     logging_federate.add_logger("voltage", voltage_logger)
+    logging_federate.add_logger("storage", storage_logger)
     logging_federate.initialize()
     logging_federate.run(1000)
     if show_plots:
@@ -212,4 +274,25 @@ def run_logger(loglevel, bus_voltage, show_plots=False):
         plt.ylabel("Voltage (PU)")
         plt.xlabel("time (s)")
         plt.legend()
+        for device in devices:
+            plt.figure()
+            plt.title(device)
+            plt.plot(
+                storage_logger.time,
+                storage_logger.power_in[device],
+                label='charging power'
+            )
+            plt.plot(
+                storage_logger.time,
+                storage_logger.power_out[device],
+                label='discharging power'
+            )
+            plt.plot(
+                storage_logger.time,
+                storage_logger.reactive_power[device],
+                label='reactive power (kVAR)'
+            )
+            plt.xlabel('time (s)')
+            plt.ylabel('Power (kW)')
+            plt.legend()
         plt.show()
