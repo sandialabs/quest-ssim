@@ -23,8 +23,7 @@ def _helics_broker():
         time.sleep(1)
 
 
-def run_simulation(opendss_file, storage_name, storage_bus,
-                   storage_kw_rated, storage_kwh_rated,
+def run_simulation(opendss_file, storage_devices,
                    loglevel=logging.WARN):
     """Simulate the performance of the grid with attached storage.
 
@@ -32,31 +31,37 @@ def run_simulation(opendss_file, storage_name, storage_bus,
     ----------
     opendss_file : PathLike
         Grid model file.
-    storage_name : str
-        Name of the attached storage device.
-    storage_bus : str
-        Bus where the storage device is connected.
-    storage_kw_rated : float
-        rated maximum power output from the storage device. [kW]
-    storage_kwh_rated : float
-        rated capacity of the storage device. [kWh]
+    storage_devices : dict
+        Dictionary keys are storage names, values are dictionaries with
+        keys 'kwhrated', 'kwrated', and 'bus' which specify the kWh rating,
+        the maximum kW rating, and the bus where the device is connected
+        respectively.
     """
     broker_process = Process(target=_helics_broker, name="broker")
     grid_process = Process(
         target=opendss.run_opendss_federate,
-        args=(opendss_file, storage_name, storage_bus,
-              {'kwrated': storage_kw_rated, 'kwhrated': storage_kwh_rated},
+        args=(opendss_file,
+              {storage_name:
+                  {'bus': specs['bus'],
+                   'params': {'kwrated': specs['kwrated'],
+                              'kwhrated': specs['kwhrated']}}
+               for storage_name, specs in storage_devices.items()},
               loglevel),
         name="grid_federate"
     )
     storage_process = Process(
         target=storage.run_storage_federate,
-        args=(storage_name, storage_kwh_rated, storage_kw_rated, loglevel),
+        args=({storage_name: {'kwhrated': specs['kwhrated'],
+                              'kwrated': specs['kwrated']}
+               for storage_name, specs in storage_devices.items()},
+              loglevel),
         name="storage_federate"
     )
     power_logger = Process(
         target=logger.run_logger,
-        args=(loglevel, {storage_bus}, True),
+        args=(loglevel,
+              {specs['bus'] for specs in storage_devices.values()},
+              True),
         name="logger_federate"
     )
     logging.info("starting broker")

@@ -9,7 +9,6 @@ from helics import (
 )
 
 from ssim.opendss import Storage, DSSModel
-from ssim.storage import StorageState
 
 
 class GridFederate:
@@ -107,7 +106,7 @@ class GridFederate:
             self.step(current_time)
 
 
-def run_opendss_federate(dss_file, storage_name, storage_bus, storage_params,
+def run_opendss_federate(dss_file, storage_devices,
                          loglevel=logging.INFO):
     """Start the OpenDSS federate.
 
@@ -115,20 +114,18 @@ def run_opendss_federate(dss_file, storage_name, storage_bus, storage_params,
     ----------
     dss_file : PathLike
         Name of the OpenDSS file containing the circuit definition.
-    storage_name : str
-        Name of a storage device connected to the simulation.
-    storage_bus : str
-        Name of the bus where the storage device is connected.
-    storage_params : dict
-        Storage device parameters.
+    storage_devices : dict
+        Dictionary keys are device names. Values are dictionaries with
+        two keys: 'bus' (the bus where the device is connected), and
+        'params' storage device parameters.
     """
     logging.basicConfig(format="[OpenDSS] %(levelname)s - %(message)s",
                         level=loglevel)
     logging.info("starting federate")
     logging.info(f"  {dss_file}")
-    logging.info(f"  {storage_name}")
-    logging.info(f"  {storage_bus}")
-    logging.info(f"  {storage_params}")
+    # logging.info(f"  {storage_name}")
+    # logging.info(f"  {storage_bus}")
+    # logging.info(f"  {storage_params}")
     fedinfo = helicsCreateFederateInfo()
     fedinfo.core_name = "grid"
     fedinfo.core_type = "zmq"
@@ -139,11 +136,12 @@ def run_opendss_federate(dss_file, storage_name, storage_bus, storage_params,
     logging.debug("federate created")
 
     model = DSSModel(dss_file)
-    storage_device = model.add_storage(
-        storage_name, storage_bus, 3, storage_params,
-        StorageState.DISCHARGING, initial_soc=0.5
-    )
-    storage_device.set_power(kw=10, kvar=0.0)
+    for name in storage_devices:
+        model.add_storage(
+            name, storage_devices[name]['bus'], 3,
+            storage_devices[name]['params']
+        )
+
     grid_federate = GridFederate(federate, model)
     federate.enter_executing_mode()
     grid_federate.run(1000)

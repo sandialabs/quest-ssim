@@ -1,6 +1,7 @@
 """Storage device federate"""
 from abc import ABC, abstractmethod
 import logging
+from typing import Dict
 
 from helics import (
     HelicsValueFederate,
@@ -33,11 +34,6 @@ class StorageController(ABC):
     def next_update(self) -> float:
         """Return the time of the next controller action in seconds."""
 
-    @property
-    @abstractmethod
-    def device_name(self) -> str:
-        """The name of the device being controlled"""
-
 
 class IdealStorageModel(StorageController):
     """A device that cycles between charging and discharging.
@@ -57,7 +53,7 @@ class IdealStorageModel(StorageController):
     soc_min : float, default 0.2
         Minimum state of charge for normal operation. Float between 0 and 1.
     """
-    def __init__(self, name: str, kwh_rated: float, kw_rated: float,
+    def __init__(self, kwh_rated: float, kw_rated: float,
                  initial_soc: float = None, soc_min: float = 0.2):
         if initial_soc is not None and 1 < initial_soc < 0:
             raise ValueError(f"`initial_soc` must be between 0 and 1"
@@ -74,13 +70,8 @@ class IdealStorageModel(StorageController):
         self.state = StorageState.IDLE
         self.power = 0.0
         self._last_step = 0.0
-        self._name = name
         self._charging_power = -kw_rated
         self._discharging_power = kw_rated
-
-    @property
-    def device_name(self):
-        return self._name
 
     @property
     def complex_power(self):
@@ -140,23 +131,48 @@ class IdealStorageModel(StorageController):
 
 
 class StorageControllerFederate:
-    """Simple storage device federate.
+    """A federate that controls storage devices.
 
-    Has a kWh rating and a maximum kW rating. Currently there
-    are no losses modeled (100% efficiency).
+    This federate manages the state of one or more storage devices.
+    Each device is identified by name and has a :py:class:`StorageController`
+    associated with it. When HELICS grants the federate a time, it will
+    call :py:meth:`StorageController.step` on each controller. The next time
+    requested by the federate is the minimum time returned by
+    :py:meth:`StorageController.next_update` from all controllers.
     """
     def __init__(self, federate: HelicsValueFederate,
-                 storage_model: StorageController):
-        self._model = storage_model
-        self._power_pub = federate.register_global_publication(
-            f"storage.{storage_model.device_name}.power",
-            HelicsDataType.COMPLEX,
-            units="kW"
-        )
+                 devices: Dict[str, StorageController]):
+        self._storage_devices = devices
+        self._power_pubs = {
+            device: federate.register_global_publication(
+                f"storage.{device}.power",
+                HelicsDataType.COMPLEX,
+                units="kW"
+            )
+            for device in devices
+        }
         self._federate = federate
         logging.debug("federate initialized")
 
-    def run(self, hours):
+    def _next_update(self):
+        """Return the time of the next update."""
+        return min(
+            device.next_update() for device in self._storage_devices.values()
+        )
+
+    def _step(self, time: float):
+        """Advance the controllers to `time`.
+
+        Parameters
+        ----------
+        time : float
+            Current time in seconds.
+        """
+        for device, controller in self._storage_devices.items():
+            power = controller.step(time)
+            self._power_pubs[device].publish(power)
+
+    def run(self, hours: float):
         """Step the federate.
 
         Parameters
@@ -166,22 +182,23 @@ class StorageControllerFederate:
         """
         time = 0
         while time < hours * 3600:
-            time = self._federate.request_time(self._model.next_update())
-            power = self._model.step(time)
-            self._power_pub.publish(power)
+            time = self._federate.request_time(self._next_update())
+            logging.debug("granted time %s", time)
+            self._step(time)
 
 
-def run_storage_federate(storage_name, kwh_rated, kw_rated, loglevel):
+def run_storage_federate(devices, loglevel):
     logging.basicConfig(format="[storage] %(levelname)s - %(message)s",
-                        level=loglevel)
+                        level=logging.DEBUG)
     fedinfo = helicsCreateFederateInfo()
-    fedinfo.core_name = storage_name
+    fedinfo.core_name = "storage_controller"
     fedinfo.core_type = "zmq"
     fedinfo.core_init = "-f1"
-    federate = helicsCreateValueFederate(storage_name, fedinfo)
-    storage = StorageControllerFederate(
-        federate, IdealStorageModel(storage_name, kwh_rated, kw_rated)
-    )
+    federate = helicsCreateValueFederate("storage_controller", fedinfo)
+    controllers = {name: IdealStorageModel(devices[name]['kwhrated'],
+                                           devices[name]['kwrated'])
+                   for name in devices}
+    storage = StorageControllerFederate(federate, controllers)
     logging.debug("entering executing mode")
     federate.enter_executing_mode()
     logging.debug("in executing mode")
