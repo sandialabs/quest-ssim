@@ -65,9 +65,34 @@ ssim.opendss
 
 .. automodule:: ssim.opendss
    :members:
+   :show-inheritance:
 
 ssim.dssutil
 ^^^^^^^^^^^^
 
 .. automodule:: ssim.dssutil
    :members:
+
+Federates
+---------
+
+ssim.federates.opendss
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: ssim.federates.opendss
+   :members:
+   :show-inheritance:
+
+ssim.federates.storage
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: ssim.federates.storage
+   :members:
+   :show-inheritance:
+
+ssim.federates.logger
+^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: ssim.federates.logger
+   :members:
+   :show-inheritance:
