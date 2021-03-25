@@ -25,24 +25,19 @@ class Storage(StorageDevice):
         sensitive
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
-    initial_soc : float, default 1.0
-        Initial state of charge as a fraction of the total capacity.
     """
     def __init__(self, name, bus, device_parameters, phases,
-                 state=StorageState.IDLE, initial_soc=1.0):
+                 state=StorageState.IDLE):
         self.name = name
         self.bus = bus
         self._device_parameters = device_parameters
         self.state = state
-        self.pf = 0
-        self._soc = initial_soc
         dssutil.run_command(
             f"New Storage.{name}"
             f" bus1={bus}"
             f" phases={phases}"
             f" dispmode=external"
             f" {self._make_dss_args(device_parameters)}"
-            f" %stored={initial_soc *  100}"
             f" state={state}"
         )
 
@@ -201,8 +196,7 @@ class DSSModel:
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
-                    state: StorageState = StorageState.IDLE,
-                    initial_soc: float = 1.0) -> Storage:
+                    state: StorageState = StorageState.IDLE) -> Storage:
         """Add a storage device to OpenDSS.
 
         Parameters
@@ -217,12 +211,8 @@ class DSSModel:
             Dictionary of additional OpenDSS storage device parameters.
         state : StorageState
             Initial operating state of the device.
-        initial_soc : float
-            Initial state of charge as a fraction of the capacity of the
-            device (0.0 being empty, 1.0 being full).
         """
-        device = Storage(name, bus, device_parameters, phases,
-                         state, initial_soc)
+        device = Storage(name, bus, device_parameters, phases, state)
         self._storage[name] = device
         return device
 
