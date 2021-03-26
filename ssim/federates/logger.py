@@ -295,4 +295,7 @@ def run_logger(loglevel, bus_voltage, devices, hours, show_plots=False):
             plt.xlabel('time (s)')
             plt.ylabel('Power (kW)')
             plt.legend()
+            plt.figure()
+            plt.title(device + " SOC")
+            plt.plot(storage_logger.time, storage_logger.soc[device])
         plt.show()
