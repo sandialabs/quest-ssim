@@ -139,6 +139,10 @@ class PowerLogger(HelicsLogger):
             self._total_power.complex.imag
         )
 
+    @property
+    def time_hours(self):
+        return list(map(lambda x: x / 3600, self.time))
+
     def finalize(self):
         pass
 
@@ -172,6 +176,10 @@ class VoltageLogger(HelicsLogger):
             self.bus_voltage[bus].append(
                 self._voltage_subs[bus].double
             )
+
+    @property
+    def time_hours(self):
+        return list(map(lambda x: x / 3600, self.time))
 
     def finalize(self):
         pass
@@ -211,6 +219,10 @@ class StorageLogger(HelicsLogger):
             )
             for device in self.device_names
         }
+
+    @property
+    def time_hours(self):
+        return list(map(lambda x: x / 3600, self.time))
 
     def _log_soc(self):
         for device, soc in self.soc.items():
@@ -259,16 +271,16 @@ def run_logger(loglevel, bus_voltage, devices, hours, show_plots=False):
     logging_federate.run(hours)
     if show_plots:
         plt.figure()
-        plt.plot(power_logger.time, power_logger.active_power,
+        plt.plot(power_logger.time_hours, power_logger.active_power,
                  label="active power")
-        plt.plot(power_logger.time, power_logger.reactive_power,
+        plt.plot(power_logger.time_hours, power_logger.reactive_power,
                  label="reactive power")
         plt.ylabel("Power (kW)")
         plt.xlabel("time (s)")
         plt.legend()
         plt.figure()
         for bus in voltage_logger.bus_voltage:
-            plt.plot(voltage_logger.time,
+            plt.plot(voltage_logger.time_hours,
                      voltage_logger.bus_voltage[bus],
                      label=bus)
         plt.ylabel("Voltage (PU)")
@@ -278,17 +290,17 @@ def run_logger(loglevel, bus_voltage, devices, hours, show_plots=False):
             plt.figure()
             plt.title(device)
             plt.plot(
-                storage_logger.time,
+                storage_logger.time_hours,
                 storage_logger.power_in[device],
                 label='charging power'
             )
             plt.plot(
-                storage_logger.time,
+                storage_logger.time_hours,
                 storage_logger.power_out[device],
                 label='discharging power'
             )
             plt.plot(
-                storage_logger.time,
+                storage_logger.time_hours,
                 storage_logger.reactive_power[device],
                 label='reactive power (kVAR)'
             )
@@ -297,5 +309,5 @@ def run_logger(loglevel, bus_voltage, devices, hours, show_plots=False):
             plt.legend()
             plt.figure()
             plt.title(device + " SOC")
-            plt.plot(storage_logger.time, storage_logger.soc[device])
+            plt.plot(storage_logger.time_hours, storage_logger.soc[device])
         plt.show()
