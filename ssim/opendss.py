@@ -360,7 +360,7 @@ class DSSModel:
     @staticmethod
     def positive_sequence_voltage(bus):
         """Return positive sequence voltage at `bus` [pu]."""
-        dssdirect.Circuit.SetActiveBus(bus)
+        dssdirect.Circuit.SetActiveBus(bus.split('.')[0])  # remove node names
         zero, positive, negative = dssdirect.Bus.SeqVoltages()
         return positive / (dssdirect.Bus.kVBase() * 1000)
 
