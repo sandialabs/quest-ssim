@@ -59,8 +59,7 @@ def test_DSSModel_storage(test_circuit):
         "TestStorage",
         "loadbus1",
         3,
-        {"kwhrated": 5000, "kwrated": 1000, "kv": 12.47},
-        initial_soc=0.5,
+        {"kwhrated": 5000, "kwrated": 1000, "kv": 12.47, "%stored": 50},
         state=opendss.StorageState.DISCHARGING
     )
     test_circuit.update_storage("TestStorage", 0.0, 0)

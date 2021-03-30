@@ -143,11 +143,12 @@ class DSSModel:
     def __init__(self, dss_file, loadshape_class=LoadShapeClass.DAILY):
         dssutil.load_model(dss_file)
         dssutil.run_command(
-            "set mode=time controlmode=time number=1"
+            "set mode=time controlmode=time number=1 stepsize=15m"
         )
         self.loadshapeclass = loadshape_class
         self._last_solution_time = None
         self._storage = {}
+        self._max_step = 15 * 60  # 15 minutes
 
     @property
     def loadshapeclass(self) -> LoadShapeClass:
@@ -168,11 +169,15 @@ class DSSModel:
         dssdirect.Solution.Hour(hours)
         dssdirect.Solution.Seconds(seconds)
 
-    @staticmethod
-    def next_update() -> float:
-        """Return the time of the next simulation step in seconds."""
+    @property
+    def current_time(self):
+        """The current OpenDSS time in seconds."""
         hour = dssdirect.Solution.Hour()
         return hour * 3600 + dssdirect.Solution.Seconds()
+
+    def next_update(self) -> float:
+        """Return the time of the next simulation step in seconds."""
+        return self.current_time + self._max_step
 
     def last_update(self) -> Optional[float]:
         """Return the time of the most recent power flow calculation."""
@@ -188,8 +193,10 @@ class DSSModel:
             is solved at the current time in OpenDSS. [seconds]
         """
         if time is not None:
+            time_delta = time - (self._last_solution_time or 0)
+            dssutil.run_command(f"set stepsize={time_delta}s")
             self._set_time(time)
-        solution_time = self.next_update()
+        solution_time = self.current_time
         dssdirect.Solution.Solve()
         dssdirect.Circuit.SaveSample()
         self._last_solution_time = solution_time
@@ -353,7 +360,7 @@ class DSSModel:
     @staticmethod
     def positive_sequence_voltage(bus):
         """Return positive sequence voltage at `bus` [pu]."""
-        dssdirect.Circuit.SetActiveBus(bus)
+        dssdirect.Circuit.SetActiveBus(bus.split('.')[0])  # remove node names
         zero, positive, negative = dssdirect.Bus.SeqVoltages()
         return positive / (dssdirect.Bus.kVBase() * 1000)
 

@@ -7,7 +7,11 @@ from helics import (
     HelicsValueFederate,
     HelicsDataType,
     helicsCreateFederateInfo,
-    helicsCreateValueFederate
+    helicsCreateValueFederate,
+    helics_time_maxtime,
+    helicsInputSetOption,
+    helics_handle_option_only_update_on_change,
+    helicsInputSetMinimumChange
 )
 
 from ssim.storage import StorageState
@@ -16,13 +20,15 @@ from ssim.storage import StorageState
 class StorageController(ABC):
     """Base class for storage controllers."""
     @abstractmethod
-    def step(self, time: float) -> complex:
+    def step(self, time: float, voltage: float) -> complex:
         """Step the model to `time`.
 
         Parameters
         ----------
         time : float
             Current time in seconds.
+        voltage : float
+            Voltage at the bus where the device is connected. [pu]
 
         Returns
         -------
@@ -33,6 +39,35 @@ class StorageController(ABC):
     @abstractmethod
     def next_update(self) -> float:
         """Return the time of the next controller action in seconds."""
+
+
+class DroopController(StorageController):
+    """Storage droop control.
+
+    Parameters
+    ----------
+    p_droop : float
+        Active power droop constant.
+    q_droop : float
+        Reactive power droop constant.
+    reference_voltage : float, default 1.0
+        Reference voltage. [PU]
+    """
+    def __init__(self, p_droop: float, q_droop: float,
+                 reference_voltage: float = 1.0):
+        self._p_droop = p_droop
+        self._q_droop = q_droop
+        self._reference_voltage = reference_voltage
+        self._last_output = None
+
+    def step(self, time, voltage):
+        p = (self._reference_voltage - voltage) * self._p_droop
+        q = (self._reference_voltage - voltage) * self._q_droop
+        return complex(p, q)
+
+    def next_update(self) -> float:
+        # only changes state when the voltage changes.
+        return helics_time_maxtime - 1
 
 
 class IdealStorageModel(StorageController):
@@ -114,7 +149,7 @@ class IdealStorageModel(StorageController):
             self.state = StorageState.CHARGING
             self.power = self._charging_power
 
-    def step(self, time):
+    def step(self, time, voltage):
         if self.state is StorageState.IDLE:
             if self._soc <= self._soc_min:
                 self.state = StorageState.CHARGING
@@ -141,7 +176,8 @@ class StorageControllerFederate:
     :py:meth:`StorageController.next_update` from all controllers.
     """
     def __init__(self, federate: HelicsValueFederate,
-                 devices: Dict[str, StorageController]):
+                 devices: Dict[str, StorageController],
+                 busses: Dict[str, str]):
         self._storage_devices = devices
         self._power_pubs = {
             device: federate.register_global_publication(
@@ -151,13 +187,31 @@ class StorageControllerFederate:
             )
             for device in devices
         }
+        self._voltage_subs = {
+            device: federate.register_subscription(
+                f"grid/voltage.{bus}"
+            )
+            for device, bus in busses.items()
+        }
+        # Only update the voltage values if they have changed significantly.
+        # This prevents us from getting stuck iterating at very small time
+        # steps because of meaningless variation in the output of the power
+        # flow calculation.
+        for sub in self._voltage_subs.values():
+            helicsInputSetOption(
+                sub,
+                helics_handle_option_only_update_on_change,
+                True
+            )
+            helicsInputSetMinimumChange(sub, 1e-8)
         self._federate = federate
         logging.debug("federate initialized")
 
     def _next_update(self):
         """Return the time of the next update."""
         return min(
-            device.next_update() for device in self._storage_devices.values()
+            controller.next_update()
+            for controller in self._storage_devices.values()
         )
 
     def _step(self, time: float):
@@ -169,7 +223,15 @@ class StorageControllerFederate:
             Current time in seconds.
         """
         for device, controller in self._storage_devices.items():
-            power = controller.step(time)
+            # Only update the controllers if the voltage has changed
+            # or the time of the next update has arrived.
+            if not (self._voltage_subs[device].is_updated()
+                    or time >= controller.next_update()):
+                continue
+            voltage = self._voltage_subs[device].double
+            power = controller.step(time, voltage)
+            logging.info("updating device %s: voltage=%s power=%s",
+                         device, voltage, power)
             self._power_pubs[device].publish(power)
 
     def run(self, hours: float):
@@ -195,10 +257,9 @@ def run_storage_federate(devices, hours, loglevel):
     fedinfo.core_type = "zmq"
     fedinfo.core_init = "-f1"
     federate = helicsCreateValueFederate("storage_controller", fedinfo)
-    controllers = {name: IdealStorageModel(devices[name]['kwhrated'],
-                                           devices[name]['kwrated'])
-                   for name in devices}
-    storage = StorageControllerFederate(federate, controllers)
+    controllers = {name: DroopController(5000, -500) for name in devices}
+    busses = {name: devices[name]['bus'] for name in devices}
+    storage = StorageControllerFederate(federate, controllers, busses)
     logging.debug("entering executing mode")
     federate.enter_executing_mode()
     logging.debug("in executing mode")

@@ -45,8 +45,9 @@ def run_simulation(opendss_file, storage_devices, hours,
         args=(opendss_file,
               {storage_name:
                   {'bus': specs['bus'],
-                   'params': {'kwrated': specs['kwrated'],
-                              'kwhrated': specs['kwhrated']}}
+                   'params': {param: value
+                              for param, value in specs.items()
+                              if param != 'bus'}}
                for storage_name, specs in storage_devices.items()},
               hours,
               loglevel),
@@ -54,9 +55,7 @@ def run_simulation(opendss_file, storage_devices, hours,
     )
     storage_process = Process(
         target=storage.run_storage_federate,
-        args=({storage_name: {'kwhrated': specs['kwhrated'],
-                              'kwrated': specs['kwrated']}
-               for storage_name, specs in storage_devices.items()},
+        args=(storage_devices,
               hours,
               loglevel),
         name="storage_federate"
