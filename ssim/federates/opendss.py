@@ -93,7 +93,7 @@ class GridFederate:
         for device in self._storage_devices.values():
             self._voltage_pubs[device.bus].publish(
                 self._grid_model.positive_sequence_voltage(
-                    device.bus.split('.')[0]
+                    device.bus.split('.')[0]  # remove node names
                 )
             )
 
