@@ -210,7 +210,8 @@ class StorageControllerFederate:
     def _next_update(self):
         """Return the time of the next update."""
         return min(
-            device.next_update() for device in self._storage_devices.values()
+            controller.next_update()
+            for controller in self._storage_devices.values()
         )
 
     def _step(self, time: float):
@@ -222,14 +223,15 @@ class StorageControllerFederate:
             Current time in seconds.
         """
         for device, controller in self._storage_devices.items():
-            if not self._voltage_subs[device].is_updated():
-                # If the voltage has not changed then don't update
-                # the device.
-                #
-                # XXX This breaks the "IdealStorageModel"?
+            # Only update the controllers if the voltage has changed
+            # or the time of the next update has arrived.
+            if not (self._voltage_subs[device].is_updated()
+                    or time >= controller.next_update()):
                 continue
             voltage = self._voltage_subs[device].double
             power = controller.step(time, voltage)
+            logging.info("updating device %s: voltage=%s power=%s",
+                         device, voltage, power)
             self._power_pubs[device].publish(power)
 
     def run(self, hours: float):
