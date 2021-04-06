@@ -365,6 +365,25 @@ class DSSModel:
         return positive / (dssdirect.Bus.kVBase() * 1000)
 
     @staticmethod
+    def complex_voltage(bus):
+        """Return a list of complex voltages of each node at 'bus' [pu]. """
+        dssdirect.Circuit.SetActiveBus(bus)
+        pu_voltages = dssdirect.Bus.PuVoltage()
+        complex_voltages = []
+        if len(pu_voltages) == 6:  # 3-phase bus
+            complex_voltages = [complex(pu_voltages[0], pu_voltages[1]),
+                                complex(pu_voltages[2], pu_voltages[3]),
+                                complex(pu_voltages[4], pu_voltages[5]), ]
+        elif len(pu_voltages) == 4:  # 2-phase bus (L-L connection)
+            complex_voltages = [complex(pu_voltages[0], pu_voltages[1]),
+                                complex(pu_voltages[2], pu_voltages[3]), ]
+        elif len(pu_voltages) == 2:  # 1-phase bus
+            complex_voltages = [complex(pu_voltages[0], pu_voltages[1])]
+
+        return complex_voltages
+
+
+    @staticmethod
     def total_power():
         """Return the total power on the circuit.
 
