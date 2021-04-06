@@ -351,11 +351,16 @@ class DSSModel:
         return self._storage.values()
 
     @staticmethod
-    def node_voltage(node):
-        """Return the voltage at `node` [pu]."""
-        node_voltages = dict(zip(dssdirect.Circuit.AllNodeNames(),
-                                 dssdirect.Circuit.AllBusMagPu()))
-        return node_voltages[node]
+    def node_voltage(bus):
+        """Return a list of node voltage magnitudes at `bus` [pu]."""
+        dssdirect.Circuit.SetActiveBus(bus)
+        voltages = dssdirect.Bus.VMagAngle()
+        node_voltages = []
+        for v in range(len(voltages)):
+            if (v % 2) == 0:  # every other element (i.e., ignore angles)
+                node_voltages.append(voltages[v] / (dssdirect.Bus.kVBase()
+                                                    * 1000))
+        return node_voltages
 
     @staticmethod
     def positive_sequence_voltage(bus):
