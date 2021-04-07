@@ -1,4 +1,5 @@
 """Interface for devices that are part of an OpenDSS model."""
+from __future__ import annotations
 import enum
 import math
 from os import PathLike
@@ -6,6 +7,7 @@ from typing import Any, List, Dict, Optional
 
 import opendssdirect as dssdirect
 
+from ssim.grid import GridSpecification, StorageSpecification
 from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
 
@@ -96,7 +98,8 @@ class Storage(StorageDevice):
     def kvar(self):
         return float(self._get("kvar"))
 
-    def get_kw_rated(self, state: StorageState) -> float:
+    @property
+    def kw_rated(self) -> float:
         return float(self._get("kwrated"))
 
     @property
@@ -138,17 +141,62 @@ class LoadShapeClass(enum.Enum):
         return cls(value.lower())
 
 
+def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
+    """Return a dictionary of opendss storage object parameters.
+
+    Extracts the parameters from the storage specification and returns a
+    dictionary with keys that are the corresponding names of the opendss
+    storage object parameters. Parameters 'bus' and 'phases' are excluded
+    from the returned dictionary.
+
+    Returns
+    -------
+    dict
+        Dictionary with str keys that are names of opendss Storage Object
+        paramters.
+    """
+    params = {'kwhrated': storage_spec.kwh_rated,
+              'kwrated': storage_spec.kw_rated}
+    return {**params, **storage_spec.params}
+
+
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
-    def __init__(self, dss_file, loadshape_class=LoadShapeClass.DAILY):
+    def __init__(self,
+                 dss_file: PathLike,
+                 loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
         dssutil.load_model(dss_file)
         dssutil.run_command(
-            "set mode=time controlmode=time number=1 stepsize=15m"
+            "set mode=time controlmode=time number=1 stepsize=15s"
         )
         self.loadshapeclass = loadshape_class
         self._last_solution_time = None
         self._storage = {}
-        self._max_step = 15 * 60  # 15 minutes
+        self._max_step = 15  # 15 minutes
+
+    @classmethod
+    def from_grid_spec(cls, gridspec: GridSpecification) -> DSSModel:
+        """Construct an DSSModel from a grid specification.
+
+        Parameters
+        ----------
+        gridspec : GridSpecification
+            Grid specification.
+
+        Returns
+        -------
+        DSSModel
+            An opendss grid model that matches the specification in `gridspec`.
+        """
+        model = DSSModel(gridspec.file)
+        for storage_device in gridspec.storage_devices:
+            model.add_storage(
+                storage_device.name,
+                storage_device.bus,
+                storage_device.phases,
+                _opendss_storage_params(storage_device)
+            )
+        return model
 
     @property
     def loadshapeclass(self) -> LoadShapeClass:
@@ -348,7 +396,7 @@ class DSSModel:
         model, only those that were added with
         :py:meth:`DSSModel.add_storage`.
         """
-        return self._storage.values()
+        return self._storage
 
     @staticmethod
     def node_voltage(node):

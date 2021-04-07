@@ -5,9 +5,9 @@ from typing import Set, List
 from helics import (
     HelicsFederate,
     HelicsValueFederate,
-    helicsCreateFederateInfo,
-    helicsCreateValueFederate,
-    helics_time_maxtime
+    helics_time_maxtime,
+    HelicsFederateInfo,
+    helicsCreateValueFederate
 )
 
 import matplotlib.pyplot as plt
@@ -252,68 +252,96 @@ def to_hours(seconds: List[float]) -> List[float]:
     return list(map(lambda x: x / 3600, seconds))
 
 
-def run_logger(loglevel, bus_voltage, devices, hours, show_plots=False):
-    logging.basicConfig(format="[HelicsLogger] %(levelname)s - %(message)s",
-                        level=loglevel)
-    logging.info("starting federate")
-    fedinfo = helicsCreateFederateInfo()
-    fedinfo.core_name = "power_logger"
-    fedinfo.core_type = "zmq"
-    fedinfo.core_init = "-f1"
-    logging.debug(f"federate info: {fedinfo}")
-    federate = helicsCreateValueFederate("power_logger", fedinfo)
-    logging.debug("federate created")
-    logging_federate = LoggingFederate(federate)
+def run_federate(name: str,
+                 fedinfo: HelicsFederateInfo,
+                 busses: Set[str],
+                 storage_devices: Set[str],
+                 hours: float,
+                 show_plots: bool):
+    """Run a logging federate as `federate`.
+
+    Parameters
+    ----------
+    name : str
+        Federate name.
+    fedinfo : HelicsFederateInfo
+        Federate info structure to use for initializing the federate.
+    busses : Set[str]
+        Names of busses at which voltage is to be logged.
+    storage_devices : Set[str]
+        Names of storage devices to monitor.
+    hours : float
+        Number of hours to run before exiting.
+    show_plots : bool
+        If true figures are displayed for each logger before exiting.
+    """
+    federate = helicsCreateValueFederate(name, fedinfo)
+    logging.debug("federate: %s", federate)
+    logging.debug("busses: %s", busses)
+    logging.debug("storage: %s", storage_devices)
     power_logger = PowerLogger()
-    voltage_logger = VoltageLogger(bus_voltage)
-    storage_logger = StorageLogger(devices)
+    voltage_logger = VoltageLogger(busses)
+    storage_logger = StorageLogger(storage_devices)
+    logging_federate = LoggingFederate(federate)
     logging_federate.add_logger("power", power_logger)
     logging_federate.add_logger("voltage", voltage_logger)
     logging_federate.add_logger("storage", storage_logger)
     logging_federate.initialize()
     logging_federate.run(hours)
     if show_plots:
-        plt.figure()
-        plt.plot(to_hours(power_logger.time), power_logger.active_power,
-                 label="active power")
-        plt.plot(to_hours(power_logger.time), power_logger.reactive_power,
-                 label="reactive power")
-        plt.ylabel("Power (kW)")
-        plt.xlabel("time (s)")
-        plt.legend()
-        plt.figure()
-        for bus in voltage_logger.bus_voltage:
-            plt.plot(to_hours(voltage_logger.time),
-                     voltage_logger.bus_voltage[bus],
-                     label=bus)
-        plt.ylabel("Voltage (PU)")
-        plt.xlabel("time (s)")
-        plt.legend()
-        for device in devices:
-            plt.figure()
-            plt.title(device)
-            plt.plot(
-                to_hours(storage_logger.time),
-                storage_logger.power_in[device],
-                label='charging power'
-            )
-            plt.plot(
-                to_hours(storage_logger.time),
-                storage_logger.power_out[device],
-                label='discharging power'
-            )
-            plt.plot(
-                to_hours(storage_logger.time),
-                storage_logger.reactive_power[device],
-                label='reactive power (kVAR)'
-            )
-            plt.xlabel('time (s)')
-            plt.ylabel('Power (kW)')
-            plt.legend()
-            plt.figure()
-            plt.title(device + " SOC")
-            plt.plot(
-                to_hours(storage_logger.time),
-                storage_logger.soc[device]
-            )
+        _power_plot(power_logger)
+        _voltage_plot(voltage_logger)
+        _storage_plots(storage_logger)
         plt.show()
+
+
+def _power_plot(power_logger: PowerLogger):
+    plt.figure()
+    plt.plot(to_hours(power_logger.time), power_logger.active_power,
+             label="active power")
+    plt.plot(to_hours(power_logger.time), power_logger.reactive_power,
+             label="reactive power")
+    plt.ylabel("Power (kW)")
+    plt.xlabel("time (h)")
+    plt.legend()
+
+
+def _voltage_plot(voltage_logger: VoltageLogger):
+    plt.figure()
+    for bus in voltage_logger.bus_voltage:
+        plt.plot(to_hours(voltage_logger.time),
+                 voltage_logger.bus_voltage[bus],
+                 label=bus)
+    plt.ylabel("Voltage (PU)")
+    plt.xlabel("time (h)")
+    plt.legend()
+
+
+def _storage_plots(storage_logger: StorageLogger):
+    for device in storage_logger.device_names:
+        plt.figure()
+        plt.title(device)
+        plt.plot(
+            to_hours(storage_logger.time),
+            storage_logger.power_in[device],
+            label='charging power'
+        )
+        plt.plot(
+            to_hours(storage_logger.time),
+            storage_logger.power_out[device],
+            label='discharging power'
+        )
+        plt.plot(
+            to_hours(storage_logger.time),
+            storage_logger.reactive_power[device],
+            label='reactive power (kVAR)'
+        )
+        plt.xlabel('time (h)')
+        plt.ylabel('Power (kW)')
+        plt.legend()
+        plt.figure()
+        plt.title(device + " SOC")
+        plt.plot(
+            to_hours(storage_logger.time),
+            storage_logger.soc[device]
+        )
