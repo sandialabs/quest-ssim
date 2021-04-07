@@ -4,10 +4,11 @@ import logging
 from helics import (
     HelicsValueFederate,
     HelicsDataType,
-    helicsCreateFederateInfo,
+    HelicsFederateInfo,
     helicsCreateValueFederate
 )
 
+from ssim.grid import GridSpecification
 from ssim.opendss import Storage, DSSModel
 
 
@@ -37,14 +38,11 @@ class GridFederate:
             HelicsDataType.COMPLEX,
             units="kW"
         )
-        self._load_multiplier_sub = self._federate.register_subscription(
-            "load_multiplier",
-        )
         self._configure_storage()
 
     def _configure_storage(self):
         """Configure publications and subscriptions for a storage deveice."""
-        for storage_device in self._grid_model.storage_devices:
+        for storage_device in self._grid_model.storage_devices.values():
             self._configure_storage_inputs(storage_device)
             self._configure_storage_outputs(storage_device)
             self._storage_devices[storage_device.name] = storage_device
@@ -97,11 +95,11 @@ class GridFederate:
 
     def _publish_storage_state(self):
         """Publish power and state of charge for each storage device."""
-        for device in self._grid_model.storage_devices:
-            self._power_pubs[device.name].publish(
+        for name, device in self._grid_model.storage_devices.items():
+            self._power_pubs[name].publish(
                 complex(device.kw, device.kvar)
             )
-            self._soc_pubs[device.name].publish(
+            self._soc_pubs[name].publish(
                 device.soc
             )
 
@@ -129,43 +127,25 @@ class GridFederate:
             self.step(current_time)
 
 
-def run_opendss_federate(dss_file, storage_devices, hours,
-                         loglevel=logging.INFO):
-    """Start the OpenDSS federate.
+def run_federate(name: str,
+                 fedinfo: HelicsFederateInfo,
+                 grid: GridSpecification,
+                 hours: float):
+    """Run the grid federate.
 
     Parameters
     ----------
-    dss_file : PathLike
-        Name of the OpenDSS file containing the circuit definition.
-    storage_devices : dict
-        Dictionary keys are device names. Values are dictionaries with
-        two keys: 'bus' (the bus where the device is connected), and
-        'params' storage device parameters.
+    name : str
+        Federate name
+    fedinfo : HelicsFederateInfo
+        Federate info structure to use when initializing the federate.
+    grid : GridSpecification
+        Grid specification to use when building the grid model.
     hours : float
-        Amount of time to simulate. [hours]
-    loglevel : logging.Level
-        Log level.
+        How many hours to run.
     """
-    logging.basicConfig(format="[OpenDSS] %(levelname)s - %(message)s",
-                        level=loglevel)
-    logging.info("starting federate")
-    logging.info(f"  {dss_file}")
-    fedinfo = helicsCreateFederateInfo()
-    fedinfo.core_name = "grid"
-    fedinfo.core_type = "zmq"
-    fedinfo.core_init = "-f1"
-    logging.debug(f"federate info: {fedinfo}")
-
-    federate = helicsCreateValueFederate("grid", fedinfo)
-    logging.debug("federate created")
-
-    model = DSSModel(dss_file)
-    for name in storage_devices:
-        model.add_storage(
-            name, storage_devices[name]['bus'], 3,
-            storage_devices[name]['params']
-        )
-
+    federate = helicsCreateValueFederate(name, fedinfo)
+    model = DSSModel.from_grid_spec(grid)
     grid_federate = GridFederate(federate, model)
     federate.enter_executing_mode()
     grid_federate.run(hours)

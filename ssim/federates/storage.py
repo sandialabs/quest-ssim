@@ -1,19 +1,22 @@
 """Storage device federate"""
 from abc import ABC, abstractmethod
 import logging
-from typing import Dict
+from typing import Dict, List
 
 from helics import (
     HelicsValueFederate,
     HelicsDataType,
-    helicsCreateFederateInfo,
-    helicsCreateValueFederate,
     helics_time_maxtime,
     helicsInputSetOption,
     helics_handle_option_only_update_on_change,
-    helicsInputSetMinimumChange
+    helicsInputSetMinimumChange,
+    HelicsFederateInfo,
+    helicsFederateInfoSetTimeProperty,
+    helics_property_time_delta,
+    helicsCreateValueFederate
 )
 
+from ssim.grid import StorageSpecification
 from ssim.storage import StorageState
 
 
@@ -249,21 +252,40 @@ class StorageControllerFederate:
             self._step(time)
 
 
-def run_storage_federate(devices, hours, loglevel):
-    logging.basicConfig(format="[storage] %(levelname)s - %(message)s",
-                        level=loglevel)
-    fedinfo = helicsCreateFederateInfo()
-    fedinfo.core_name = "storage_controller"
-    fedinfo.core_type = "zmq"
-    fedinfo.core_init = "-f1"
-    federate = helicsCreateValueFederate("storage_controller", fedinfo)
-    controllers = {name: DroopController(5000, -500) for name in devices}
-    busses = {name: devices[name]['bus'] for name in devices}
-    storage = StorageControllerFederate(federate, controllers, busses)
+def run_federate(name: str,
+                 fedinfo: HelicsFederateInfo,
+                 devices: List[StorageSpecification],
+                 hours: float):
+    """Run `federate` as a storage control federate.
+
+    Parameters
+    ----------
+    name : str
+        Federate name
+    fedinfo : HelicsFederateInfo
+        Federate info structure to use for initializing the federate.
+    devices : List[StorageSpecification]
+        Storage devices that are controlled by this federate.
+    hours : float
+        Number of hours to run before exiting.
+    """
+    helicsFederateInfoSetTimeProperty(
+        fedinfo, helics_property_time_delta, 0.01
+    )
+    federate = helicsCreateValueFederate(name, fedinfo)
+    controllers = {device.name: DroopController(5000, -500)
+                   for device in devices}
+    busses = {device.name: device.bus for device in devices}
+    logging.debug("devices: %s", busses.items())
+    storage_controller = StorageControllerFederate(
+        federate,
+        controllers,
+        busses
+    )
     logging.debug("entering executing mode")
     federate.enter_executing_mode()
-    logging.debug("in executing mode")
-    storage.run(hours)
+    logging.debug("running...")
+    storage_controller.run(hours)
     logging.debug("finalizing")
     federate.finalize()
-    logging.debug("done")
+    logging.debug("exiting")

@@ -3,7 +3,7 @@ import os.path
 from pathlib import Path
 import pytest
 import opendssdirect as dssdirect
-from ssim import opendss, dssutil
+from ssim import opendss, dssutil, grid
 
 
 @pytest.fixture(scope='function')
@@ -99,3 +99,41 @@ def test_DSSModel_add_xycurve(test_circuit):
     assert dssdirect.XYCurves.Npts() == 3
     assert dssdirect.XYCurves.XArray() == [0, 0.5, 1.0]
     assert dssdirect.XYCurves.YArray() == [1.0, 1.5, 2.0]
+
+
+def test_DSSModel_from_gridspec(data_dir):
+    spec = grid.GridSpecification(data_dir / "test_circuit.dss")
+    model = opendss.DSSModel.from_grid_spec(spec)
+    assert len(model.storage_devices) == 0
+    spec = grid.GridSpecification(data_dir / "test_circuit.dss")
+    del model
+    dssutil.run_command("clear")
+    spec.add_storage(
+        grid.StorageSpecification(
+            name="S1",
+            bus="loadbus1",
+            kwh_rated=1000,
+            kw_rated=100,
+            phases=3,
+            params={"%stored": 11}
+        )
+    )
+    spec.add_storage(
+        grid.StorageSpecification(
+            name="S2",
+            bus="loadbus2.1.2",
+            kwh_rated=2000,
+            kw_rated=200,
+            phases=2,
+            params={"%stored": 22}
+        )
+    )
+    model = opendss.DSSModel.from_grid_spec(spec)
+    assert len(model.storage_devices) == 2
+    assert model.storage_devices["S1"].soc == pytest.approx(0.11)
+    assert model.storage_devices["S1"].kwh_rated == 1000
+    assert model.storage_devices["S1"].kw_rated == 100
+    assert model.storage_devices["S2"].soc == pytest.approx(0.22)
+    assert model.storage_devices["S2"].kwh_rated == 2000
+    assert model.storage_devices["S2"].kw_rated == 200
+    assert dssutil.get_property("storage.S2.phases") == '2'
