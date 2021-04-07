@@ -53,6 +53,18 @@ def test_DSSModel_node_voltage(test_circuit):
     test_circuit.solve(10*3600)
     assert voltage != pytest.approx(test_circuit.node_voltage('loadbus1'))
 
+def test_DSSModel_positive_sequence_voltage(test_circuit):
+    test_circuit.solve(0)
+    voltage = test_circuit.positive_sequence_voltage('loadbus1')
+    test_circuit.solve(10*3600)
+    assert voltage != pytest.approx(test_circuit.
+                                    positive_sequence_voltage('loadbus1'))
+
+def test_DSSModel_complex_voltage(test_circuit):
+    test_circuit.solve(0)
+    voltage = test_circuit.complex_voltage('loadbus1')
+    test_circuit.solve(10 * 3600)
+    assert voltage != pytest.approx(test_circuit.complex_voltage('loadbus1'))
 
 def test_DSSModel_storage(test_circuit):
     test_circuit.add_storage(
