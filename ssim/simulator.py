@@ -248,6 +248,7 @@ def run_simulation(opendss_file, storage_devices, hours,
                 kwh_rated=specs.pop('kwhrated'),
                 kw_rated=specs.pop('kwrated'),
                 phases=specs.pop('phases', 3),
+                soc=specs.pop('%stored', 50) / 100,
                 controller=specs.pop('controller', 'droop'),
                 controller_params=specs.pop('controller_params', {}),
                 params=specs

@@ -30,6 +30,9 @@ class StorageSpecification:
     #: Number of phases to which the device is connected.
     phases: int = 3
 
+    #: State of charge (between 0 and 1).
+    soc: float = field(default=1.0)
+
     #: Additional storage parameters passed to the grid model.
     params: dict = field(default_factory=dict)
 

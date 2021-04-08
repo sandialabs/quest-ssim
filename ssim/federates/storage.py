@@ -81,7 +81,7 @@ class DroopController(StorageController):
         return helics_time_maxtime - 1
 
 
-class IdealStorageModel(StorageController):
+class CycleController(StorageController):
     """A device that cycles between charging and discharging.
 
     The device is 100% efficient and has linear charging
@@ -89,35 +89,20 @@ class IdealStorageModel(StorageController):
 
     Parameters
     ----------
-    kwh_rated : float
-        Capacity of the device. [kWh]
-    kw_rated : float
-        Maximum power rating of the device. Used for both charging and
-        discharging. [kW]
-    initial_soc : float, optional
-        Initial state of charge as a float between 0 and 1.
-    soc_min : float, default 0.2
-        Minimum state of charge for normal operation. Float between 0 and 1.
+    device : StorageSpecification
+        The specification of the device to be controller. To set a reserve
+        capacity include the key 'soc_min' in the controller_params with a
+        value between 0 and 1.
     """
-    def __init__(self, kwh_rated: float, kw_rated: float,
-                 initial_soc: float = None, soc_min: float = 0.2):
-        if initial_soc is not None and 1 < initial_soc < 0:
-            raise ValueError(f"`initial_soc` must be between 0 and 1"
-                             f" (got {initial_soc})")
-        if 1 < soc_min < 0:
-            raise ValueError(f"`soc_min` must be between 0 and 1"
-                             f" (got {soc_min})")
-        self._kwh_rated = kwh_rated
-        if initial_soc is None:
-            self._soc = soc_min
-        else:
-            self._soc = initial_soc
-        self._soc_min = soc_min
+    def __init__(self, device):
+        self._soc = device.soc
+        self._kwh_rated = device.kwh_rated
+        self._soc_min = device.controller_params.get('soc_min', 0.2)
         self.state = StorageState.IDLE
         self.power = 0.0
         self._last_step = 0.0
-        self._charging_power = -kw_rated
-        self._discharging_power = kw_rated
+        self._charging_power = -device.kw_rated
+        self._discharging_power = device.kw_rated
 
     @property
     def complex_power(self):
@@ -265,7 +250,7 @@ def _init_controller(device: StorageSpecification):
     if device.controller == 'droop':
         return DroopController(device)
     if device.controller == 'cycle':
-        return IdealStorageModel(device.kwh_rated, device.kw_rated)
+        return CycleController(device)
 
 
 def run_federate(name: str,

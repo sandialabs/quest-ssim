@@ -16,6 +16,18 @@ def droop_spec():
     )
 
 
+@pytest.fixture
+def cycle_spec():
+    return StorageSpecification(
+        name='foo',
+        bus='bar',
+        kwh_rated=100,
+        kw_rated=10,
+        controller='cycle',
+        soc=0.45
+    )
+
+
 def test_DroopController_missing_params():
     spec = StorageSpecification(
         'foo',
@@ -49,6 +61,8 @@ def test_DroopConrtoller_step(droop_spec):
     assert controller.step(1, 0.0) == complex(5000, -500)
 
 
-def test_storage__init_controller(droop_spec):
+def test_storage__init_controller(droop_spec, cycle_spec):
     controller = storage._init_controller(droop_spec)
     assert isinstance(controller, storage.DroopController)
+    controller = storage._init_controller(cycle_spec)
+    assert isinstance(controller, storage.CycleController)

@@ -115,7 +115,7 @@ def test_DSSModel_from_gridspec(data_dir):
             kwh_rated=1000,
             kw_rated=100,
             phases=3,
-            params={"%stored": 11},
+            soc=0.11,
             controller='cycle'
         )
     )
@@ -126,7 +126,7 @@ def test_DSSModel_from_gridspec(data_dir):
             kwh_rated=2000,
             kw_rated=200,
             phases=2,
-            params={"%stored": 22},
+            soc=0.22,
             controller='cycle'
         )
     )
