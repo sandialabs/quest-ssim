@@ -15,7 +15,7 @@ class StorageSpecification:
     #: Device name. Should be unique among all storage devices.
     name: str
 
-    #: Bus where the device is connected
+    #: Bus where the device is connected.
     bus: str
 
     #: Rated capacity of the device [kWh].
@@ -24,11 +24,17 @@ class StorageSpecification:
     #: Rated maximum power output [kW].
     kw_rated: float
 
-    #: Number of phases the device is connected to
+    #: Type of the controller for this device.
+    controller: str
+
+    #: Number of phases to which the device is connected.
     phases: int = 3
 
-    #: Additional storage parameters passed to the grid model
-    params: dict = field(default_factory=dict())
+    #: Additional storage parameters passed to the grid model.
+    params: dict = field(default_factory=dict)
+
+    #: Additional parameters to be passed to the controller constructor.
+    controller_params: dict = field(default_factory=dict)
 
 
 class GridSpecification:

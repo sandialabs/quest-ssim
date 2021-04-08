@@ -49,19 +49,27 @@ class DroopController(StorageController):
 
     Parameters
     ----------
-    p_droop : float
-        Active power droop constant.
-    q_droop : float
-        Reactive power droop constant.
-    reference_voltage : float, default 1.0
-        Reference voltage. [PU]
+    device : StorageSpecification
+        Specification of the storge device being controlled.
     """
-    def __init__(self, p_droop: float, q_droop: float,
-                 reference_voltage: float = 1.0):
-        self._p_droop = p_droop
-        self._q_droop = q_droop
-        self._reference_voltage = reference_voltage
-        self._last_output = None
+    def __init__(self, device: StorageSpecification):
+        self._reference_voltage = device.controller_params.get(
+            'reference_voltage', 1.0
+        )
+        if 'p_droop' not in device.controller_params:
+            raise ValueError(self._missing_param_message('p_droop', device))
+        if 'q_droop' not in device.controller_params:
+            raise ValueError(self._missing_param_message('q_droop', device))
+        self._p_droop = device.controller_params['p_droop']
+        self._q_droop = device.controller_params['q_droop']
+
+    @staticmethod
+    def _missing_param_message(param, device):
+        return f"Missing required parameter '{param}' in " \
+               f"controller_params for device '{device.name}'. " \
+               "Both 'p_droop' and 'q_droop' are required for " \
+               "the 'droop' controller. " \
+               f"Got params: {set(device.controller_params.keys())}."
 
     def step(self, time, voltage):
         p = (self._reference_voltage - voltage) * self._p_droop
@@ -252,6 +260,14 @@ class StorageControllerFederate:
             self._step(time)
 
 
+def _init_controller(device: StorageSpecification):
+    """Initialize a controller for `device`."""
+    if device.controller == 'droop':
+        return DroopController(device)
+    if device.controller == 'cycle':
+        return IdealStorageModel(device.kwh_rated, device.kw_rated)
+
+
 def run_federate(name: str,
                  fedinfo: HelicsFederateInfo,
                  devices: List[StorageSpecification],
@@ -273,7 +289,7 @@ def run_federate(name: str,
         fedinfo, helics_property_time_delta, 0.01
     )
     federate = helicsCreateValueFederate(name, fedinfo)
-    controllers = {device.name: DroopController(5000, -500)
+    controllers = {device.name: _init_controller(device)
                    for device in devices}
     busses = {device.name: device.bus for device in devices}
     logging.debug("devices: %s", busses.items())
