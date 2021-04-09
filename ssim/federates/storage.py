@@ -50,7 +50,11 @@ class DroopController(StorageController):
     Parameters
     ----------
     device : StorageSpecification
-        Specification of the storge device being controlled.
+        Specification of the storage device being controlled. The
+        ``device.controller_params`` must contain keys `'p_droop'` and
+        `'q_droop'`. An optional `'reference_voltage'` key may be included
+        to specify per-unit reference voltage (defaults to 1.0, if not
+        specified).
     """
     def __init__(self, device: StorageSpecification):
         self._reference_voltage = device.controller_params.get(
