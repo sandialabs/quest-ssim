@@ -49,19 +49,32 @@ class DroopController(StorageController):
 
     Parameters
     ----------
-    p_droop : float
-        Active power droop constant.
-    q_droop : float
-        Reactive power droop constant.
-    reference_voltage : float, default 1.0
-        Reference voltage. [PU]
+    device : StorageSpecification
+        Specification of the storage device being controlled. The
+        ``device.controller_params`` must contain keys 'p_droop' and
+        'q_droop'. An optional 'reference_voltage' key may be included
+
+        to specify per-unit reference voltage (defaults to 1.0, if not
+        specified).
     """
-    def __init__(self, p_droop: float, q_droop: float,
-                 reference_voltage: float = 1.0):
-        self._p_droop = p_droop
-        self._q_droop = q_droop
-        self._reference_voltage = reference_voltage
-        self._last_output = None
+    def __init__(self, device: StorageSpecification):
+        self._reference_voltage = device.controller_params.get(
+            'reference_voltage', 1.0
+        )
+        if 'p_droop' not in device.controller_params:
+            raise ValueError(self._missing_param_message('p_droop', device))
+        if 'q_droop' not in device.controller_params:
+            raise ValueError(self._missing_param_message('q_droop', device))
+        self._p_droop = device.controller_params['p_droop']
+        self._q_droop = device.controller_params['q_droop']
+
+    @staticmethod
+    def _missing_param_message(param, device):
+        return f"Missing required parameter '{param}' in " \
+               f"controller_params for device '{device.name}'. " \
+               "Both 'p_droop' and 'q_droop' are required for " \
+               "the 'droop' controller. " \
+               f"Got params: {set(device.controller_params.keys())}."
 
     def step(self, time, voltage):
         p = (self._reference_voltage - voltage) * self._p_droop
@@ -73,43 +86,28 @@ class DroopController(StorageController):
         return helics_time_maxtime - 1
 
 
-class IdealStorageModel(StorageController):
+class CycleController(StorageController):
     """A device that cycles between charging and discharging.
 
-    The device is 100% efficient and has linear charging
+    The device is assumed to be 100% efficient and has linear charging
     and discharging profiles.
 
     Parameters
     ----------
-    kwh_rated : float
-        Capacity of the device. [kWh]
-    kw_rated : float
-        Maximum power rating of the device. Used for both charging and
-        discharging. [kW]
-    initial_soc : float, optional
-        Initial state of charge as a float between 0 and 1.
-    soc_min : float, default 0.2
-        Minimum state of charge for normal operation. Float between 0 and 1.
+    device : StorageSpecification
+        The specification of the device to be controlled. To set a reserve
+        capacity include the key 'soc_min' in ``device.controller_params``
+        with a value between 0 and 1.
     """
-    def __init__(self, kwh_rated: float, kw_rated: float,
-                 initial_soc: float = None, soc_min: float = 0.2):
-        if initial_soc is not None and 1 < initial_soc < 0:
-            raise ValueError(f"`initial_soc` must be between 0 and 1"
-                             f" (got {initial_soc})")
-        if 1 < soc_min < 0:
-            raise ValueError(f"`soc_min` must be between 0 and 1"
-                             f" (got {soc_min})")
-        self._kwh_rated = kwh_rated
-        if initial_soc is None:
-            self._soc = soc_min
-        else:
-            self._soc = initial_soc
-        self._soc_min = soc_min
+    def __init__(self, device):
+        self._soc = device.soc
+        self._kwh_rated = device.kwh_rated
+        self._soc_min = device.controller_params.get('soc_min', 0.2)
         self.state = StorageState.IDLE
         self.power = 0.0
         self._last_step = 0.0
-        self._charging_power = -kw_rated
-        self._discharging_power = kw_rated
+        self._charging_power = -device.kw_rated
+        self._discharging_power = device.kw_rated
 
     @property
     def complex_power(self):
@@ -158,7 +156,7 @@ class IdealStorageModel(StorageController):
                 self.state = StorageState.CHARGING
                 self.power = self._charging_power
             else:
-                self.state = StorageState.CHARGING
+                self.state = StorageState.DISCHARGING
                 self.power = self._discharging_power
         elif self.state is StorageState.CHARGING:
             self._step_charging((time - self._last_step) / 3600)
@@ -252,6 +250,14 @@ class StorageControllerFederate:
             self._step(time)
 
 
+def _init_controller(device: StorageSpecification):
+    """Initialize the controller specified by ``device.controller``."""
+    if device.controller == 'droop':
+        return DroopController(device)
+    if device.controller == 'cycle':
+        return CycleController(device)
+
+
 def run_federate(name: str,
                  fedinfo: HelicsFederateInfo,
                  devices: List[StorageSpecification],
@@ -273,7 +279,7 @@ def run_federate(name: str,
         fedinfo, helics_property_time_delta, 0.01
     )
     federate = helicsCreateValueFederate(name, fedinfo)
-    controllers = {device.name: DroopController(5000, -500)
+    controllers = {device.name: _init_controller(device)
                    for device in devices}
     busses = {device.name: device.bus for device in devices}
     logging.debug("devices: %s", busses.items())

@@ -156,7 +156,8 @@ def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
         paramters.
     """
     params = {'kwhrated': storage_spec.kwh_rated,
-              'kwrated': storage_spec.kw_rated}
+              'kwrated': storage_spec.kw_rated,
+              '%stored': storage_spec.soc * 100}
     return {**params, **storage_spec.params}
 
 

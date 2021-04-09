@@ -244,11 +244,14 @@ def run_simulation(opendss_file, storage_devices, hours,
         grid_spec.add_storage(
             StorageSpecification(
                 name,
-                specs.pop('bus'),
-                specs.pop('kwhrated'),
-                specs.pop('kwrated'),
-                specs.pop('phases', 3),
-                specs
+                bus=specs.pop('bus'),
+                kwh_rated=specs.pop('kwhrated'),
+                kw_rated=specs.pop('kwrated'),
+                phases=specs.pop('phases', 3),
+                soc=specs.pop('%stored', 50) / 100,
+                controller=specs.pop('controller', 'droop'),
+                controller_params=specs.pop('controller_params', {}),
+                params=specs
             )
         )
     simulation = Simulation(grid_spec, show_plots=True, loglevel=loglevel)
