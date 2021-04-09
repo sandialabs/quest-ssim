@@ -90,9 +90,9 @@ class CycleController(StorageController):
     Parameters
     ----------
     device : StorageSpecification
-        The specification of the device to be controller. To set a reserve
-        capacity include the key 'soc_min' in the controller_params with a
-        value between 0 and 1.
+        The specification of the device to be controlled. To set a reserve
+        capacity include the key 'soc_min' in ``device.controller_params``
+        with a value between 0 and 1.
     """
     def __init__(self, device):
         self._soc = device.soc
@@ -246,7 +246,7 @@ class StorageControllerFederate:
 
 
 def _init_controller(device: StorageSpecification):
-    """Initialize a controller for `device`."""
+    """Initialize the controller specified by ``device.controller``."""
     if device.controller == 'droop':
         return DroopController(device)
     if device.controller == 'cycle':
