@@ -51,8 +51,9 @@ class DroopController(StorageController):
     ----------
     device : StorageSpecification
         Specification of the storage device being controlled. The
-        ``device.controller_params`` must contain keys `'p_droop'` and
-        `'q_droop'`. An optional `'reference_voltage'` key may be included
+        ``device.controller_params`` must contain keys 'p_droop' and
+        'q_droop'. An optional 'reference_voltage' key may be included
+
         to specify per-unit reference voltage (defaults to 1.0, if not
         specified).
     """
