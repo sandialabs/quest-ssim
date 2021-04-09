@@ -88,7 +88,7 @@ class DroopController(StorageController):
 class CycleController(StorageController):
     """A device that cycles between charging and discharging.
 
-    The device is 100% efficient and has linear charging
+    The device is assumed to be 100% efficient and has linear charging
     and discharging profiles.
 
     Parameters
@@ -155,7 +155,7 @@ class CycleController(StorageController):
                 self.state = StorageState.CHARGING
                 self.power = self._charging_power
             else:
-                self.state = StorageState.CHARGING
+                self.state = StorageState.DISCHARGING
                 self.power = self._discharging_power
         elif self.state is StorageState.CHARGING:
             self._step_charging((time - self._last_step) / 3600)

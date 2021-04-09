@@ -24,7 +24,7 @@ def cycle_spec():
         kwh_rated=100,
         kw_rated=10,
         controller='cycle',
-        soc=0.45
+        soc=1.0
     )
 
 
@@ -66,3 +66,12 @@ def test_storage__init_controller(droop_spec, cycle_spec):
     assert isinstance(controller, storage.DroopController)
     controller = storage._init_controller(cycle_spec)
     assert isinstance(controller, storage.CycleController)
+
+
+def test_CycleController_step(cycle_spec):
+    controller = storage.CycleController(cycle_spec)
+    assert controller.step(0.0, 1.0) == complex(10, 0)
+    assert controller.next_update() == 8.0 * 3600
+    assert controller.step(3600, 1.0) == complex(10, 0)
+    assert controller.next_update() == 8.0 * 3600
+    assert controller.step(8.0 * 3600, 1.0) == complex(-10, 0)
