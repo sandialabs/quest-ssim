@@ -5,7 +5,11 @@ data structures and models used by the various simulation federates.
 """
 from dataclasses import dataclass, field
 from os import PathLike
-from typing import Optional
+from typing import Optional, List, Tuple
+
+
+#: Type for a curve specified as x, y pairs.
+Curve = Tuple[Tuple[float, float], ...]
 
 
 @dataclass
@@ -40,6 +44,34 @@ class StorageSpecification:
     controller_params: dict = field(default_factory=dict)
 
 
+@dataclass
+class PVSpecification:
+
+    #: Name of the PV system.
+    name: str
+
+    #: Bus where the PV system is connected to the grid.
+    bus: str
+
+    #: Maximum power output of the PV Array at :math:`1.0kW/m^2`
+    pmpp: float
+
+    #: Inverter kVA rating [kVA].
+    kva_rated: float
+
+    #: Number of phases the inverter is connected to.
+    phases: int = 3
+
+    #: Additional parameters
+    params: dict = field(default_factory=dict)
+
+    #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
+    inverter_efficiency: Optional[Curve] = field(default=None)
+
+    # Maximum DC array output at changing temperature relative to `pmpp`.
+    pt_curve: Optional[Curve] = field(default=None)
+
+
 class GridSpecification:
     """Specification of the grid.
 
@@ -51,7 +83,8 @@ class GridSpecification:
     """
     def __init__(self, file: Optional[PathLike] = None):
         self.file = file
-        self.storage_devices = []
+        self.storage_devices: List[StorageSpecification] = []
+        self.pv_systems: List[PVSpecification] = []
 
     def add_storage(self, specs: StorageSpecification):
         """Add a storage device to the grid specification.
@@ -62,3 +95,13 @@ class GridSpecification:
             Specifications for the device.
         """
         self.storage_devices.append(specs)
+
+    def add_pvsystem(self, specs: PVSpecification):
+        """Add a PV system to the grid specification.
+
+        Parameters
+        ----------
+        specs : PVSpecification
+            Specifications for the PV system.
+        """
+        self.pv_systems.append(specs)

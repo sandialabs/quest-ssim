@@ -101,14 +101,21 @@ def test_DSSModel_add_xycurve(test_circuit):
     assert dssdirect.XYCurves.YArray() == [1.0, 1.5, 2.0]
 
 
-def test_DSSModel_from_gridspec(data_dir):
-    spec = grid.GridSpecification(data_dir / "test_circuit.dss")
-    model = opendss.DSSModel.from_grid_spec(spec)
+@pytest.fixture
+def grid_spec(data_dir):
+    """GridSpecification for the circuit defined in 'test_circuit.dss'."""
+    dssdirect.run_command("clear")
+    return grid.GridSpecification(data_dir / "test_circuit.dss")
+
+
+def test_DSSModel_from_gridspec(grid_spec):
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
     assert len(model.storage_devices) == 0
-    spec = grid.GridSpecification(data_dir / "test_circuit.dss")
-    del model
-    dssutil.run_command("clear")
-    spec.add_storage(
+    assert dssdirect.Circuit.Name() == "dssllibtestckt"
+
+
+def test_DSSModel_from_gridspec_storage(grid_spec):
+    grid_spec.add_storage(
         grid.StorageSpecification(
             name="S1",
             bus="loadbus1",
@@ -119,7 +126,7 @@ def test_DSSModel_from_gridspec(data_dir):
             controller='cycle'
         )
     )
-    spec.add_storage(
+    grid_spec.add_storage(
         grid.StorageSpecification(
             name="S2",
             bus="loadbus2.1.2",
@@ -130,7 +137,7 @@ def test_DSSModel_from_gridspec(data_dir):
             controller='cycle'
         )
     )
-    model = opendss.DSSModel.from_grid_spec(spec)
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
     assert len(model.storage_devices) == 2
     assert model.storage_devices["S1"].soc == pytest.approx(0.11)
     assert model.storage_devices["S1"].kwh_rated == 1000
@@ -139,3 +146,38 @@ def test_DSSModel_from_gridspec(data_dir):
     assert model.storage_devices["S2"].kwh_rated == 2000
     assert model.storage_devices["S2"].kw_rated == 200
     assert dssutil.get_property("storage.S2.phases") == '2'
+
+
+def test_DSSModel_from_gridspec_pvsystem(grid_spec):
+    pv_params = {
+        "kV": 12.47,
+        "irrad_scale": 1000,
+        "temperature": 25,
+    }
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv1",
+            bus="loadbus1.1.2.3",
+            pmpp=100.0,
+            kva_rated=80.0,
+            params=pv_params
+        )
+    )
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv2",
+            bus="loadbus2.2.3",
+            pmpp=250.0,
+            kva_rated=300.0,
+            params=pv_params
+        )
+    )
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
+    assert set(dssdirect.PVsystems.AllNames()) == {"pv1", "pv2"}
+    dssdirect.PVsystems.Name("pv1")
+    assert dssdirect.PVsystems.kVARated() == 80.0
+    assert dssdirect.PVsystems.Pmpp() == 100.0
+    dssdirect.Circuit.SetActiveBus("loadbus1")
+    assert "PVSystem.pv1" in dssdirect.Bus.AllPCEatBus()
+    dssdirect.Circuit.SetActiveBus("loadbus2")
+    assert "PVSystem.pv2" in dssdirect.Bus.AllPCEatBus()

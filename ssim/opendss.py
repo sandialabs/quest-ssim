@@ -197,6 +197,21 @@ class DSSModel:
                 storage_device.phases,
                 _opendss_storage_params(storage_device)
             )
+        for pv_system in gridspec.pv_systems:
+            model.add_pvsystem(
+                pv_system.name,
+                pv_system.bus,
+                pv_system.phases,
+                pv_system.params["kV"],
+                pv_system.kva_rated,
+                pv_system.params.get("connection_type", "wye"),
+                pv_system.params["irrad_scale"],
+                pv_system.pmpp,
+                pv_system.params["temperature"],
+                pv_system.params.get("pf", 1.0),
+                pv_system.params.get("irradiance_profile")
+
+            )
         return model
 
     @property
@@ -275,7 +290,7 @@ class DSSModel:
     @staticmethod
     def add_pvsystem(name: str, bus: str, phases: int,
                      bus_kv: float, kva_rating: float, connection_type: str,
-                     irrad_scale, pmpp_kw: float, temperature: float,
+                     irrad_scale: float, pmpp_kw: float, temperature: float,
                      pf: float, profile_name: str):
         """Add a PV System to OpenDSS.
 
@@ -315,7 +330,7 @@ class DSSModel:
             f" Pmpp={pmpp_kw}"
             f" temperature={temperature}"
             f" pf={pf}"
-            f" daily={profile_name}"
+            + (f" daily={profile_name}" if profile_name is not None else "")
         )
 
     @staticmethod
