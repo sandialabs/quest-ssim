@@ -79,8 +79,11 @@ def test_DSSModel_add_pvsystem(test_circuit, data_dir):
     test_circuit.add_loadshape(
         "TestProfile", data_dir / "triangle.csv", 1.0, 24)
     test_circuit.add_pvsystem(
-        "TestPV", "loadbus1", 3, 12.47, 12.0, "",
-        1000.0, 12.0, 27, 1.0, "TestProfile"
+        "TestPV", "loadbus1", 3, 12.0, 12.0,
+        {"kV": 12.47,
+         "daily": "TestProfile",
+         "temperature": 27,
+         "irrad": 1000.0}
     )
     test_circuit.solve(0)
     dssdirect.PVsystems.Name("TestPV")
@@ -151,7 +154,7 @@ def test_DSSModel_from_gridspec_storage(grid_spec):
 def test_DSSModel_from_gridspec_pvsystem(grid_spec):
     pv_params = {
         "kV": 12.47,
-        "irrad_scale": 1000,
+        "irrad": 1000,
         "temperature": 25,
     }
     grid_spec.add_pvsystem(
