@@ -184,3 +184,26 @@ def test_DSSModel_from_gridspec_pvsystem(grid_spec):
     assert "PVSystem.pv1" in dssdirect.Bus.AllPCEatBus()
     dssdirect.Circuit.SetActiveBus("loadbus2")
     assert "PVSystem.pv2" in dssdirect.Bus.AllPCEatBus()
+
+
+def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv1",
+            bus="loadbus2",
+            pmpp=100,
+            kva_rated=100,
+            pt_curve=((0.0, 2.0), (2.0, 1.0), (3.0, 0.0)),
+            inverter_efficiency=((0.1, 0.8), (0.5, 0.9),
+                                 (0.8, 0.95), (1.0, 1.0))
+        )
+    )
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
+    dssdirect.PVsystems.Name("pv1")
+    eff_curve_name = dssdirect.run_command("? pvsystem.pv1.effcurve")
+    dssdirect.XYCurves.Name(eff_curve_name)
+    assert dssdirect.XYCurves.XArray() == [0.1, 0.5, 0.8, 1.0]
+    assert dssdirect.XYCurves.YArray() == [0.8, 0.9, 0.95, 1.0]
+    dssdirect.XYCurves.Name(dssdirect.run_command("? pvsystem.pv1.p-tcurve"))
+    assert dssdirect.XYCurves.XArray() == [0.0, 2.0, 3.0]
+    assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]

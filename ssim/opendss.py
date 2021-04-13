@@ -205,6 +205,20 @@ class DSSModel:
     def from_grid_spec(cls, gridspec: GridSpecification) -> DSSModel:
         """Construct an DSSModel from a grid specification.
 
+        The OpenDSS model is initialized by loading ``gridspec.file``. After
+        the model is loaded the storage devices in ``gridspec.storage_devices``
+        are added to the model. After all storage devices have been added, the
+        pv systems are added.
+
+        For PV systems, the efficiency curve and the p-t curve may be specified
+        either as a parameter in :py:attr:`grid.PVSpecification.params` or
+        in the :py:attr:`PVSpecification.inverter_efficiency` and
+        :py:attr:`PVSpecification.pt_curve` fields. If either of these fields
+        are specified then a new XYCurve will be created in the OpenDSS model
+        named "eff_<pvsystem-name>" or "pt_<pvsystem-name>". Curve specified
+        this way override the value provided in
+        :py:attr:`PVSpecification.params`.
+
         Parameters
         ----------
         gridspec : GridSpecification
@@ -224,13 +238,22 @@ class DSSModel:
                 _opendss_storage_params(storage_device)
             )
         for pv_system in gridspec.pv_systems:
+            system_params = pv_system.params.copy()
+            if pv_system.inverter_efficiency is not None:
+                model.add_xycurve(f"eff_{pv_system.name}",
+                                  *zip(*pv_system.inverter_efficiency))
+                system_params["EffCurve"] = f"eff_{pv_system.name}"
+            if pv_system.pt_curve is not None:
+                model.add_xycurve(f"pt_{pv_system.name}",
+                                  *zip(*pv_system.pt_curve))
+                system_params["P-TCurve"] = f"pt_{pv_system.name}"
             model.add_pvsystem(
                 pv_system.name,
                 pv_system.bus,
                 pv_system.phases,
                 pv_system.kva_rated,
                 pv_system.pmpp,
-                pv_system.params
+                system_params
             )
         return model
 
