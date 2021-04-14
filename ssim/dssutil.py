@@ -47,6 +47,7 @@ def make_opendss_params(params: dict):
         f"{param}={value}" for param, value in params.items()
     )
 
+
 def run_command(command: str,
                 extra_args: Optional[dict] = None,
                 warn: bool = False) -> str:
