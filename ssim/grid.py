@@ -66,10 +66,10 @@ class PVSpecification:
     params: dict = field(default_factory=dict)
 
     #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
-    inverter_efficiency: Optional[Curve] = field(default=None)
+    inverter_efficiency: Optional[Curve] = None
 
     # Maximum DC array output at changing temperature relative to `pmpp`.
-    pt_curve: Optional[Curve] = field(default=None)
+    pt_curve: Optional[Curve] = None
 
 
 class GridSpecification:
