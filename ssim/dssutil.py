@@ -42,7 +42,11 @@ def _check_result(result: str, warn: bool) -> str:
 
 
 def make_opendss_params(params: dict):
-    """Return a string """
+    """Return a string of OpenDSS paramters in `dict`.
+
+    The returned string has the form "key1=value1 key2=value2 ..." for all
+    items in `dict`.
+    """
     return " ".join(
         f"{param}={value}" for param, value in params.items()
     )
