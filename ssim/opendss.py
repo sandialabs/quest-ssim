@@ -355,12 +355,8 @@ class DSSModel:
         """Return a list of node voltage magnitudes at `bus` [pu]."""
         dssdirect.Circuit.SetActiveBus(bus)
         voltages = dssdirect.Bus.VMagAngle()
-        node_voltages = []
-        for v in range(len(voltages)):
-            if (v % 2) == 0:  # every other element (i.e., ignore angles)
-                node_voltages.append(voltages[v] / (dssdirect.Bus.kVBase()
-                                                    * 1000))
-        return node_voltages
+        base_voltage = dssdirect.Bus.kVBase() * 1000
+        return list(voltage / base_voltage for voltage in voltages[::2])
 
     @staticmethod
     def positive_sequence_voltage(bus):
@@ -374,18 +370,9 @@ class DSSModel:
         """Return a list of complex voltages of each node at 'bus' [pu]. """
         dssdirect.Circuit.SetActiveBus(bus)
         pu_voltages = dssdirect.Bus.PuVoltage()
-        complex_voltages = []
-        if len(pu_voltages) == 6:  # 3-phase bus
-            complex_voltages = [complex(pu_voltages[0], pu_voltages[1]),
-                                complex(pu_voltages[2], pu_voltages[3]),
-                                complex(pu_voltages[4], pu_voltages[5]), ]
-        elif len(pu_voltages) == 4:  # 2-phase bus (L-L connection)
-            complex_voltages = [complex(pu_voltages[0], pu_voltages[1]),
-                                complex(pu_voltages[2], pu_voltages[3]), ]
-        elif len(pu_voltages) == 2:  # 1-phase bus
-            complex_voltages = [complex(pu_voltages[0], pu_voltages[1])]
-
-        return complex_voltages
+        return list(
+            complex(real, imag) for real, imag in zip(pu_voltages[::2],
+                                                      pu_voltages[1::2]))
 
     @staticmethod
     def total_power():
