@@ -2,6 +2,8 @@
 import warnings
 from collections import namedtuple
 from collections.abc import Iterable
+from typing import Optional
+
 import pandas as pd
 import opendssdirect as dssdirect
 
@@ -39,7 +41,20 @@ def _check_result(result: str, warn: bool) -> str:
     return result
 
 
-def run_command(command: str, warn: bool = False) -> str:
+def make_opendss_params(params: dict):
+    """Return a string of OpenDSS paramters in `dict`.
+
+    The returned string has the form "key1=value1 key2=value2 ..." for all
+    items in `dict`.
+    """
+    return " ".join(
+        f"{param}={value}" for param, value in params.items()
+    )
+
+
+def run_command(command: str,
+                extra_args: Optional[dict] = None,
+                warn: bool = False) -> str:
     """Run an opendss command.
 
     Wrapper around the :py:func:`opendssdirect.run_command`
@@ -50,9 +65,15 @@ def run_command(command: str, warn: bool = False) -> str:
     ----------
     command : str
         OpenDSS command to execute.
+    extra_args : dict
+        Extra parameters to be passed with the command. The dictionary is
+        expanded to a string of the form "key1=value1 key2=value2 ..." and
+        appended to `command` before command is executed.
     warn : bool, default False
         If True errors are reported as warnings instead of exceptions.
     """
+    if extra_args is not None:
+        command = f"{command} {make_opendss_params(extra_args)}"
     return _check_result(dssdirect.run_command(command), warn)
 
 

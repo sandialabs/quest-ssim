@@ -25,6 +25,8 @@ class Storage(StorageDevice):
         Dictionary of device parameters. Keys must be valid OpenDSS storage
         object options such as 'kVA', and 'kWhrated'. Keys are not case
         sensitive
+    phases : int
+        Number of phases the device is connected to.
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
     """
@@ -35,18 +37,10 @@ class Storage(StorageDevice):
         self._device_parameters = device_parameters
         self.state = state
         dssutil.run_command(
-            f"New Storage.{name}"
-            f" bus1={bus}"
-            f" phases={phases}"
-            f" dispmode=external"
-            f" {self._make_dss_args(device_parameters)}"
-            f" state={state}"
+            f"New Storage.{name}",
+            {"bus1": bus, "phases": phases, "state": state,
+             "dispmode": "external", **device_parameters}
         )
-
-    @staticmethod
-    def _make_dss_args(device_parameters):
-        return " ".join(f"{param}={value}"
-                        for param, value in device_parameters.items())
 
     def get_state(self) -> StorageState:
         return self.state
@@ -105,6 +99,37 @@ class Storage(StorageDevice):
     @property
     def kwh_rated(self) -> float:
         return float(self._get("kwhrated"))
+
+
+class PVSystem:
+    """Representation of a PV system in OpenDSS.
+
+    Parameters
+    ----------
+    name : str
+        Name of the PV system. Must be unique among all PV systems on the grid.
+    bus : str
+        Bus where the PV system is connected to the grid.
+    phases : int
+        Number of phases the PV system is connected to.
+    pmpp : float
+        Maximum power output of the PV Array.
+    inverter_kva : float
+        Maximum kVA rated for the inverter.
+    system_parameters : dict
+        Additional parameters
+    """
+    def __init__(self, name: str, bus: str, phases: int, pmpp: float,
+                 inverter_kva: float, system_parameters: dict):
+        self.name = name
+        self.bus = bus
+        self.inverter_kva = inverter_kva
+        self.pmpp = pmpp
+        self.phases = phases
+        dssutil.run_command(f"new pvsystem.{name}",
+                            {"bus1": bus, "phases": phases,
+                             "Pmpp": pmpp, "kVA": inverter_kva,
+                             **system_parameters})
 
 
 @enum.unique
@@ -168,16 +193,31 @@ class DSSModel:
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
         dssutil.load_model(dss_file)
         dssutil.run_command(
-            "set mode=time controlmode=time number=1 stepsize=15s"
+            "set mode=time controlmode=time number=1 stepsize=15m"
         )
         self.loadshapeclass = loadshape_class
         self._last_solution_time = None
         self._storage = {}
-        self._max_step = 15  # 15 minutes
+        self._pvsystems = {}
+        self._max_step = 15 * 60  # 15 minutes
 
     @classmethod
     def from_grid_spec(cls, gridspec: GridSpecification) -> DSSModel:
         """Construct an DSSModel from a grid specification.
+
+        The OpenDSS model is initialized by loading ``gridspec.file``. After
+        the model is loaded the storage devices in ``gridspec.storage_devices``
+        are added to the model. After all storage devices have been added, the
+        pv systems are added.
+
+        For PV systems, the efficiency curve and the p-t curve may be specified
+        either as a parameter in :py:attr:`grid.PVSpecification.params` or
+        in the :py:attr:`PVSpecification.inverter_efficiency` and
+        :py:attr:`PVSpecification.pt_curve` fields. If either of these fields
+        are specified then a new XYCurve will be created in the OpenDSS model
+        named "eff_<pvsystem-name>" or "pt_<pvsystem-name>". Curve specified
+        this way override the value provided in
+        :py:attr:`PVSpecification.params`.
 
         Parameters
         ----------
@@ -196,6 +236,24 @@ class DSSModel:
                 storage_device.bus,
                 storage_device.phases,
                 _opendss_storage_params(storage_device)
+            )
+        for pv_system in gridspec.pv_systems:
+            system_params = pv_system.params.copy()
+            if pv_system.inverter_efficiency is not None:
+                model.add_xycurve(f"eff_{pv_system.name}",
+                                  *zip(*pv_system.inverter_efficiency))
+                system_params["EffCurve"] = f"eff_{pv_system.name}"
+            if pv_system.pt_curve is not None:
+                model.add_xycurve(f"pt_{pv_system.name}",
+                                  *zip(*pv_system.pt_curve))
+                system_params["P-TCurve"] = f"pt_{pv_system.name}"
+            model.add_pvsystem(
+                pv_system.name,
+                pv_system.bus,
+                pv_system.phases,
+                pv_system.kva_rated,
+                pv_system.pmpp,
+                system_params
             )
         return model
 
@@ -272,11 +330,9 @@ class DSSModel:
         self._storage[name] = device
         return device
 
-    @staticmethod
-    def add_pvsystem(name: str, bus: str, phases: int,
-                     bus_kv: float, kva_rating: float, connection_type: str,
-                     irrad_scale, pmpp_kw: float, temperature: float,
-                     pf: float, profile_name: str):
+    def add_pvsystem(self, name: str, bus: str, phases: int,
+                     kva_rating: float, pmpp_kw: float,
+                     system_parameters: Optional[dict] = None):
         """Add a PV System to OpenDSS.
 
         Parameters
@@ -287,36 +343,17 @@ class DSSModel:
             Name of the bus where the system is connected.
         phases : int
             Number of phases to connect
-        bus_kv : float
-            Rated voltage of the bus [kV].
         kva_rating : float
             Rated kVA of the PV system [kVA].
-        connection_type : str
-            Connection type between the inverter and the grid.
-        irrad_scale : float
-            Irradiance scale factor.
         pmpp_kw : float
             Power output of PV system at MPP [kW].
-        temperature : float
-            Temperature of operation [C].
-        pf : float
-            Power factor.
-        profile_name : str
-            Name of the load shape to use as the irradiance profile.
+        system_parameters : dict, optional
+            Additional parameters. Keys must be valid OpenDSS PVSystem object
+            parameters.
         """
-        dssutil.run_command(
-            f"New PVSystem.{name}"
-            f" bus1={bus}"
-            f" phases={phases}"
-            f" kV={bus_kv}"
-            f" kVA={kva_rating}"
-            f" conn={connection_type}"
-            f" irrad={irrad_scale}"
-            f" Pmpp={pmpp_kw}"
-            f" temperature={temperature}"
-            f" pf={pf}"
-            f" daily={profile_name}"
-        )
+        system = PVSystem(name, bus, phases, pmpp_kw, kva_rating,
+                          system_parameters)
+        self._pvsystems[name] = system
 
     @staticmethod
     def add_loadshape(name: str, file: PathLike,
@@ -398,6 +435,15 @@ class DSSModel:
         :py:meth:`DSSModel.add_storage`.
         """
         return self._storage
+
+    @property
+    def pvsystems(self):
+        """Return the PV systems that have been added to the grid model.
+
+        Similarly to :py:attr:`DSSModel.storage_devices`, only systems added
+        to the model with :py:meth:`DSSModel.add_pvsystem` are returned.
+        """
+        return self._pvsystems
 
     @staticmethod
     def node_voltage(node):

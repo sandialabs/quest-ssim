@@ -79,8 +79,11 @@ def test_DSSModel_add_pvsystem(test_circuit, data_dir):
     test_circuit.add_loadshape(
         "TestProfile", data_dir / "triangle.csv", 1.0, 24)
     test_circuit.add_pvsystem(
-        "TestPV", "loadbus1", 3, 12.47, 12.0, "",
-        1000.0, 12.0, 27, 1.0, "TestProfile"
+        "TestPV", "loadbus1", 3, 12.0, 12.0,
+        {"kV": 12.47,
+         "daily": "TestProfile",
+         "temperature": 27,
+         "irrad": 1000.0}
     )
     test_circuit.solve(0)
     dssdirect.PVsystems.Name("TestPV")
@@ -101,14 +104,21 @@ def test_DSSModel_add_xycurve(test_circuit):
     assert dssdirect.XYCurves.YArray() == [1.0, 1.5, 2.0]
 
 
-def test_DSSModel_from_gridspec(data_dir):
-    spec = grid.GridSpecification(data_dir / "test_circuit.dss")
-    model = opendss.DSSModel.from_grid_spec(spec)
+@pytest.fixture
+def grid_spec(data_dir):
+    """GridSpecification for the circuit defined in 'test_circuit.dss'."""
+    dssdirect.run_command("clear")
+    return grid.GridSpecification(data_dir / "test_circuit.dss")
+
+
+def test_DSSModel_from_gridspec(grid_spec):
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
     assert len(model.storage_devices) == 0
-    spec = grid.GridSpecification(data_dir / "test_circuit.dss")
-    del model
-    dssutil.run_command("clear")
-    spec.add_storage(
+    assert dssdirect.Circuit.Name() == "dssllibtestckt"
+
+
+def test_DSSModel_from_gridspec_storage(grid_spec):
+    grid_spec.add_storage(
         grid.StorageSpecification(
             name="S1",
             bus="loadbus1",
@@ -119,7 +129,7 @@ def test_DSSModel_from_gridspec(data_dir):
             controller='cycle'
         )
     )
-    spec.add_storage(
+    grid_spec.add_storage(
         grid.StorageSpecification(
             name="S2",
             bus="loadbus2.1.2",
@@ -130,7 +140,7 @@ def test_DSSModel_from_gridspec(data_dir):
             controller='cycle'
         )
     )
-    model = opendss.DSSModel.from_grid_spec(spec)
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
     assert len(model.storage_devices) == 2
     assert model.storage_devices["S1"].soc == pytest.approx(0.11)
     assert model.storage_devices["S1"].kwh_rated == 1000
@@ -139,3 +149,61 @@ def test_DSSModel_from_gridspec(data_dir):
     assert model.storage_devices["S2"].kwh_rated == 2000
     assert model.storage_devices["S2"].kw_rated == 200
     assert dssutil.get_property("storage.S2.phases") == '2'
+
+
+def test_DSSModel_from_gridspec_pvsystem(grid_spec):
+    pv_params = {
+        "kV": 12.47,
+        "irrad": 1000,
+        "temperature": 25,
+    }
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv1",
+            bus="loadbus1.1.2.3",
+            pmpp=100.0,
+            kva_rated=80.0,
+            params=pv_params
+        )
+    )
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv2",
+            bus="loadbus2.2.3",
+            pmpp=250.0,
+            kva_rated=300.0,
+            params=pv_params
+        )
+    )
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
+    assert set(dssdirect.PVsystems.AllNames()) == {"pv1", "pv2"}
+    dssdirect.PVsystems.Name("pv1")
+    assert dssdirect.PVsystems.kVARated() == 80.0
+    assert dssdirect.PVsystems.Pmpp() == 100.0
+    dssdirect.Circuit.SetActiveBus("loadbus1")
+    assert "PVSystem.pv1" in dssdirect.Bus.AllPCEatBus()
+    dssdirect.Circuit.SetActiveBus("loadbus2")
+    assert "PVSystem.pv2" in dssdirect.Bus.AllPCEatBus()
+
+
+def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv1",
+            bus="loadbus2",
+            pmpp=100,
+            kva_rated=100,
+            pt_curve=((0.0, 2.0), (2.0, 1.0), (3.0, 0.0)),
+            inverter_efficiency=((0.1, 0.8), (0.5, 0.9),
+                                 (0.8, 0.95), (1.0, 1.0))
+        )
+    )
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
+    dssdirect.PVsystems.Name("pv1")
+    eff_curve_name = dssdirect.run_command("? pvsystem.pv1.effcurve")
+    dssdirect.XYCurves.Name(eff_curve_name)
+    assert dssdirect.XYCurves.XArray() == [0.1, 0.5, 0.8, 1.0]
+    assert dssdirect.XYCurves.YArray() == [0.8, 0.9, 0.95, 1.0]
+    dssdirect.XYCurves.Name(dssdirect.run_command("? pvsystem.pv1.p-tcurve"))
+    assert dssdirect.XYCurves.XArray() == [0.0, 2.0, 3.0]
+    assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]
