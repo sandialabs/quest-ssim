@@ -193,13 +193,13 @@ class DSSModel:
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
         dssutil.load_model(dss_file)
         dssutil.run_command(
-            "set mode=time controlmode=time number=1 stepsize=15s"
+            "set mode=time controlmode=time number=1 stepsize=15m"
         )
         self.loadshapeclass = loadshape_class
         self._last_solution_time = None
         self._storage = {}
         self._pvsystems = {}
-        self._max_step = 15  # 15 minutes
+        self._max_step = 15 * 60  # 15 minutes
 
     @classmethod
     def from_grid_spec(cls, gridspec: GridSpecification) -> DSSModel:
