@@ -387,7 +387,6 @@ class DSSModel:
 
         return complex_voltages
 
-
     @staticmethod
     def total_power():
         """Return the total power on the circuit.
