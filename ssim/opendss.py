@@ -277,12 +277,6 @@ class DSSModel:
         dssdirect.Solution.Hour(hours)
         dssdirect.Solution.Seconds(seconds)
 
-    @property
-    def current_time(self):
-        """The current OpenDSS time in seconds."""
-        hour = dssdirect.Solution.Hour()
-        return hour * 3600 + dssdirect.Solution.Seconds()
-
     def next_update(self) -> float:
         """Return the time of the next simulation step in seconds."""
         if self._last_solution_time is None:
