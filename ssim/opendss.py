@@ -1,6 +1,7 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
 import enum
+import logging
 import math
 from os import PathLike
 from typing import Any, List, Dict, Optional
@@ -284,7 +285,10 @@ class DSSModel:
 
     def next_update(self) -> float:
         """Return the time of the next simulation step in seconds."""
-        return self.current_time + self._max_step
+        if self._last_solution_time is None:
+            # The model has never been solved, its next step should be at 0 s.
+            return 0
+        return self._last_solution_time + self._max_step
 
     def last_update(self) -> Optional[float]:
         """Return the time of the most recent power flow calculation."""
@@ -301,12 +305,12 @@ class DSSModel:
         """
         if time is not None:
             time_delta = time - (self._last_solution_time or 0)
+            logging.debug(f"[{time}] - delta: {time_delta}")
             dssutil.run_command(f"set stepsize={time_delta}s")
             self._set_time(time)
-        solution_time = self.current_time
         dssdirect.Solution.Solve()
         dssdirect.Circuit.SaveSample()
-        self._last_solution_time = solution_time
+        self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
