@@ -270,8 +270,13 @@ class DSSModel:
         """Set the OpenDSS LoadShape class used for loads and generators."""
         dssutil.run_command(f'set loadshapeclass={lsclass}')
 
-    @staticmethod
-    def _set_time(time):
+    def _set_time(self, time):
+        time_delta = time - (self._last_solution_time or 0)
+        logging.debug(f"[{time}] - delta: {time_delta}")
+        # Update the opendss stepsize to match the current time delta.
+        # This is required to ensure that storage devices update their state
+        # of charge accurately.
+        dssutil.run_command(f"set stepsize={time_delta}s")
         hours = math.floor(time) // 3600
         seconds = time - hours * 3600
         dssdirect.Solution.Hour(hours)
@@ -288,20 +293,15 @@ class DSSModel:
         """Return the time of the most recent power flow calculation."""
         return self._last_solution_time
 
-    def solve(self, time: float = None):
+    def solve(self, time: float):
         """Calculate the power flow on the circuit.
 
         Parameters
         ----------
-        time : float, optional
-            Time at which to solve, if not specified then the circuit
-            is solved at the current time in OpenDSS. [seconds]
+        time : float
+            Time at which to solve. [seconds]
         """
-        if time is not None:
-            time_delta = time - (self._last_solution_time or 0)
-            logging.debug(f"[{time}] - delta: {time_delta}")
-            dssutil.run_command(f"set stepsize={time_delta}s")
-            self._set_time(time)
+        self._set_time(time)
         dssdirect.Solution.Solve()
         dssdirect.Circuit.SaveSample()
         self._last_solution_time = time
