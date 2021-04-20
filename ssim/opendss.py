@@ -561,7 +561,7 @@ class DSSModel:
         """Restore a failed line.
 
         Sets the switch at `terminal` to the state specified by `how` and
-        unlocks any switch controllers assigned to that terminal.
+        unlocks any switch controllers associated with the line.
 
         Parameters
         ----------
