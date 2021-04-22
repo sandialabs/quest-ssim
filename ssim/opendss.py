@@ -1,6 +1,7 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
 import enum
+import logging
 import math
 from os import PathLike
 from typing import Any, List, Dict, Optional
@@ -269,44 +270,41 @@ class DSSModel:
         """Set the OpenDSS LoadShape class used for loads and generators."""
         dssutil.run_command(f'set loadshapeclass={lsclass}')
 
-    @staticmethod
-    def _set_time(time):
+    def _set_time(self, time):
+        time_delta = time - (self._last_solution_time or 0)
+        logging.debug(f"[{time}] - delta: {time_delta}")
+        # Update the opendss stepsize to match the current time delta.
+        # This is required to ensure that storage devices update their state
+        # of charge correctly.
+        dssutil.run_command(f"set stepsize={time_delta}s")
         hours = math.floor(time) // 3600
         seconds = time - hours * 3600
         dssdirect.Solution.Hour(hours)
         dssdirect.Solution.Seconds(seconds)
 
-    @property
-    def current_time(self):
-        """The current OpenDSS time in seconds."""
-        hour = dssdirect.Solution.Hour()
-        return hour * 3600 + dssdirect.Solution.Seconds()
-
     def next_update(self) -> float:
         """Return the time of the next simulation step in seconds."""
-        return self.current_time + self._max_step
+        if self._last_solution_time is None:
+            # The model has never been solved, its next step should be at 0 s.
+            return 0
+        return self._last_solution_time + self._max_step
 
     def last_update(self) -> Optional[float]:
         """Return the time of the most recent power flow calculation."""
         return self._last_solution_time
 
-    def solve(self, time: float = None):
+    def solve(self, time: float):
         """Calculate the power flow on the circuit.
 
         Parameters
         ----------
-        time : float, optional
-            Time at which to solve, if not specified then the circuit
-            is solved at the current time in OpenDSS. [seconds]
+        time : float
+            Time at which to solve. [seconds]
         """
-        if time is not None:
-            time_delta = time - (self._last_solution_time or 0)
-            dssutil.run_command(f"set stepsize={time_delta}s")
-            self._set_time(time)
-        solution_time = self.current_time
+        self._set_time(time)
         dssdirect.Solution.Solve()
         dssdirect.Circuit.SaveSample()
-        self._last_solution_time = solution_time
+        self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],

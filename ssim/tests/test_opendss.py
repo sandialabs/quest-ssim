@@ -222,3 +222,12 @@ def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
     dssdirect.XYCurves.Name(dssdirect.run_command("? pvsystem.pv1.p-tcurve"))
     assert dssdirect.XYCurves.XArray() == [0.0, 2.0, 3.0]
     assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]
+
+
+def test_DSSModel_solution_time(test_circuit):
+    assert test_circuit.next_update() == 0
+    test_circuit.solve(0)
+    delta = test_circuit.next_update()
+    test_circuit.solve(delta)
+    test_circuit.solve(delta + delta)
+    assert test_circuit.next_update() == delta * 3
