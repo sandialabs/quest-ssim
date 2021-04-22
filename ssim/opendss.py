@@ -275,7 +275,7 @@ class DSSModel:
         logging.debug(f"[{time}] - delta: {time_delta}")
         # Update the opendss stepsize to match the current time delta.
         # This is required to ensure that storage devices update their state
-        # of charge accurately.
+        # of charge correctly.
         dssutil.run_command(f"set stepsize={time_delta}s")
         hours = math.floor(time) // 3600
         seconds = time - hours * 3600
