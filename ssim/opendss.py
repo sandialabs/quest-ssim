@@ -446,11 +446,12 @@ class DSSModel:
         return self._pvsystems
 
     @staticmethod
-    def node_voltage(node):
-        """Return the voltage at `node` [pu]."""
-        node_voltages = dict(zip(dssdirect.Circuit.AllNodeNames(),
-                                 dssdirect.Circuit.AllBusMagPu()))
-        return node_voltages[node]
+    def node_voltage(bus):
+        """Return a list of node voltage magnitudes at `bus` [pu]."""
+        dssdirect.Circuit.SetActiveBus(bus)
+        voltages = dssdirect.Bus.VMagAngle()
+        base_voltage = dssdirect.Bus.kVBase() * 1000
+        return list(voltage / base_voltage for voltage in voltages[::2])
 
     @staticmethod
     def positive_sequence_voltage(bus):
@@ -458,6 +459,15 @@ class DSSModel:
         dssdirect.Circuit.SetActiveBus(bus.split('.')[0])  # remove node names
         zero, positive, negative = dssdirect.Bus.SeqVoltages()
         return positive / (dssdirect.Bus.kVBase() * 1000)
+
+    @staticmethod
+    def complex_voltage(bus):
+        """Return a list of complex voltages of each node at 'bus' [pu]. """
+        dssdirect.Circuit.SetActiveBus(bus)
+        pu_voltages = dssdirect.Bus.PuVoltage()
+        return list(
+            complex(real, imag) for real, imag in zip(pu_voltages[::2],
+                                                      pu_voltages[1::2]))
 
     @staticmethod
     def total_power():
