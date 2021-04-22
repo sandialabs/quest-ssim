@@ -7,7 +7,9 @@ from helics import (
     HelicsValueFederate,
     helics_time_maxtime,
     HelicsFederateInfo,
-    helicsCreateValueFederate
+    helicsCreateValueFederate,
+    helicsFederateInfoSetFlagOption,
+    HelicsFederateFlag
 )
 
 import matplotlib.pyplot as plt
@@ -275,6 +277,10 @@ def run_federate(name: str,
     show_plots : bool
         If true figures are displayed for each logger before exiting.
     """
+    # Mark the logger federate as an observer (i.e. doesn't publish anything).
+    helicsFederateInfoSetFlagOption(
+        fedinfo, HelicsFederateFlag.OBSERVER, True
+    )
     federate = helicsCreateValueFederate(name, fedinfo)
     logging.debug("federate: %s", federate)
     logging.debug("busses: %s", busses)
