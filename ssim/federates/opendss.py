@@ -2,12 +2,13 @@
 import logging
 
 from helics import (
-    HelicsValueFederate,
     HelicsDataType,
     HelicsFederateInfo,
-    helicsCreateValueFederate
+    helicsCreateCombinationFederate,
+    HelicsCombinationFederate
 )
 
+from ssim import reliability
 from ssim.grid import GridSpecification
 from ssim.opendss import Storage, DSSModel
 
@@ -25,7 +26,7 @@ class GridFederate:
     model : DSSModel
         The grid model.
     """
-    def __init__(self, federate: HelicsValueFederate, model: DSSModel):
+    def __init__(self, federate: HelicsCombinationFederate, model: DSSModel):
         self._federate = federate
         self._storage_subs = {}
         self._voltage_pubs = {}
@@ -39,6 +40,9 @@ class GridFederate:
             units="kW"
         )
         self._configure_storage()
+        self._reliability_endpoint = self._federate.register_endpoint(
+            "reliability"
+        )
 
     def _configure_storage(self):
         """Configure publications and subscriptions for a storage deveice."""
@@ -103,6 +107,35 @@ class GridFederate:
                 device.soc
             )
 
+    def _apply_reliability_event(self, event: reliability.Event):
+        """Apply a reliability event to the grid model."""
+        if event.type is reliability.EventType.FAIL:
+            self._grid_model.fail_line(
+                event.element,
+                terminal=event.data.get("terminal", 1),
+                how=str(event.mode)
+            )
+        else:
+            self._grid_model.restore_line(
+                event.element,
+                terminal=event.data.get("terminal", 1),
+                how=str(event.mode)
+            )
+
+    def _update_reliability(self):
+        """Update failed/restored components.
+
+        Processes messages received at the "reliability" endpoint.
+        Each message contains the name of a circuit element and whether
+        it is to be failed or restored along with the state to put the
+        element in (open/closed/current).
+        """
+        while self._reliability_endpoint.n_pending_messages > 0:
+            message = self._reliability_endpoint.get_message()
+            self._apply_reliability_event(
+                 reliability.Event.from_json(message.data)
+            )
+
     def step(self, time: float):
         """Step the opendss model to `time`.
 
@@ -112,6 +145,7 @@ class GridFederate:
             Time in seconds.
         """
         self._update_storage()
+        self._update_reliability()
         self._grid_model.solve(time)
         self._publish_power()
         self._publish_node_voltages()
@@ -144,7 +178,7 @@ def run_federate(name: str,
     hours : float
         How many hours to run.
     """
-    federate = helicsCreateValueFederate(name, fedinfo)
+    federate = helicsCreateCombinationFederate(name, fedinfo)
     model = DSSModel.from_grid_spec(grid)
     grid_federate = GridFederate(federate, model)
     federate.enter_executing_mode()
