@@ -1,4 +1,5 @@
 """Federate interface for a grid reliability simulation."""
+import logging
 from typing import List
 
 from helics import (
@@ -35,14 +36,22 @@ class ReliabilityFederate:
             "reliability"
         )
 
+    def _event_message(self, event):
+        message = self._endpoint.create_message()
+        message.destination = "grid/reliability"
+        message.data = event.to_json()
+        return message
+
     def step(self, time):
         """Advance the time of the reliability model to `time`."""
         for event in self._reliability_model.events(time):
-            message = self._endpoint.create_message()
-            message.append(bytes(event.to_json()))
-            self._endpoint.send_data(message, "grid/reliability")
+            message = self._event_message(event)
+            logging.debug("sending message: %s", message)
+            self._endpoint.send_data(message)
 
     def run(self, hours: float):
+        logging.info("Running reliability federate.")
+        logging.info("endpoints: %s", self._federate.endpoints)
         current_time = 0.0
         while current_time < hours * 3600:
             current_time = self._federate.request_time(
@@ -70,7 +79,7 @@ def run_federate(name: str,
     """
     federate = helicsCreateMessageFederate(name, fedinfo)
     model = GridReliabilityModel(
-        [LineReliability(line, 1.0 / 3600, 1800, 3600) for line in lines]
+        [LineReliability(line, 1.0 / 3600, 3*3600, 10*3600) for line in lines]
     )
     reliability_federate = ReliabilityFederate(federate, model)
     federate.enter_executing_mode()

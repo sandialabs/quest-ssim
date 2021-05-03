@@ -103,7 +103,7 @@ class GridReliabilityModel(ReliabilityModel):
             Time in seconds.
         """
         component_events = itertools.chain(
-            component.events(time) for component in self._components
+            *(component.events(time) for component in self._components)
         )
         for event in component_events:
             yield event

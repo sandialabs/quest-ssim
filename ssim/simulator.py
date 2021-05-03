@@ -13,7 +13,7 @@ from helics import (
 )
 
 from ssim.grid import GridSpecification, StorageSpecification
-from ssim.federates import storage, opendss, logger
+from ssim.federates import storage, opendss, logger, reliability
 
 
 _BROKER_NAME = "ssimbroker"
@@ -122,7 +122,7 @@ class Simulation:
 
     Parameters
     ----------
-    grid_description : grid.Grid
+    grid_description : grid.GridSpecification
         Description of the grid and connected devices to simulate.
     show_plots : bool
         If true then the logger displays figures showing the values
@@ -135,11 +135,12 @@ class Simulation:
                  show_plots: bool = False,
                  loglevel: int = logging.WARN):
         self.grid = grid_description
-        self.num_federates = 3  # grid, storage, logger
+        self.num_federates = 4  # grid, storage, logger, reliability
         self._broker_process = None
         self._logger_process = None
         self._grid_process = None
         self._storage_process = None
+        self._reliability_process = None
         self._show_plots = show_plots
         self._loglevel = loglevel
 
@@ -194,13 +195,27 @@ class Simulation:
             name="logger_federate"
         )
 
+    def _init_reliability_federate(self, hours):
+        """Initialize the reliabilty federate process."""
+        self._reliability_process = Process(
+            target=_start_federate,
+            kwargs={"name": "reliability",
+                    "target": reliability.run_federate,
+                    "federate_kwargs": {"lines": {"671680", "632633"},  # TODO specify lines
+                                        "hours": hours},
+                    "loglevel": logging.DEBUG},
+            name="reliability_federate"
+        )
+
     def _run(self):
         self._broker_process.start()
         self._logger_process.start()
+        self._reliability_process.start()
         self._grid_process.start()
         self._storage_process.start()
         # Wait for federates to finish
         self._logger_process.join()
+        self._reliability_process.join()
         self._grid_process.join()
         self._storage_process.join()
         self._broker_process.join()
@@ -216,6 +231,7 @@ class Simulation:
         self._start_broker()
         self._init_grid_federate(hours)
         self._init_storage_federate(hours)
+        self._init_reliability_federate(hours)
         self._init_logger_federate(hours)
         self._run()
 

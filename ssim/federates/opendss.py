@@ -113,13 +113,13 @@ class GridFederate:
             self._grid_model.fail_line(
                 event.element,
                 terminal=event.data.get("terminal", 1),
-                how=str(event.mode)
+                how=event.mode
             )
         else:
             self._grid_model.restore_line(
                 event.element,
                 terminal=event.data.get("terminal", 1),
-                how=str(event.mode)
+                how=event.mode
             )
 
     def _update_reliability(self):
