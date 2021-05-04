@@ -200,6 +200,7 @@ class DSSModel:
         self._last_solution_time = None
         self._storage = {}
         self._pvsystems = {}
+        self._failed_elements = set()
         self._max_step = 15 * 60  # 15 minutes
 
     @classmethod
@@ -479,3 +480,99 @@ class DSSModel:
             Reactive power [kVAR]
         """
         return dssdirect.Circuit.TotalPower()
+
+    @staticmethod
+    def _switch_terminal(full_name: str, terminal: int, how: str):
+        if how not in {'open', 'closed', 'current'}:
+            raise ValueError("`how` must be one of 'open', 'closed', "
+                             f"or 'current'. Got '{how}'.")
+        if how == 'open':
+            dssutil.open_terminal(full_name, terminal)
+        elif how == 'closed':
+            dssutil.close_terminal(full_name, terminal)
+
+    def _fail_element(self, full_name: str, terminal: int, how: str):
+        """Fail an element in the OpenDSS model.
+
+        Fail an element by opening or closing the switch at `terminal` and
+        lock out all switch controls associated with the element.
+
+        Parameters
+        ----------
+        full_name : str
+            Full name of the OpenDSS circuit element (e.g. 'line.l123').
+        terminal : int
+            Terminal of the element to operate on.
+        how : str
+            How to fail the element. Can be 'open' (the terminal is opened),
+            'closed' (the terminal is closed), or 'current' (the
+            element/terminal is locked out in its current state).
+        """
+        self._switch_terminal(full_name, terminal, how)
+        dssutil.lock_switch_control(full_name)
+        self._failed_elements.add(full_name)
+
+    def _restore_element(self, full_name: str, terminal: int, how: str):
+        """Restore a failed element.
+
+        Sets the terminal switch for the element as specified by `how` and
+        unlocks all switch controllers associated with the element.
+
+        Parameters
+        ----------
+        full_name : str
+            Full name of the OpenDSS circuit element (e.g. 'line.l123')
+        terminal : int
+            Terminal of the device to operate on.
+        how : str
+            State to return the terminal to. Can be 'open' (terminal is
+            switched opened), 'closed' (terminal is switched closed), or
+            'current' (terminal is kept in its current state).
+        """
+        if full_name not in self._failed_elements:
+            raise ValueError(f"Element '{full_name}' is not failed.")
+        self._switch_terminal(full_name, terminal, how)
+        dssutil.unlock_switch_control(full_name)
+        self._failed_elements.remove(full_name)
+
+    def fail_line(self, name: str, terminal: int, how: str = 'open'):
+        """Fail a line.
+
+        This is also used to fail switches, which are modeled in OpenDSS as
+        lines with negligible impedance. As opposed to the "normal" way of
+        operating switches (through switch controls), this method operates
+        directly on implicit switches at each terminal of the line. If any
+        switch controllers are associated with the line they are locked out
+        to prevent normal operation while the line is out of service.
+
+        Parameters
+        ----------
+        name : str
+            Name of the line to fail.
+        terminal : int
+            Which terminal of the line to fail (i.e. which end).
+        how : str, default 'open'
+            State to fail the line in. Must be one of 'current', 'open', or
+            'closed'.
+        """
+        self._fail_element(f"line.{name}", terminal, how)
+
+    def restore_line(self, name: str, terminal: int, how: str = 'current'):
+        """Restore a failed line.
+
+        Sets the switch at `terminal` to the state specified by `how` and
+        unlocks any switch controllers assigned to that terminal.
+
+        Parameters
+        ----------
+        name : str
+            Name of the line to restore.
+        terminal : int
+            Terminal to restore.
+        how : str, default 'current'
+            State to restore the line to. By default the line is restored to
+            its current state. This effectively does nothing other than allow
+            switch controls (if present) to operate again. Can be any of
+            'open', 'closed', or 'current'.
+        """
+        self._restore_element(f"line.{name}", terminal, how)

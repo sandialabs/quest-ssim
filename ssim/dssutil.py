@@ -205,3 +205,130 @@ def to_dataframe(element_type, properties=None):
         )
     names, props = zip(*iterate_properties(element_type, properties))
     return pd.DataFrame(props, index=names, columns=properties)
+
+
+def open_terminal(full_name: str, terminal: int,
+                  conductor: Optional[int] = None):
+    """Open the conductor(s) connecting to `terminal`.
+
+    Parameters
+    ----------
+    full_name : str
+        Full name of the element to operate on (e.g. 'storage.stor1').
+    terminal : int
+        Terminal to open.
+    conductor : int, optional
+        Conductor to open. If not specified, all conductors are opened.
+
+    Raises
+    ------
+    ValueError
+        If the terminal is not a valid terminal for the circuit element
+        specified by `full_name`.
+    """
+    dssdirect.Circuit.SetActiveElement(full_name)
+    if terminal > dssdirect.CktElement.NumTerminals():
+        raise ValueError("Invalid terminal. Attempt to open terminal "
+                         f"{terminal}, but {full_name} has only "
+                         f"{dssdirect.CktElement.NumTerminals()} terminals.")
+    if conductor is not None:
+        dssdirect.CktElement.Open(terminal, conductor)
+    else:
+        for conductor in dssdirect.CktElement.NodeOrder():
+            dssdirect.CktElement.Open(terminal, conductor)
+
+
+def close_terminal(full_name: str, terminal: int,
+                   conductor: Optional[int] = None):
+    """Close the conductor(s) connecting to `terminal`.
+
+    Parameters
+    ----------
+    full_name : str
+        Full name of the element to operate on (e.g. 'storage.stor1').
+    terminal : int
+        Terminal to close.
+    conductor : int, optional
+        Conductor to close. If not specified, all conductors are closed.
+
+    Raises
+    ------
+    ValueError
+        If the terminal is not a valid terminal for the circuit element
+        specified by `full_name`.
+    """
+    dssdirect.Circuit.SetActiveElement(full_name)
+    if terminal > dssdirect.CktElement.NumTerminals():
+        raise ValueError("Invalid terminal. Attempt to close terminal "
+                         f"{terminal}, but {full_name} has only "
+                         f"{dssdirect.CktElement.NumTerminals()} terminals.")
+    if conductor is not None:
+        dssdirect.CktElement.Close(terminal, conductor)
+    else:
+        for conductor in dssdirect.CktElement.NodeOrder():
+            dssdirect.CktElement.Close(terminal, conductor)
+
+
+def _set_switch_control_lock(element: str, locked: bool,
+                             terminal: Optional[int] = None):
+    """Lock/unlock switch controls associated with `element`.
+
+    Parameters
+    ----------
+    element : str
+        Name of the circuit element that is being controlled.
+    locked : bool
+        Lock state to set. If True the controller is locked, if False the
+        controller is unlocked.
+    terminal : int, optional
+        If specified, only switch controllers that switch `terminal` are
+        locked/unlocked. If not specified, all switch controllers associated
+        with `element` are locked/unlocked.
+    """
+    dssdirect.Circuit.SetActiveElement(element)
+    if not dssdirect.CktElement.HasSwitchControl():
+        return
+    all_controllers = [dssdirect.CktElement.Controller(index)
+                       for index in range(
+                           1, dssdirect.CktElement.NumControls()+1)]
+    switch_controllers = [controller for controller in all_controllers
+                          if controller.startswith("SwtControl.")]
+    for controller in switch_controllers:
+        if (terminal is None
+                or terminal == dssdirect.SwtControls.SwitchedTerm()):
+            dssdirect.Circuit.SetActiveElement(controller)
+            dssdirect.SwtControls.IsLocked(locked)
+
+
+def lock_switch_control(element: str, terminal: Optional[int] = None):
+    """Lock any switch controllers for `terminal`.
+
+    If there is no switch control object for `element` then no action is
+    taken. If the terminal is specified then only switch controllers that
+    switch `terminal` of `element` are locked.
+
+    Parameters
+    ----------
+    element : str
+        Full name of the controlled opendss element.
+    terminal : int, optional
+        The terminal of `element` that the switch control is connected to.
+    """
+    _set_switch_control_lock(element, locked=True, terminal=terminal)
+
+
+def unlock_switch_control(element: str, terminal: Optional[int] = None):
+    """Unlock any switch controllers for `terminal`.
+
+    If there is no switch control object for `element` then no action is
+    taken. If the terminal is specified then only switch controllers that
+    switch `terminal` of `element` are unlocked.
+
+    Parameters
+    ----------
+    element : str
+        Full name of the controlled opendss element.
+    terminal : int, optional
+        The terminal of `element` that the switch control is connected to.
+    """
+    _set_switch_control_lock(element, locked=False, terminal=terminal)

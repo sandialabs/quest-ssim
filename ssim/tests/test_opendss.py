@@ -231,3 +231,13 @@ def test_DSSModel_solution_time(test_circuit):
     test_circuit.solve(delta)
     test_circuit.solve(delta + delta)
     assert test_circuit.next_update() == delta * 3
+
+
+def test_DSSModel_fail_line_restore_line(test_circuit):
+    test_circuit.fail_line("line2", terminal=1, how='open')
+    test_circuit.solve(7200)
+    active_power, _ = test_circuit.total_power()
+    test_circuit.restore_line("line2", terminal=1, how='closed')
+    test_circuit.solve(7200)
+    active_power_restored, _ = test_circuit.total_power()
+    assert active_power < active_power_restored
