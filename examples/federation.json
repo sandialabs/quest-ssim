@@ -1,0 +1,30 @@
+{
+  "federates": [
+    {
+      "directory": ".",
+      "exec": "helics_broker -f 2 --loglevel=7",
+      "host": "localhost",
+      "name": "broker"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate --hours 48 s1.json",
+      "host": "localhost",
+      "name": "storage"
+    },
+    {
+      "directory": ".",
+      "exec": "grid-federate --hours 48 grid.json grid-federate.json",
+      "host": "localhost",
+      "name": "grid"
+    },
+    {
+      "directory": ".",
+      "exec": "logger-federate --hours 48 logger.json",
+      "host": "localhost",
+      "name": "logger"
+    }
+  ],
+  "name": "ssim_demo"
+}
+

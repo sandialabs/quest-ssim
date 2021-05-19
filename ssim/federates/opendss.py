@@ -1,11 +1,14 @@
 """Federate for OpenDSS grid simulation."""
+import argparse
 import logging
 
 from helics import (
     HelicsDataType,
     HelicsFederateInfo,
     helicsCreateCombinationFederate,
-    HelicsCombinationFederate
+    HelicsCombinationFederate, helics_time_maxtime,
+    helicsCreateValueFederateFromConfig, HelicsValueFederate,
+    helicsFederateLogDebugMessage
 )
 
 from ssim import reliability
@@ -183,4 +186,121 @@ def run_federate(name: str,
     grid_federate = GridFederate(federate, model)
     federate.enter_executing_mode()
     grid_federate.run(hours)
+    federate.finalize()
+
+
+class StorageInterface:
+    """Handle all publications related to a storage device.
+
+    Parameters
+    ----------
+    federate :
+        HELICS federate handle.
+    device : Storage
+        The storage device.
+    """
+    def __init__(self, federate, device):
+        self.device = device
+        self._power_sub = federate.subscriptions[
+            f"{device.name}/power"
+        ]
+        self._voltage_pub = federate.publications[
+            f"grid/storage.{device.name}.voltage"
+        ]
+        self._soc_pub = federate.publications[
+            f"grid/storage.{device.name}.soc"
+        ]
+        self._power_pub = federate.publications[
+            f"grid/storage.{device.name}.power"
+        ]
+
+    def update(self):
+        if self._power_sub.is_updated():
+            self.device.set_power(self._power_sub.complex.real,
+                                  self._power_sub.complex.imag)
+
+    def publish(self, voltage):
+        self._voltage_pub.publish(voltage)
+        self._soc_pub.publish(self.device.soc)
+        self._power_pub.publish(
+            complex(self.device.kw, self.device.kvar)
+        )
+
+
+class SimpleGridFederate:
+    def __init__(self, federate: HelicsValueFederate, grid_file: str):
+        helicsFederateLogDebugMessage(
+            federate, f"initializing DSSModel with {grid_file}"
+        )
+        helicsFederateLogDebugMessage(
+            federate, f"pulications: {federate.publications.keys()}"
+        )
+        self._grid_model = DSSModel.from_json(grid_file)
+        self._federate = federate
+        self._storage_interface = [
+            StorageInterface(federate, device)
+            for device in self._grid_model.storage_devices.values()
+        ]
+
+    def _update_storage(self):
+        for storage in self._storage_interface:
+            storage.update()
+
+    def _publish(self):
+        for storage in self._storage_interface:
+            storage.publish(
+                self._grid_model.positive_sequence_voltage(storage.device.bus)
+            )
+        self._federate.publications['grid/total_power'].publish(
+            complex(*self._grid_model.total_power())
+        )
+
+    def step(self, time: float):
+        """Step the opendss model to `time`.
+
+        Parameters
+        ----------
+        time : float
+            Time in seconds.
+        """
+        self._update_storage()
+        # self._update_reliability()
+        self._grid_model.solve(time)
+        self._publish()
+
+    def run(self, hours: float):
+        """Run the simulation for `hours`."""
+        current_time = self._grid_model.last_update() or 0
+        while current_time < hours * 3600:
+            current_time = self._federate.request_time(
+                self._grid_model.next_update()
+            )
+            self.step(current_time)
+
+
+def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "grid_config",
+        type=str,
+        help="path to JSON file specifying the grid configuration"
+    )
+    parser.add_argument(
+        "federate_config",
+        type=str,
+        help="path to federate config file"
+    )
+    parser.add_argument(
+        "--hours",
+        type=float,
+        default=helics_time_maxtime,
+        help="how many hours the simulation will run"
+    )
+    args = parser.parse_args()
+    federate = helicsCreateValueFederateFromConfig(args.federate_config)
+    helicsFederateLogDebugMessage(federate, "Federate created")
+    grid_federate = SimpleGridFederate(federate, args.grid_config)
+    helicsFederateLogDebugMessage(federate, "Model initialized")
+    federate.enter_executing_mode()
+    grid_federate.run(args.hours)
     federate.finalize()

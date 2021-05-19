@@ -1,6 +1,7 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
 import enum
+import json
 import logging
 import math
 from os import PathLike
@@ -256,6 +257,21 @@ class DSSModel:
                 pv_system.kva_rated,
                 pv_system.pmpp,
                 system_params
+            )
+        return model
+
+    @classmethod
+    def from_json(cls, file):
+        with open(file) as f:
+            spec = json.load(f)
+        logging.debug("loaded grid json: dss_file='%s'", spec["dss_file"])
+        model = DSSModel(spec.pop("dss_file"))
+        for storage_device in spec["storage"]:
+            model.add_storage(
+                storage_device.pop("name"),
+                storage_device.pop("bus"),
+                storage_device.pop("phases"),
+                storage_device  # remaining keys are opendss param names
             )
         return model
 

@@ -1,0 +1,12 @@
+{
+  "dss_file": "c:\\users\\wfvinin\\src\\ieee13demo\\ieee13nodeckt_modified.dss",
+  "storage": [
+    {
+      "name": "S1",
+      "bus": "632",
+      "phases": 3,
+      "kwrated": 100,
+      "kwhrated": 1000
+    }
+  ]
+}

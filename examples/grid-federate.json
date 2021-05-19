@@ -1,0 +1,44 @@
+{
+  "name": "grid",
+  "core_name": "grid_core",
+  "log_level": 7,
+  "core_type": "zmq",
+  "time_delta": 0.1,
+  "subscriptions": [
+    {
+      "key": "S1/power",
+      "unit": "kW",
+      "type": "complex",
+      "default": 1.0
+    }
+  ],
+  "publications": [
+    {
+      "key": "total_power",
+      "unit": "kW",
+      "type": "complex"
+    },
+    {
+      "key": "storage.S1.soc",
+      "unit": "",
+      "type": "double",
+      "default": 1.0
+    },
+    {
+      "key": "storage.S1.voltage",
+      "unit": "pu",
+      "type": "double",
+      "default": 0.0
+    },
+    {
+      "key": "storage.S1.power",
+      "unit": "kW",
+      "type": "complex"
+    }
+  ],
+  "endpoints": [
+    {
+      "key": "reliability"
+    }
+  ]
+}
