@@ -1,0 +1,10 @@
+{
+  "name": "reliability",
+  "core_name": "reliability_core",
+  "core_type": "zmq",
+  "endpoints": [
+    {
+      "key": "reliability"
+    }
+  ]
+}

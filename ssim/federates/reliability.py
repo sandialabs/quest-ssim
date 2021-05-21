@@ -1,11 +1,12 @@
 """Federate interface for a grid reliability simulation."""
+import argparse
 import logging
 from typing import List
 
 from helics import (
     HelicsMessageFederate,
     HelicsFederateInfo,
-    helicsCreateMessageFederate
+    helicsCreateMessageFederate, helicsCreateMessageFederateFromConfig
 )
 
 from ssim.reliability import GridReliabilityModel, LineReliability
@@ -32,9 +33,7 @@ class ReliabilityFederate:
                  reliability_model: GridReliabilityModel):
         self._federate = federate
         self._reliability_model = reliability_model
-        self._endpoint = federate.register_endpoint(
-            "reliability"
-        )
+        self._endpoint = federate.endpoints['reliability']
 
     def _event_message(self, event):
         message = self._endpoint.create_message()
@@ -79,8 +78,54 @@ def run_federate(name: str,
     """
     federate = helicsCreateMessageFederate(name, fedinfo)
     model = GridReliabilityModel(
-        [LineReliability(line, 1.0 / 3600, 3*3600, 10*3600) for line in lines]
+        [LineReliability(line, 1.0 / 36000000, 3*3600, 10*3600) for line in lines]
     )
     reliability_federate = ReliabilityFederate(federate, model)
     federate.enter_executing_mode()
     reliability_federate.run(hours)
+
+
+def _make_reliability_model(grid_config: str) -> GridReliabilityModel:
+    """Construct a reliability model for the grid.
+
+    Parameters
+    ----------
+    grid_config : str
+        Path the the JSON grid configuration file.
+
+    Returns
+    -------
+    GridReliabilityModel
+    """
+    # TODO load the grid config and build a reliability model for every
+    #      circuit element.
+    model = GridReliabilityModel(
+        [LineReliability(line, 1.0 / 36000, 3 * 3600, 10 * 3600) for line in
+         {"671680", "632633"}]
+    )
+    return model
+
+
+def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "grid_config",
+        type=str,
+        help="path to grid config file"
+    )
+    parser.add_argument(
+        "federate_config",
+        type=str,
+        help="path to federate config file"
+    )
+    parser.add_argument(
+        "--hours",
+        type=float,
+        help="number of hours to simulate"
+    )
+    args = parser.parse_args()
+    federate = helicsCreateMessageFederateFromConfig(args.federate_config)
+    reliability_model = _make_reliability_model(args.grid_config)
+    fed = ReliabilityFederate(federate, reliability_model)
+    federate.enter_executing_mode()
+    fed.run(args.hours)

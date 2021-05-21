@@ -19,9 +19,13 @@ def _controller(federate, hours):
         federate.log_message(f"voltage: {voltage}", HelicsLogLevel.TRACE)
         federate.log_message(f"soc: {soc}", HelicsLogLevel.TRACE)
         if abs(last_voltage - voltage) > 1.0e-3:
-            federate.publications[f"{federate.name}/power"].publish(
-                complex((1.0 - voltage) * 5000, voltage * -500)
+            voltage_error = 1.0 - voltage
+            power = complex(voltage_error * 5000, voltage_error * -500)
+            federate.log_message(
+                f"publishing new power @ {time}: {power}",
+                HelicsLogLevel.TRACE
             )
+            federate.publications[f"{federate.name}/power"].publish(power)
             last_voltage = voltage
         time = federate.request_time(helics_time_maxtime)
 

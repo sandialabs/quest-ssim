@@ -3,19 +3,20 @@
   "core_name": "s1_core",
   "log_level": 7,
   "core_type": "zmq",
-  "time_delta": 0.1,
+  "time_delta": 1.0,
+  "wait_for_current_time_update": true,
   "subscriptions": [
     {
       "key": "grid/storage.S1.soc",
       "unit": "",
       "type": "double",
-      "default": 1.0
+      "default": 0.5
     },
     {
       "key": "grid/storage.S1.voltage",
       "unit": "pu",
       "type": "double",
-      "default": 0.0
+      "default": 1.0
     }
   ],
   "publications": [

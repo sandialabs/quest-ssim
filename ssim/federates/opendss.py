@@ -1,14 +1,16 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
+import collections
 import logging
 
+import matplotlib.pyplot as plt
 from helics import (
     HelicsDataType,
     HelicsFederateInfo,
     helicsCreateCombinationFederate,
     HelicsCombinationFederate, helics_time_maxtime,
     helicsCreateValueFederateFromConfig, HelicsValueFederate,
-    helicsFederateLogDebugMessage
+    helicsFederateLogDebugMessage, HelicsLogLevel
 )
 
 from ssim import reliability
@@ -201,6 +203,7 @@ class StorageInterface:
     """
     def __init__(self, federate, device):
         self.device = device
+        self._federate = federate
         self._power_sub = federate.subscriptions[
             f"{device.name}/power"
         ]
@@ -216,6 +219,12 @@ class StorageInterface:
 
     def update(self):
         if self._power_sub.is_updated():
+            self._federate.log_message(
+                f"Updating {self.device.name} power @ "
+                f"{self._power_sub.get_last_update_time()}: "
+                f"{self._power_sub.complex}",
+                HelicsLogLevel.TRACE
+            )
             self.device.set_power(self._power_sub.complex.real,
                                   self._power_sub.complex.imag)
 
@@ -241,6 +250,9 @@ class SimpleGridFederate:
             StorageInterface(federate, device)
             for device in self._grid_model.storage_devices.values()
         ]
+        self.voltage = collections.defaultdict(list)
+        self.power = []
+        self.time = []
 
     def _update_storage(self):
         for storage in self._storage_interface:
@@ -248,9 +260,12 @@ class SimpleGridFederate:
 
     def _publish(self):
         for storage in self._storage_interface:
-            storage.publish(
-                self._grid_model.positive_sequence_voltage(storage.device.bus)
+            voltage = self._grid_model.positive_sequence_voltage(
+                storage.device.bus
             )
+            self.voltage[storage.device.bus].append(voltage)
+            storage.publish(voltage)
+        self.power.append(self._grid_model.total_power())
         self._federate.publications['grid/total_power'].publish(
             complex(*self._grid_model.total_power())
         )
@@ -263,8 +278,10 @@ class SimpleGridFederate:
         time : float
             Time in seconds.
         """
+        self._federate.log_message(f"granted time: {time}", HelicsLogLevel.INTERFACES)
         self._update_storage()
         # self._update_reliability()
+        self.time.append(time)
         self._grid_model.solve(time)
         self._publish()
 
@@ -276,6 +293,12 @@ class SimpleGridFederate:
                 self._grid_model.next_update()
             )
             self.step(current_time)
+        plt.figure()
+        plt.plot(self.time, self.power)
+        plt.figure()
+        for bus in self.voltage:
+            plt.plot(self.time, self.voltage[bus])
+        plt.show()
 
 
 def run():
@@ -298,7 +321,8 @@ def run():
     )
     args = parser.parse_args()
     federate = helicsCreateValueFederateFromConfig(args.federate_config)
-    helicsFederateLogDebugMessage(federate, "Federate created")
+    helicsFederateLogDebugMessage(federate, f"Federate created: publications: {federate.publications}")
+    helicsFederateLogDebugMessage(federate, f"Federate created: subscriptions: {federate.subscriptions}")
     grid_federate = SimpleGridFederate(federate, args.grid_config)
     helicsFederateLogDebugMessage(federate, "Model initialized")
     federate.enter_executing_mode()
