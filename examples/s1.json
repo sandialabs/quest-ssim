@@ -4,7 +4,6 @@
   "log_level": 7,
   "core_type": "zmq",
   "time_delta": 1.0,
-  "wait_for_current_time_update": true,
   "subscriptions": [
     {
       "key": "grid/storage.S1.soc",

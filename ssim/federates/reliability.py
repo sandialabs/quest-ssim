@@ -31,9 +31,10 @@ class ReliabilityFederate:
     """
     def __init__(self, federate: HelicsMessageFederate,
                  reliability_model: GridReliabilityModel):
+        print(f"endpoints: {federate.endpoints}")
         self._federate = federate
         self._reliability_model = reliability_model
-        self._endpoint = federate.endpoints['reliability']
+        self._endpoint = federate.get_endpoint_by_name("reliability")
 
     def _event_message(self, event):
         message = self._endpoint.create_message()

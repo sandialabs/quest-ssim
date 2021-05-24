@@ -9,8 +9,8 @@ from helics import (
     HelicsFederateInfo,
     helicsCreateCombinationFederate,
     HelicsCombinationFederate, helics_time_maxtime,
-    helicsCreateValueFederateFromConfig, HelicsValueFederate,
-    helicsFederateLogDebugMessage, HelicsLogLevel
+    helicsFederateLogDebugMessage, HelicsLogLevel,
+    helicsCreateCombinationFederateFromConfig
 )
 
 from ssim import reliability
@@ -191,6 +191,29 @@ def run_federate(name: str,
     federate.finalize()
 
 
+class ReliabilityInterface:
+    """Wrapper around reliability endpoint.
+
+    Handles event parsing and iteration.
+
+    Parameters
+    ----------
+    federate : HelicsCombinationFederate
+        Federate handle. Must have an endpoint named "reliability".
+    """
+    def __init__(self, federate):
+        self.endpoint = federate.get_endpoint_by_name(
+            "reliability"
+        )
+
+    @property
+    def events(self):
+        """An iterator over all pending reliability events."""
+        while self.endpoint.has_message():
+            message = self.endpoint.get_message()
+            yield reliability.Event.from_json(message.data)
+
+
 class StorageInterface:
     """Handle all publications related to a storage device.
 
@@ -237,7 +260,7 @@ class StorageInterface:
 
 
 class SimpleGridFederate:
-    def __init__(self, federate: HelicsValueFederate, grid_file: str):
+    def __init__(self, federate: HelicsCombinationFederate, grid_file: str):
         helicsFederateLogDebugMessage(
             federate, f"initializing DSSModel with {grid_file}"
         )
@@ -251,6 +274,7 @@ class SimpleGridFederate:
             for device in self._grid_model.storage_devices.values()
         ]
         self.voltage = collections.defaultdict(list)
+        self._reliability = ReliabilityInterface(federate)
         self.power = []
         self.time = []
 
@@ -270,6 +294,25 @@ class SimpleGridFederate:
             complex(*self._grid_model.total_power())
         )
 
+    def _apply_reliability_event(self, event: reliability.Event):
+        """Apply a reliability event to the grid model."""
+        if event.type is reliability.EventType.FAIL:
+            self._grid_model.fail_line(
+                event.element,
+                terminal=event.data.get("terminal", 1),
+                how=event.mode
+            )
+        else:
+            self._grid_model.restore_line(
+                event.element,
+                terminal=event.data.get("terminal", 1),
+                how=event.mode
+            )
+
+    def _update_reliability(self):
+        for event in self._reliability.events:
+            self._apply_reliability_event(event)
+
     def step(self, time: float):
         """Step the opendss model to `time`.
 
@@ -278,9 +321,10 @@ class SimpleGridFederate:
         time : float
             Time in seconds.
         """
-        self._federate.log_message(f"granted time: {time}", HelicsLogLevel.INTERFACES)
+        self._federate.log_message(
+            f"granted time: {time}", HelicsLogLevel.INTERFACES)
+        self._update_reliability()
         self._update_storage()
-        # self._update_reliability()
         self.time.append(time)
         self._grid_model.solve(time)
         self._publish()
@@ -293,6 +337,7 @@ class SimpleGridFederate:
                 self._grid_model.next_update()
             )
             self.step(current_time)
+        # Plot some figures for debugging
         plt.figure()
         plt.plot(self.time, self.power)
         plt.figure()
@@ -320,9 +365,13 @@ def run():
         help="how many hours the simulation will run"
     )
     args = parser.parse_args()
-    federate = helicsCreateValueFederateFromConfig(args.federate_config)
-    helicsFederateLogDebugMessage(federate, f"Federate created: publications: {federate.publications}")
-    helicsFederateLogDebugMessage(federate, f"Federate created: subscriptions: {federate.subscriptions}")
+    federate = helicsCreateCombinationFederateFromConfig(args.federate_config)
+    helicsFederateLogDebugMessage(
+        federate, f"Federate created: publications: {federate.publications}")
+    helicsFederateLogDebugMessage(
+        federate, f"Federate created: subscriptions: {federate.subscriptions}")
+    helicsFederateLogDebugMessage(
+        federate, f"Federate created: endpoints: {federate.endpoints}")
     grid_federate = SimpleGridFederate(federate, args.grid_config)
     helicsFederateLogDebugMessage(federate, "Model initialized")
     federate.enter_executing_mode()
