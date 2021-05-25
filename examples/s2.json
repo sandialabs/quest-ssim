@@ -1,0 +1,28 @@
+{
+  "name": "S2",
+  "core_name": "s2_core",
+  "log_level": 7,
+  "core_type": "zmq",
+  "time_delta": 1.0,
+  "subscriptions": [
+    {
+      "key": "grid/storage.S2.soc",
+      "unit": "",
+      "type": "double",
+      "default": 0.5
+    },
+    {
+      "key": "grid/storage.S2.voltage",
+      "unit": "pu",
+      "type": "double",
+      "default": 1.0
+    }
+  ],
+  "publications": [
+    {
+      "key": "power",
+      "unit": "kW",
+      "type": "complex"
+    }
+  ]
+}

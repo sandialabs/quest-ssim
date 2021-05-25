@@ -8,6 +8,14 @@
       "kwrated": 100,
       "kwhrated": 1000,
       "%stored": 50
+    },
+    {
+      "name": "S2",
+      "bus": "670",
+      "phases": 3,
+      "kwrated": 500,
+      "kwhrated": 50000,
+      "%stored": 50
     }
   ]
 }
