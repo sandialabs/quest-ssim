@@ -5,9 +5,14 @@ import enum
 import functools
 import itertools
 import json
+import logging
 import random
 from dataclasses import dataclass, field
 from typing import Collection, Iterator
+
+import opendssdirect
+
+from ssim import dssutil
 
 
 @enum.unique
@@ -90,6 +95,33 @@ class GridReliabilityModel(ReliabilityModel):
     """
     def __init__(self, components: Collection[ReliabilityModel]):
         self._components = components
+
+    @classmethod
+    def from_json(cls, file: str):
+        """Build a grid reliability model from the grid config.
+
+        To build a grid reliability model we need to iterate over every
+        grid component and construct a wear-out model for it.
+        """
+        with open(file) as f:
+            config = json.load(f)
+        dssutil.load_model(config["dss_file"])
+        line_reliability_models = [
+            LineReliability(
+                name,
+                # 100 hours on average between line failures
+                1.0 / (3600 * 100),
+                1 * 3600,
+                10 * 3600
+            )
+            for name, _
+            in dssutil.iterate_properties(opendssdirect.Lines, ['Name'])
+        ]
+        logging.warning("created line reliability model for %s lines",
+                        len(line_reliability_models))
+        return cls(
+            line_reliability_models
+        )
 
     def peek(self):
         return min(component.peek() for component in self._components)

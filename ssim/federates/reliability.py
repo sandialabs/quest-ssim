@@ -7,7 +7,7 @@ from helics import (
     helicsCreateMessageFederateFromConfig
 )
 
-from ssim.reliability import GridReliabilityModel, LineReliability
+from ssim.reliability import GridReliabilityModel
 
 
 class ReliabilityFederate:
@@ -70,13 +70,7 @@ def _make_reliability_model(grid_config: str) -> GridReliabilityModel:
     -------
     GridReliabilityModel
     """
-    # TODO load the grid config and build a reliability model for every
-    #      circuit element.
-    model = GridReliabilityModel(
-        [LineReliability(line, 1.0 / 36000, 3 * 3600, 10 * 3600) for line in
-         {"671680", "632633"}]
-    )
-    return model
+    return GridReliabilityModel.from_json(grid_config)
 
 
 def run():
