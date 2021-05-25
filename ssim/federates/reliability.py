@@ -1,12 +1,10 @@
 """Federate interface for a grid reliability simulation."""
 import argparse
 import logging
-from typing import List
 
 from helics import (
     HelicsMessageFederate,
-    HelicsFederateInfo,
-    helicsCreateMessageFederate, helicsCreateMessageFederateFromConfig
+    helicsCreateMessageFederateFromConfig
 )
 
 from ssim.reliability import GridReliabilityModel, LineReliability
@@ -58,32 +56,6 @@ class ReliabilityFederate:
                 self._reliability_model.peek()
             )
             self.step(current_time)
-
-
-def run_federate(name: str,
-                 fedinfo: HelicsFederateInfo,
-                 lines: List[str],
-                 hours: float):
-    """Run the reliability federate.
-
-    Parameters
-    ----------
-    name : str
-        Federate name.
-    fedinfo : HelicsFederateInfo
-        Federate info structure to use when initializing the federate.
-    lines : List[str]
-        Names of lines that are subject to failure.
-    hours : float
-        How many hours to simulate.
-    """
-    federate = helicsCreateMessageFederate(name, fedinfo)
-    model = GridReliabilityModel(
-        [LineReliability(line, 1.0 / 36000000, 3*3600, 10*3600) for line in lines]
-    )
-    reliability_federate = ReliabilityFederate(federate, model)
-    federate.enter_executing_mode()
-    reliability_federate.run(hours)
 
 
 def _make_reliability_model(grid_config: str) -> GridReliabilityModel:
