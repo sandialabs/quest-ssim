@@ -9,6 +9,7 @@ from helics import (
 )
 
 from ssim import reliability
+from ssim.grid import GridSpecification
 from ssim.opendss import Storage, DSSModel
 
 
@@ -86,9 +87,11 @@ class GridFederate:
             federate, f"initializing DSSModel with {grid_file}"
         )
         helicsFederateLogDebugMessage(
-            federate, f"pulications: {federate.publications.keys()}"
+            federate, f"publications: {federate.publications.keys()}"
         )
-        self._grid_model = DSSModel.from_json(grid_file)
+        self._grid_model = DSSModel.from_grid_spec(
+            GridSpecification.from_json(grid_file)
+        )
         self._federate = federate
         self._storage_interface = [
             StorageInterface(federate, device)

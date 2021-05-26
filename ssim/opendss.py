@@ -1,7 +1,6 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
 import enum
-import json
 import logging
 import math
 from os import PathLike
@@ -260,21 +259,6 @@ class DSSModel:
             )
         return model
 
-    @classmethod
-    def from_json(cls, file):
-        with open(file) as f:
-            spec = json.load(f)
-        logging.debug("loaded grid json: dss_file='%s'", spec["dss_file"])
-        model = DSSModel(spec.pop("dss_file"))
-        for storage_device in spec["storage"]:
-            model.add_storage(
-                storage_device.pop("name"),
-                storage_device.pop("bus"),
-                storage_device.pop("phases"),
-                storage_device  # remaining keys are opendss param names
-            )
-        return model
-
     @property
     def loadshapeclass(self) -> LoadShapeClass:
         """The OpenDSS LoadShape class used for loads and generators."""
@@ -485,7 +469,7 @@ class DSSModel:
                                                       pu_voltages[1::2]))
 
     @staticmethod
-    def total_power():
+    def total_power() -> [float]:
         """Return the total power on the circuit.
 
         Returns

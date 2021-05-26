@@ -7,7 +7,12 @@
       "phases": 3,
       "kwrated": 100,
       "kwhrated": 1000,
-      "%stored": 50
+      "%stored": 0,
+      "controller": "droop",
+      "controller_params": {
+        "p_droop": 10,
+        "q_droop": -5000
+      }
     },
     {
       "name": "S2",
@@ -15,7 +20,12 @@
       "phases": 3,
       "kwrated": 500,
       "kwhrated": 50000,
-      "%stored": 50
+      "%stored": 50,
+      "controller": "droop",
+      "controller_params": {
+        "p_droop": 500,
+        "q_droop": -50
+      }
     }
   ]
 }

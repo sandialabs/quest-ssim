@@ -3,6 +3,8 @@
 Contains a grid specification that can be used to construct
 data structures and models used by the various simulation federates.
 """
+import json
+import pathlib
 from dataclasses import dataclass, field
 from os import PathLike
 from typing import Optional, List, Tuple
@@ -42,6 +44,33 @@ class StorageSpecification:
 
     #: Additional parameters to be passed to the controller constructor.
     controller_params: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, params: dict):
+        """Build a StorageSpecification instance from a dict with OpenDSS keys.
+
+        Parameters
+        ----------
+        params : dict
+            Dictionary with keys that have the same names as OpenDSS storage
+            device parameters. Some additional keys are also expected that have
+            the same names as the StorageSpecification fields they represent
+            (e.g. "controller" and "controller_params").
+        """
+        # copy the dict so we can modify it with impunity
+        params = params.copy()
+        # pop the keys off so we are left with only the extra OpenDSS params.
+        return cls(
+            params.pop("name"),
+            params.pop("bus"),
+            params.pop("kwhrated"),
+            params.pop("kwrated"),
+            params.pop("controller"),
+            params.pop("phases", 3),
+            params.pop("%stored", 50) / 100,
+            controller_params=params.pop("controller_params"),
+            params=params
+        )
 
 
 @dataclass
@@ -105,3 +134,14 @@ class GridSpecification:
             Specifications for the PV system.
         """
         self.pv_systems.append(specs)
+
+    @classmethod
+    def from_json(cls, file: str):
+        with open(file) as f:
+            spec = json.load(f)
+        grid = cls(pathlib.Path(spec["dss_file"]))
+        for device in spec["storage"]:
+            grid.add_storage(
+                StorageSpecification.from_dict(device)
+            )
+        return grid
