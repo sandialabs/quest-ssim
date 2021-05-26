@@ -2,7 +2,7 @@
   "federates": [
     {
       "directory": ".",
-      "exec": "helics_broker -f 4 --loglevel=7",
+      "exec": "helics_broker -f 5 --loglevel=7",
       "host": "localhost",
       "name": "broker"
     },
@@ -29,6 +29,12 @@
       "exec": "reliability-federate --hours 1270 grid.json reliability.json",
       "host": "localhost",
       "name": "reliability"
+    },
+    {
+      "directory": ".",
+      "exec": "logger-federate --hours 1270 grid.json logger.json",
+      "host": "localhost",
+      "name": "logger"
     }
   ],
   "name": "ssim_demo"

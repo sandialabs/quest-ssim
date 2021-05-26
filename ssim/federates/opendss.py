@@ -2,7 +2,6 @@
 import argparse
 import collections
 
-import matplotlib.pyplot as plt
 from helics import (
     HelicsCombinationFederate, helics_time_maxtime,
     helicsFederateLogDebugMessage, HelicsLogLevel,
@@ -97,8 +96,6 @@ class GridFederate:
         ]
         self.voltage = collections.defaultdict(list)
         self._reliability = ReliabilityInterface(federate)
-        self.power = []
-        self.time = []
 
     def _update_storage(self):
         for storage in self._storage_interface:
@@ -111,7 +108,6 @@ class GridFederate:
             )
             self.voltage[storage.device.bus].append(voltage)
             storage.publish(voltage)
-        self.power.append(self._grid_model.total_power())
         self._federate.publications['grid/total_power'].publish(
             complex(*self._grid_model.total_power())
         )
@@ -147,7 +143,6 @@ class GridFederate:
             f"granted time: {time}", HelicsLogLevel.INTERFACES)
         self._update_reliability()
         self._update_storage()
-        self.time.append(time)
         self._grid_model.solve(time)
         self._publish()
 
@@ -159,13 +154,6 @@ class GridFederate:
                 self._grid_model.next_update()
             )
             self.step(current_time)
-        # Plot some figures for debugging
-        plt.figure()
-        plt.plot(self.time, self.power)
-        plt.figure()
-        for bus in self.voltage:
-            plt.plot(self.time, self.voltage[bus])
-        plt.show()
 
 
 def run():

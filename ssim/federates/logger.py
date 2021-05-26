@@ -1,3 +1,5 @@
+import argparse
+import json
 from abc import ABC, abstractmethod
 import logging
 from typing import Set, List
@@ -6,10 +8,7 @@ from helics import (
     HelicsFederate,
     HelicsValueFederate,
     helics_time_maxtime,
-    HelicsFederateInfo,
-    helicsCreateValueFederate,
-    helicsFederateInfoSetFlagOption,
-    HelicsFederateFlag
+    helicsCreateValueFederateFromConfig
 )
 
 import matplotlib.pyplot as plt
@@ -161,7 +160,7 @@ class VoltageLogger(HelicsLogger):
     def initialize(self, federate: HelicsValueFederate):
         self._voltage_subs = {
             bus: federate.register_subscription(
-                f"grid/voltage.{bus}",
+                f"grid/storage.{bus}.voltage",
                 units="pu"
             )
             for bus in self.bus_voltage
@@ -202,13 +201,13 @@ class StorageLogger(HelicsLogger):
     def initialize(self, federate: HelicsValueFederate):
         self._soc_subs = {
             device: federate.register_subscription(
-                f"grid/soc.{device}"
+                f"grid/storage.{device}.soc"
             )
             for device in self.device_names
         }
         self._power_subs = {
             device: federate.register_subscription(
-                f"grid/power.{device}",
+                f"grid/storage.{device}.power",
                 "kW"
             )
             for device in self.device_names
@@ -254,9 +253,7 @@ def to_hours(seconds: List[float]) -> List[float]:
     return list(map(lambda x: x / 3600, seconds))
 
 
-def run_federate(name: str,
-                 fedinfo: HelicsFederateInfo,
-                 busses: Set[str],
+def run_federate(federate,
                  storage_devices: Set[str],
                  hours: float,
                  show_plots: bool):
@@ -264,12 +261,8 @@ def run_federate(name: str,
 
     Parameters
     ----------
-    name : str
-        Federate name.
-    fedinfo : HelicsFederateInfo
-        Federate info structure to use for initializing the federate.
-    busses : Set[str]
-        Names of busses at which voltage is to be logged.
+    federate : HelicsFederate
+        HELICS federate handle.
     storage_devices : Set[str]
         Names of storage devices to monitor.
     hours : float
@@ -277,16 +270,10 @@ def run_federate(name: str,
     show_plots : bool
         If true figures are displayed for each logger before exiting.
     """
-    # Mark the logger federate as an observer (i.e. doesn't publish anything).
-    helicsFederateInfoSetFlagOption(
-        fedinfo, HelicsFederateFlag.OBSERVER, True
-    )
-    federate = helicsCreateValueFederate(name, fedinfo)
     logging.debug("federate: %s", federate)
-    logging.debug("busses: %s", busses)
     logging.debug("storage: %s", storage_devices)
     power_logger = PowerLogger()
-    voltage_logger = VoltageLogger(busses)
+    voltage_logger = VoltageLogger(storage_devices)
     storage_logger = StorageLogger(storage_devices)
     logging_federate = LoggingFederate(federate)
     logging_federate.add_logger("power", power_logger)
@@ -299,6 +286,35 @@ def run_federate(name: str,
         _voltage_plot(voltage_logger)
         _storage_plots(storage_logger)
         plt.show()
+
+
+def _device_names(grid_config):
+    with open(grid_config) as f:
+        config = json.load(f)
+    return set(device["name"] for device in config["storage"])
+
+
+def run():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "grid_config",
+        type=str,
+        help="path to grid config file"
+    )
+    parser.add_argument(
+        "federate_config",
+        type=str,
+        help="path to then federate config file"
+    )
+    parser.add_argument(
+        "--hours",
+        type=float,
+        help="how long to log"
+    )
+    args = parser.parse_args()
+    storage_devices = _device_names(args.grid_config)
+    federate = helicsCreateValueFederateFromConfig(args.federate_config)
+    run_federate(federate, storage_devices, args.hours, True)
 
 
 def _power_plot(power_logger: PowerLogger):
