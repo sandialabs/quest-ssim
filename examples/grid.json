@@ -27,5 +27,12 @@
         "q_droop": -50
       }
     }
-  ]
+  ],
+  "reliability": {
+    "line": {
+      "mtbf": 10000,
+      "min_repair": 1,
+      "max_repair": 10
+    }
+  }
 }

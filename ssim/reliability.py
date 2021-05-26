@@ -106,13 +106,13 @@ class GridReliabilityModel(ReliabilityModel):
         with open(file) as f:
             config = json.load(f)
         dssutil.load_model(config["dss_file"])
+        reliability = config["reliability"]
         line_reliability_models = [
             LineReliability(
                 name,
-                # 100 hours on average between line failures
-                1.0 / (3600 * 100),
-                1 * 3600,
-                10 * 3600
+                1.0 / (3600.0 * reliability["line"]["mtbf"]),
+                reliability["line"]["min_repair"] * 3600.0,
+                reliability["line"]["max_repair"] * 3600.0,
             )
             for name, _
             in dssutil.iterate_properties(opendssdirect.Lines, ['Name'])
