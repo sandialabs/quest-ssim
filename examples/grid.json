@@ -7,11 +7,11 @@
       "phases": 3,
       "kwrated": 100,
       "kwhrated": 1000,
-      "%stored": 0,
+      "%stored": 50,
       "controller": "droop",
       "controller_params": {
-        "p_droop": 10,
-        "q_droop": -5000
+        "p_droop": 5000,
+        "q_droop": -500
       }
     },
     {

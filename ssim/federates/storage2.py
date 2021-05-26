@@ -93,16 +93,31 @@ def _controller(federate, controller, hours):
         time = federate.request_time(controller.next_update())
 
 
+def _get_controller(device):
+    """Return a StorageController for `device`.
+
+    Parameters
+    ----------
+    device : StorageSpecification
+        Specification of the storage device. A controller is constructed
+        based on ``device.controller`` and ``device.controller_params``.
+
+    Returns
+    -------
+    StorageController
+        A controller for the device.
+    """
+    if device.controller == 'droop':
+        return DroopController(**device.controller_params)
+
+
 def _start_controller(federate_config, grid_config, hours):
     federate = helicsCreateValueFederateFromConfig(federate_config)
     spec = GridSpecification.from_json(grid_config)
     device = spec.get_storage_by_name(federate.name)
     federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)
     # XXX assuming everything is using a droop controller.
-    controller = DroopController(
-        device.controller_params['p_droop'],
-        device.controller_params['q_droop']
-    )
+    controller = _get_controller(device)
     federate.enter_executing_mode()
     _controller(federate, controller, hours)
     federate.finalize()
