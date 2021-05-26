@@ -8,6 +8,8 @@ from helics import (
     HelicsLogLevel
 )
 
+from ssim.grid import GridSpecification
+
 
 class StorageController(ABC):
     """Base class for storage controllers."""
@@ -48,7 +50,8 @@ class DroopController(StorageController):
              soc: float) -> Optional[complex]:
         if abs(self._last_voltage - voltage) > self._voltage_tolerance:
             voltage_error = 1.0 - voltage
-            power = complex(voltage_error * 5000, voltage_error * -500)
+            power = complex(voltage_error * self.p_droop,
+                            voltage_error * self.q_droop)
             self._last_voltage = voltage
             return power
 
@@ -90,10 +93,17 @@ def _controller(federate, controller, hours):
         time = federate.request_time(controller.next_update())
 
 
-def _start_controller(config_path, hours):
-    federate = helicsCreateValueFederateFromConfig(config_path)
+def _start_controller(federate_config, grid_config, hours):
+    federate = helicsCreateValueFederateFromConfig(federate_config)
+    spec = GridSpecification.from_json(grid_config)
+    device = spec.get_storage_by_name(federate.name)
+    federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)
+    # XXX assuming everything is using a droop controller.
+    controller = DroopController(
+        device.controller_params['p_droop'],
+        device.controller_params['q_droop']
+    )
     federate.enter_executing_mode()
-    controller = DroopController(p_droop=5000, q_droop=-500)
     _controller(federate, controller, hours)
     federate.finalize()
 
@@ -101,6 +111,12 @@ def _start_controller(config_path, hours):
 def run():
     parser = argparse.ArgumentParser(
         description="HELICS federate for a storage controller."
+    )
+    parser.add_argument(
+        "grid_config",
+        type=str,
+        help="path to the grid configuration JSON "
+             "(used to look up storage controller parameters)"
     )
     parser.add_argument(
         "federate_config",
@@ -114,4 +130,6 @@ def run():
         default=helics_time_maxtime
     )
     args = parser.parse_args()
-    _start_controller(args.federate_config, args.hours)
+    _start_controller(
+        args.federate_config, args.grid_config, args.hours
+    )

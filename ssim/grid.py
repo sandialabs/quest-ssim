@@ -135,6 +135,29 @@ class GridSpecification:
         """
         self.pv_systems.append(specs)
 
+    def get_storage_by_name(self, name):
+        """Return the specification of the storage device named `name`.
+
+        Parameters
+        ----------
+        name : str
+            Name of the device.
+
+        Returns
+        -------
+        StorageSpecification
+            Specification of the storage device named `name`.
+
+        Raises
+        ------
+        KeyError
+            If the device is not found.
+        """
+        for device in self.storage_devices:
+            if device.name == name:
+                return device
+        raise KeyError(f"no storage device named '{name}'")
+
     @classmethod
     def from_json(cls, file: str):
         with open(file) as f:
