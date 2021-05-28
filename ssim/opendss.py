@@ -273,13 +273,13 @@ class DSSModel:
 
     def _set_time(self, time):
         time_delta = time - (self._last_solution_time or 0)
-        logging.debug(f"[{time}] - delta: {time_delta}")
+        logging.debug(f"[%s] - delta: %s", time, time_delta)
         # Update the opendss stepsize to match the current time delta.
         # This is required to ensure that storage devices update their state
         # of charge correctly.
-        dssutil.run_command(f"set stepsize={time_delta}s")
         hours = math.floor(time) // 3600
         seconds = time - hours * 3600
+        dssdirect.Solution.StepSize(time_delta)
         dssdirect.Solution.Hour(hours)
         dssdirect.Solution.Seconds(seconds)
 
@@ -304,7 +304,7 @@ class DSSModel:
         """
         self._set_time(time)
         dssdirect.Solution.Solve()
-        dssdirect.Circuit.SaveSample()
+        dssdirect.Meters.SampleAll()  # sample all meters, but don't save.
         self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,
