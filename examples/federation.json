@@ -8,7 +8,7 @@
     },
     {
       "directory": ".",
-      "exec": "storage-federate --hours 127 grid.json s1.json",
+      "exec": "storage-federate --hours 1270 grid.json s1.json",
       "host": "localhost",
       "name": "s1"
     },

@@ -8,7 +8,7 @@
       "kwrated": 100,
       "kwhrated": 1000,
       "%stored": 50,
-      "controller": "droop",
+      "controller": "cycle",
       "controller_params": {
         "p_droop": 5000,
         "q_droop": -500
