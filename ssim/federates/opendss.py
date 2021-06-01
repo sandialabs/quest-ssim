@@ -1,6 +1,5 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
-import collections
 
 from helics import (
     HelicsCombinationFederate, helics_time_maxtime,
@@ -14,9 +13,11 @@ from ssim.opendss import Storage, DSSModel
 
 
 class ReliabilityInterface:
-    """Wrapper around reliability endpoint.
+    """Wrapper around the HELICS endpoint for reliability.
 
-    Handles event parsing and iteration.
+    Handles the interaction with the "reliability" endpoint, including
+    iteration over all pending receives and parsing messages into reliability
+    events.
 
     Parameters
     ----------
@@ -37,7 +38,7 @@ class ReliabilityInterface:
 
 
 class StorageInterface:
-    """Handle all publications related to a storage device.
+    """HELICS publications and subscriptions related to a storage device.
 
     Parameters
     ----------
@@ -63,6 +64,11 @@ class StorageInterface:
         ]
 
     def update(self):
+        """Update inputs for the storage device.
+
+        If the power subscription has been updated then the device model
+        is updated with the new power setting.
+        """
         if self._power_sub.is_updated():
             self._federate.log_message(
                 f"Updating {self.device.name} power @ "
@@ -74,6 +80,7 @@ class StorageInterface:
                                   self._power_sub.complex.imag)
 
     def publish(self, voltage):
+        """Publish all values associated with the device."""
         self._voltage_pub.publish(voltage)
         self._soc_pub.publish(self.device.soc)
         self._power_pub.publish(
@@ -82,6 +89,17 @@ class StorageInterface:
 
 
 class GridFederate:
+    """Manage HELICS interfaces for reliability and storage devices.
+
+    Parameters
+    ----------
+    federate : HelicsCombinationFederate
+        HELICS federate handle. Assumed to already have the publications
+        and subscriptions needed for the grid configuration specified in
+        `grid_file`.
+    grid_file : str
+        Path to the JSON grid configuration file.
+    """
     def __init__(self, federate: HelicsCombinationFederate, grid_file: str):
         helicsFederateLogDebugMessage(
             federate, f"initializing DSSModel with {grid_file}"
@@ -97,7 +115,6 @@ class GridFederate:
             StorageInterface(federate, device)
             for device in self._grid_model.storage_devices.values()
         ]
-        self.voltage = collections.defaultdict(list)
         self._reliability = ReliabilityInterface(federate)
 
     def _update_storage(self):
@@ -109,10 +126,10 @@ class GridFederate:
             voltage = self._grid_model.positive_sequence_voltage(
                 storage.device.bus
             )
-            self.voltage[storage.device.bus].append(voltage)
             storage.publish(voltage)
+        real, reactive = self._grid_model.total_power()
         self._federate.publications['grid/total_power'].publish(
-            complex(*self._grid_model.total_power())
+            complex(real, reactive)
         )
 
     def _apply_reliability_event(self, event: reliability.Event):
@@ -160,6 +177,7 @@ class GridFederate:
 
 
 def run():
+    """Federate entry point."""
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "grid_config",
