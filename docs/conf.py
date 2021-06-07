@@ -29,7 +29,8 @@ author = 'John P. Eddy, William F. Vining, Ujjwol Tamrakar'
 # ones.
 extensions = [
     'sphinx.ext.autodoc',
-    'sphinx.ext.napoleon'
+    'sphinx.ext.napoleon',
+    'sphinx.ext.graphviz'
 ]
 
 autosummary_generate = True
