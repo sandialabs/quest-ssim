@@ -42,6 +42,9 @@ class StorageSpecification:
     #: Additional storage parameters passed to the grid model.
     params: dict = field(default_factory=dict)
 
+    #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
+    inverter_efficiency: Optional[Curve] = None
+
     #: Additional parameters to be passed to the controller constructor.
     controller_params: dict = field(default_factory=dict)
 
