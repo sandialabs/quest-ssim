@@ -224,6 +224,29 @@ def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
     assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]
 
 
+def test_DSSModel_storage_efficiency_curves(grid_spec):
+    storage_params = {
+        "kV": 12.47
+    }
+    grid_spec.add_storage(
+        grid.StorageSpecification(
+            name="s1",
+            bus="loadbus2",
+            kwh_rated=1000,
+            kw_rated=100,
+            controller='cycle',
+            params=storage_params,
+            inverter_efficiency=((0.1, 0.8), (0.5, 0.9),
+                                 (0.8, 0.95), (1.0, 1.0))
+        )
+    )
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
+    eff_curve_name = dssdirect.run_command("? storage.s1.effcurve")
+    dssdirect.XYCurves.Name(eff_curve_name)
+    assert dssdirect.XYCurves.XArray() == [0.1, 0.5, 0.8, 1.0]
+    assert dssdirect.XYCurves.YArray() == [0.8, 0.9, 0.95, 1.0]
+
+
 def test_DSSModel_solution_time(test_circuit):
     assert test_circuit.next_update() == 0
     test_circuit.solve(0)
