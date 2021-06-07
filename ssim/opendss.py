@@ -221,6 +221,14 @@ class DSSModel:
         this way override the value provided in
         :py:attr:`PVSpecification.params`.
 
+        Similarly, for the storage device, the efficiency curve may be
+        specified as a parameter in :py:attr:`grid.StorageSpecification.params'
+        or in the :py:attr:`StorageSpecification.inverter_efficiency'. If
+        either of these fields are specified then a new XYCurve will be
+        created in the OpenDSS model named "eff_storage_<storagedevice-name>".
+        Curve specified this way overrides the value provided in
+        :py:attr:`StorageSpecification.params`.
+
         Parameters
         ----------
         gridspec : GridSpecification
@@ -233,18 +241,24 @@ class DSSModel:
         """
         model = DSSModel(gridspec.file)
         for storage_device in gridspec.storage_devices:
+            system_params = _opendss_storage_params(storage_device)
+            if storage_device.inverter_efficiency is not None:
+                model.add_xycurve(f"eff_storage_{storage_device.name}",
+                                  *zip(*storage_device.inverter_efficiency))
+                system_params["EffCurve"] = \
+                    f"eff_storage_{storage_device.name}"
             model.add_storage(
                 storage_device.name,
                 storage_device.bus,
                 storage_device.phases,
-                _opendss_storage_params(storage_device)
+                system_params
             )
         for pv_system in gridspec.pv_systems:
             system_params = pv_system.params.copy()
             if pv_system.inverter_efficiency is not None:
-                model.add_xycurve(f"eff_{pv_system.name}",
+                model.add_xycurve(f"eff_pv_{pv_system.name}",
                                   *zip(*pv_system.inverter_efficiency))
-                system_params["EffCurve"] = f"eff_{pv_system.name}"
+                system_params["EffCurve"] = f"eff_pv_{pv_system.name}"
             if pv_system.pt_curve is not None:
                 model.add_xycurve(f"pt_{pv_system.name}",
                                   *zip(*pv_system.pt_curve))
