@@ -1,0 +1,38 @@
+{
+  "dss_file": "c:\\users\\wfvinin\\src\\ieee13demo\\ieee13nodeckt_modified.dss",
+  "storage": [
+    {
+      "name": "S1",
+      "bus": "632",
+      "phases": 3,
+      "kwrated": 100,
+      "kwhrated": 1000,
+      "%stored": 50,
+      "controller": "cycle",
+      "controller_params": {
+        "p_droop": 5000,
+        "q_droop": -500
+      }
+    },
+    {
+      "name": "S2",
+      "bus": "670",
+      "phases": 3,
+      "kwrated": 500,
+      "kwhrated": 50000,
+      "%stored": 50,
+      "controller": "droop",
+      "controller_params": {
+        "p_droop": 500,
+        "q_droop": -50
+      }
+    }
+  ],
+  "reliability": {
+    "line": {
+      "mtbf": 10000,
+      "min_repair": 1,
+      "max_repair": 10
+    }
+  }
+}

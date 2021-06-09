@@ -1,30 +1,24 @@
-"""Storage device federate"""
 from abc import ABC, abstractmethod
-import logging
-from typing import Dict, List
+import argparse
+from typing import Optional
 
 from helics import (
-    HelicsValueFederate,
-    HelicsDataType,
+    helicsCreateValueFederateFromConfig,
     helics_time_maxtime,
-    helicsInputSetOption,
-    helics_handle_option_only_update_on_change,
-    helicsInputSetMinimumChange,
-    HelicsFederateInfo,
-    helicsFederateInfoSetTimeProperty,
-    helics_property_time_delta,
-    helicsCreateValueFederate
+    HelicsLogLevel
 )
 
-from ssim.grid import StorageSpecification
-from ssim.storage import StorageState
+from ssim.grid import GridSpecification
 
 
 class StorageController(ABC):
     """Base class for storage controllers."""
     @abstractmethod
-    def step(self, time: float, voltage: float) -> complex:
-        """Step the model to `time`.
+    def step(self,
+             time: float,
+             voltage: float,
+             soc: float) -> Optional[complex]:
+        """Return the target power output of the storage device.
 
         Parameters
         ----------
@@ -32,266 +26,158 @@ class StorageController(ABC):
             Current time in seconds.
         voltage : float
             Voltage at the bus where the device is connected. [pu]
-
-        Returns
-        -------
-        complex
-            Active and reactive power as a complex number. [kW]
+        soc : float
+            State of charge of the storage device as a fraction of its total
+            capacity.
         """
 
     @abstractmethod
-    def next_update(self) -> float:
-        """Return the time of the next controller action in seconds."""
+    def next_update(self):
+        """Returns the next time the storage controller needs to be updated."""
 
 
 class DroopController(StorageController):
-    """Storage droop control.
+    """Simple droop controller"""
+    def __init__(self, p_droop, q_droop, voltage_tolerance=1.0e-3):
+        self._voltage_tolerance = voltage_tolerance
+        self.p_droop = p_droop
+        self.q_droop = q_droop
+        self._last_voltage = 0.0
+
+    def step(self,
+             time: float,
+             voltage: float,
+             soc: float) -> Optional[complex]:
+        if abs(self._last_voltage - voltage) > self._voltage_tolerance:
+            voltage_error = 1.0 - voltage
+            power = complex(voltage_error * self.p_droop,
+                            voltage_error * self.q_droop)
+            self._last_voltage = voltage
+            return power
+
+    def next_update(self):
+        return helics_time_maxtime
+
+
+def _controller(federate, controller, hours):
+    """Main loop for the storage controller federate.
 
     Parameters
     ----------
-    device : StorageSpecification
-        Specification of the storage device being controlled. The
-        ``device.controller_params`` must contain keys 'p_droop' and
-        'q_droop'. An optional 'reference_voltage' key may be included
-
-        to specify per-unit reference voltage (defaults to 1.0, if not
-        specified).
+    federate : HelicsFederate
+        HELICS federate handle for the controller.
+    controller : StorageController
+        Controller instance.
+    hours : float
+        How long to run the controller.
     """
-    def __init__(self, device: StorageSpecification):
-        self._reference_voltage = device.controller_params.get(
-            'reference_voltage', 1.0
-        )
-        if 'p_droop' not in device.controller_params:
-            raise ValueError(self._missing_param_message('p_droop', device))
-        if 'q_droop' not in device.controller_params:
-            raise ValueError(self._missing_param_message('q_droop', device))
-        self._p_droop = device.controller_params['p_droop']
-        self._q_droop = device.controller_params['q_droop']
-
-    @staticmethod
-    def _missing_param_message(param, device):
-        return f"Missing required parameter '{param}' in " \
-               f"controller_params for device '{device.name}'. " \
-               "Both 'p_droop' and 'q_droop' are required for " \
-               "the 'droop' controller. " \
-               f"Got params: {set(device.controller_params.keys())}."
-
-    def step(self, time, voltage):
-        p = (self._reference_voltage - voltage) * self._p_droop
-        q = (self._reference_voltage - voltage) * self._q_droop
-        return complex(p, q)
-
-    def next_update(self) -> float:
-        # only changes state when the voltage changes.
-        return helics_time_maxtime - 1
+    federate.log_message(f"storage starting ({hours})", HelicsLogLevel.TRACE)
+    time = federate.request_time(0)
+    while time < (hours * 3600):
+        federate.log_message(f"granted time: {time}", HelicsLogLevel.TRACE)
+        voltage = federate.subscriptions[
+            f"grid/storage.{federate.name}.voltage"
+        ].double
+        soc = federate.subscriptions[
+            f"grid/storage.{federate.name}.soc"
+        ].double
+        federate.log_message(f"voltage: {voltage}", HelicsLogLevel.TRACE)
+        federate.log_message(f"soc: {soc}", HelicsLogLevel.TRACE)
+        power = controller.step(time, voltage, soc)
+        if power is not None:
+            federate.log_message(
+                f"publishing new power @ {time}: {power}",
+                HelicsLogLevel.TRACE
+            )
+            federate.publications[f"{federate.name}/power"].publish(power)
+        time = federate.request_time(controller.next_update())
 
 
 class CycleController(StorageController):
-    """A device that cycles between charging and discharging.
-
-    The device is assumed to be 100% efficient and has linear charging
-    and discharging profiles.
+    """Operate a device by cycling between charging and discharging.
 
     Parameters
     ----------
     device : StorageSpecification
-        The specification of the device to be controlled. To set a reserve
-        capacity include the key 'soc_min' in ``device.controller_params``
-        with a value between 0 and 1.
+        Device that is being controlled.
     """
     def __init__(self, device):
-        self._soc = device.soc
-        self._kwh_rated = device.kwh_rated
-        self._soc_min = device.controller_params.get('soc_min', 0.2)
-        self.state = StorageState.IDLE
-        self.power = 0.0
-        self._last_step = 0.0
-        self._charging_power = -device.kw_rated
-        self._discharging_power = device.kw_rated
+        self.power = device.kw_rated
+        self.capacity = device.kwh_rated
+        self.soc = device.soc
+        self.state = 'charging' if self.soc < 0.95 else 'discharging'
+        self.time = 0
 
-    @property
-    def complex_power(self):
-        return complex(self.power, 0.0)
+    def step(self,
+             time: float,
+             voltage: float,
+             soc: float) -> Optional[complex]:
+        self.time = 0
+        self.soc = soc
+        if self.soc > 0.95:
+            self.state = 'discharging'
+        if self.soc <= 0.21:
+            self.state = 'charging'
+        if self.state == 'discharging':
+            return complex(self.power, 0)
+        return complex(-self.power, 0)
 
-    def next_update(self) -> float:
-        logging.debug(f"getting time to charge: state={self.state}")
-        if self.state is StorageState.CHARGING:
-            charge_remaining = self._kwh_rated * (1.0 - self._soc)
-            time_remaining = charge_remaining / abs(self.power)
-            logging.info(f"CHARGING: charge_remaining={charge_remaining} kWh, "
-                         f"time_remaining={time_remaining} h")
-            return self._last_step + time_remaining * 3600
-        if self.state is StorageState.DISCHARGING:
-            capacity_remaining = self._kwh_rated * (self._soc - self._soc_min)
-            time_remaining = capacity_remaining / abs(self.power)
-            logging.info(f"DISCHARGING: "
-                         f"capacity_remaining={capacity_remaining} kWh, "
-                         f"time_remaining={time_remaining} h")
-            return self._last_step + time_remaining * 3600
-        return 1.0
+    def next_update(self):
+        return helics_time_maxtime
 
-    def _step_charging(self, delta_t_hours):
-        previous_charge = self._soc * self._kwh_rated
-        charged_power = abs(self.power) * delta_t_hours
-        new_charge = previous_charge + charged_power
-        self._soc = new_charge / self._kwh_rated
-        if self._soc >= 1.0:
-            logging.info(f"battery fully charged (soc={self._soc})")
-            self.state = StorageState.DISCHARGING
-            self.power = self._discharging_power
-
-    def _step_discharging(self, delta_t_hours):
-        previous_charge = self._soc * self._kwh_rated
-        discharged_power = abs(self.power) * delta_t_hours
-        new_charge = previous_charge - discharged_power
-        self._soc = new_charge / self._kwh_rated
-        if self._soc <= self._soc_min:
-            logging.info(f"battery exhausted (soc={self._soc})")
-            self.state = StorageState.CHARGING
-            self.power = self._charging_power
-
-    def step(self, time, voltage):
-        if self.state is StorageState.IDLE:
-            if self._soc <= self._soc_min:
-                self.state = StorageState.CHARGING
-                self.power = self._charging_power
-            else:
-                self.state = StorageState.DISCHARGING
-                self.power = self._discharging_power
-        elif self.state is StorageState.CHARGING:
-            self._step_charging((time - self._last_step) / 3600)
-        elif self.state is StorageState.DISCHARGING:
-            self._step_discharging((time - self._last_step) / 3600)
-        self._last_step = time
-        return self.complex_power
-
-
-class StorageControllerFederate:
-    """A federate that controls storage devices.
-
-    This federate manages the state of one or more storage devices.
-    Each device is identified by name and has a :py:class:`StorageController`
-    associated with it. When HELICS grants the federate a time, it will
-    call :py:meth:`StorageController.step` on each controller. The next time
-    requested by the federate is the minimum time returned by
-    :py:meth:`StorageController.next_update` from all controllers.
-    """
-    def __init__(self, federate: HelicsValueFederate,
-                 devices: Dict[str, StorageController],
-                 busses: Dict[str, str]):
-        self._storage_devices = devices
-        self._power_pubs = {
-            device: federate.register_global_publication(
-                f"storage.{device}.power",
-                HelicsDataType.COMPLEX,
-                units="kW"
-            )
-            for device in devices
-        }
-        self._voltage_subs = {
-            device: federate.register_subscription(
-                f"grid/voltage.{bus}"
-            )
-            for device, bus in busses.items()
-        }
-        # Only update the voltage values if they have changed significantly.
-        # This prevents us from getting stuck iterating at very small time
-        # steps because of meaningless variation in the output of the power
-        # flow calculation.
-        for sub in self._voltage_subs.values():
-            helicsInputSetOption(
-                sub,
-                helics_handle_option_only_update_on_change,
-                True
-            )
-            helicsInputSetMinimumChange(sub, 1e-8)
-        self._federate = federate
-        logging.debug("federate initialized")
-
-    def _next_update(self):
-        """Return the time of the next update."""
-        return min(
-            controller.next_update()
-            for controller in self._storage_devices.values()
-        )
-
-    def _step(self, time: float):
-        """Advance the controllers to `time`.
-
-        Parameters
-        ----------
-        time : float
-            Current time in seconds.
-        """
-        for device, controller in self._storage_devices.items():
-            # Only update the controllers if the voltage has changed
-            # or the time of the next update has arrived.
-            if not (self._voltage_subs[device].is_updated()
-                    or time >= controller.next_update()):
-                continue
-            voltage = self._voltage_subs[device].double
-            power = controller.step(time, voltage)
-            logging.info("updating device %s: voltage=%s power=%s",
-                         device, voltage, power)
-            self._power_pubs[device].publish(power)
-
-    def run(self, hours: float):
-        """Step the federate.
-
-        Parameters
-        ----------
-        hours : float
-            Number of hours to run.
-        """
-        time = 0
-        while time < hours * 3600:
-            time = self._federate.request_time(self._next_update())
-            logging.debug("granted time %s", time)
-            self._step(time)
-
-
-def _init_controller(device: StorageSpecification):
-    """Initialize the controller specified by ``device.controller``."""
-    if device.controller == 'droop':
-        return DroopController(device)
-    if device.controller == 'cycle':
-        return CycleController(device)
-
-
-def run_federate(name: str,
-                 fedinfo: HelicsFederateInfo,
-                 devices: List[StorageSpecification],
-                 hours: float):
-    """Run `federate` as a storage control federate.
+def _get_controller(device):
+    """Return a StorageController for `device`.
 
     Parameters
     ----------
-    name : str
-        Federate name
-    fedinfo : HelicsFederateInfo
-        Federate info structure to use for initializing the federate.
-    devices : List[StorageSpecification]
-        Storage devices that are controlled by this federate.
-    hours : float
-        Number of hours to run before exiting.
+    device : StorageSpecification
+        Specification of the storage device. A controller is constructed
+        based on ``device.controller`` and ``device.controller_params``.
+
+    Returns
+    -------
+    StorageController
+        A controller for the device.
     """
-    helicsFederateInfoSetTimeProperty(
-        fedinfo, helics_property_time_delta, 0.01
-    )
-    federate = helicsCreateValueFederate(name, fedinfo)
-    controllers = {device.name: _init_controller(device)
-                   for device in devices}
-    busses = {device.name: device.bus for device in devices}
-    logging.debug("devices: %s", busses.items())
-    storage_controller = StorageControllerFederate(
-        federate,
-        controllers,
-        busses
-    )
-    logging.debug("entering executing mode")
+    if device.controller == 'cycle':
+        return CycleController(device)
+    if device.controller == 'droop':
+        return DroopController(**device.controller_params)
+
+
+def _start_controller(federate_config, grid_config, hours):
+    federate = helicsCreateValueFederateFromConfig(federate_config)
+    spec = GridSpecification.from_json(grid_config)
+    device = spec.get_storage_by_name(federate.name)
+    federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)
+    controller = _get_controller(device)
     federate.enter_executing_mode()
-    logging.debug("running...")
-    storage_controller.run(hours)
-    logging.debug("finalizing")
+    _controller(federate, controller, hours)
     federate.finalize()
-    logging.debug("exiting")
+
+
+def run():
+    parser = argparse.ArgumentParser(
+        description="HELICS federate for a storage controller."
+    )
+    parser.add_argument(
+        "grid_config",
+        type=str,
+        help="path to the grid configuration JSON "
+             "(used to look up storage controller parameters)"
+    )
+    parser.add_argument(
+        "federate_config",
+        type=str,
+        help="path to federate config file"
+    )
+    parser.add_argument(
+        "--hours",
+        dest='hours',
+        type=float,
+        default=helics_time_maxtime
+    )
+    args = parser.parse_args()
+    _start_controller(
+        args.federate_config, args.grid_config, args.hours
+    )

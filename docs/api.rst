@@ -23,20 +23,19 @@ To configure a simulation we need the following information:
 - a set of generation profiles or models for renewables connected to the grid
 
 
-
 Running a Simulation
 ----------------------
 
-To run the simulation we need to know the following:
+To run the simulator it needs to be installed. Run this from the root
+directory of the repository::
 
-- how long to run (stopping criteria)
+  pip install -e .
 
-If possible, we should also provide and API that supports querying the
-simulation progress. At the very least this could just be the something that
-returns the simulation clock to indicate that progress is being made.
+This will install the stand-alone programs that are repsonsible for running
+each federate. To run a simulation use the `helics_cli`. For example, from the
+``examples`` directory::
 
-.. automodule:: ssim.simulator
-   :members:
+  helics run --path=federation.json
 
 Reporting Results
 -----------------
