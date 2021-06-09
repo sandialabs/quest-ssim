@@ -23,7 +23,6 @@ To configure a simulation we need the following information:
 - a set of generation profiles or models for renewables connected to the grid
 
 
-
 Running a Simulation
 ----------------------
 
