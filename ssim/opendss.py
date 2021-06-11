@@ -2,7 +2,6 @@
 from __future__ import annotations
 import enum
 import logging
-import math
 from os import PathLike
 from typing import Any, List, Dict, Optional
 
@@ -288,14 +287,17 @@ class DSSModel:
     def _set_time(self, time):
         time_delta = time - (self._last_solution_time or 0)
         logging.debug(f"[%s] - delta: %s", time, time_delta)
-        # Update the opendss stepsize to match the current time delta.
-        # This is required to ensure that storage devices update their state
-        # of charge correctly.
-        hours = math.floor(time) // 3600
-        seconds = time - hours * 3600
-        dssdirect.Solution.StepSize(time_delta)
-        dssdirect.Solution.Hour(hours)
-        dssdirect.Solution.Seconds(seconds)
+        # This is done using the opendssdirect.run_command() function rather
+        # than the opendssdirect.Solution API because of a bug with the
+        # Solution API that results in anomalous spikes in the total power
+        # and voltage. When all three values are set in a single command
+        # the anomalous values go away.
+        #
+        # Note that we set the step size to ensure that the state of charge of
+        # storage devices are updated correctly.
+        dssdirect.run_command(
+            f"set hour={time // 3600} sec={time % 3600} stepsize={time_delta}s"
+        )
 
     def next_update(self) -> float:
         """Return the time of the next simulation step in seconds."""
