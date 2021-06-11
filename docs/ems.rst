@@ -105,3 +105,60 @@ There will be some fixed interval at which devices are dispatched which will
 vary depending on the dispatch model/tool that is being used (for example,
 Prescient uses 5-minutes for economic dispatch and 24-hours for unit
 commitment).
+
+Architecture
+============
+
+Following the pattern for the existing federates, we will have a
+:py:mod:`ssim.ems` module which implements the EMS itself, and a
+:py:mod:`ssim.federates.ems` module which implements the HELICS federate
+interface for the EMS. This forces us to maintain a clear separation between
+the communication and the model, making it easier to modify or replace the
+model in the future.
+
+To get the basic functionality in place we need to add the HELICS interfaces
+shown in the diagram above, in particular the "control" endpoint in the storage
+controller.
+
+EMS Interface
+-------------
+
+While we may want to include multiple EMS managing different sets of storage
+devices, to start with the easiest approach is to use a global endpoint for
+all communication coming to the EMS federate. The global endpoint will just be
+called "ems".
+
+Storage Control Interface
+-------------------------
+
+We should not require that every storage device be controlled by the EMS. This
+means we should add a flag, or some other indicator the the grid configuration
+to indicate that the device is dispatchable. The fastest path to something that
+works here would be to just add another controller (i.e. "ems") which
+implements this type of external control.
+
+.. note:: This may not be quite right. Even devices which are not dispatchable
+          may provide information about their current state of charge and their
+          current power output to the EMS. In general, it is probably a
+          reasonable approach to include the interface to the EMS for every
+          storage controller, and let the controller determine what it should
+          share.
+
+The "ems" controller implies a substantial departure from the existing pattern
+used in :py:mod:`ssim.federates.storage`. This module, and the controllers it
+contains are built around the interface between the storage controller and the
+grid federate.
+
+To simplify the configuration of the storage controller federates, when each
+federate is initialized it should create a "control" endpoint. At each time
+grant the control endpoint should send a message from the "control" endpoint
+to "ems"
+
+.. note:: Does publishing the soc to the EMS imply the need for some kind of
+          Fixed minimum update interval? For now I'm going to leave this alone,
+          but I think it is worth revisiting as it could have a substantial
+          impact on the performance of an EMS that accounts for state of charge
+          in its dispatch and unit commitment decisions.
+
+.. We should also plan for potentially multiple EMS controlling different sets
+   of devices on the grid, for example multiple microgrids on the same feeder.
