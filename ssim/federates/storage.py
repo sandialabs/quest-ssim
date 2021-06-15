@@ -1,13 +1,15 @@
+import json
 from abc import ABC, abstractmethod
 import argparse
-from typing import Optional
+from typing import Optional, Iterable
 
 from helics import (
-    helicsCreateValueFederateFromConfig,
     helics_time_maxtime,
-    HelicsLogLevel
+    HelicsLogLevel,
+    helicsCreateCombinationFederateFromConfig
 )
 
+from ssim import ems
 from ssim.grid import GridSpecification
 
 
@@ -30,6 +32,18 @@ class StorageController(ABC):
             State of charge of the storage device as a fraction of its total
             capacity.
         """
+
+    @abstractmethod
+    def apply_control(self, control_messages: Iterable[bytes]):
+        """Apply external control actions (i.e. from the EMS).
+
+        Parameters
+        ----------
+        control_messages : Iterable[bytes]
+            Iterator over all pending control messages.
+        """
+        for message in control_messages:
+            json.loads(message)
 
     @abstractmethod
     def next_update(self):
@@ -55,8 +69,52 @@ class DroopController(StorageController):
             self._last_voltage = voltage
             return power
 
+    def apply_control(self, control_messages: Iterable[dict]):
+        # DroopController does not respond to control messages.
+        pass
+
     def next_update(self):
         return helics_time_maxtime
+
+
+def pending_messages(endpoint):
+    """Iterator over all pending messages received at `endpoint`.
+
+    The iterator yields the raw data from the message, it is not parsed
+    or processed.
+
+    Parameters
+    ----------
+    endpoint : HelicsEndpoint
+        The endpoint to receive from.
+    """
+
+    while endpoint.has_message():
+        message = endpoint.get_message()
+        yield message.data
+
+
+def _send_soc_to_ems(soc, time, federate):
+    """Send a message to the ems/control endpoint with the current SOC.
+
+    Parameters
+    ----------
+    soc : float
+        Current state of charge.
+    time : float
+        Time the message is being sent. [seconds]
+    federate : HelicsFederate
+        Federate handle to send the message from. Must have a registered
+        endpoint named "control".
+    """
+    endpoint = federate.get_endpoint_by_name("control")
+    message = endpoint.create_message()
+    message.destination = "ems/control"
+    message.original_source = f"{federate.name}/control"
+    message.source = f"{federate.name}/control"
+    message.data = json.dumps({"soc": soc})
+    message.time = time
+    endpoint.send_data(message)
 
 
 def _controller(federate, controller, hours):
@@ -83,6 +141,9 @@ def _controller(federate, controller, hours):
         ].double
         federate.log_message(f"voltage: {voltage}", HelicsLogLevel.TRACE)
         federate.log_message(f"soc: {soc}", HelicsLogLevel.TRACE)
+        controller.apply_control(
+            pending_messages(federate.get_endpoint_by_name("control"))
+        )
         power = controller.step(time, voltage, soc)
         if power is not None:
             federate.log_message(
@@ -90,6 +151,7 @@ def _controller(federate, controller, hours):
                 HelicsLogLevel.TRACE
             )
             federate.publications[f"{federate.name}/power"].publish(power)
+        _send_soc_to_ems(soc, time, federate)
         time = federate.request_time(controller.next_update())
 
 
@@ -122,8 +184,57 @@ class CycleController(StorageController):
             return complex(self.power, 0)
         return complex(-self.power, 0)
 
+    def apply_control(self, control_messages: Iterable[dict]):
+        # Cycle controller does not respond to control messages.
+        pass
+
     def next_update(self):
         return helics_time_maxtime
+
+
+class ExternalController(StorageController):
+    """Controller for a storage device that is dispatched by an external EMS.
+
+    Parameters
+    ----------
+    device : grid.StorageSpecification
+        Specification of the device being controlled.
+    """
+    def __init__(self, device):
+        self.time = 0
+        self.power = complex(0.0, 0.0)
+        self.soc = device.soc
+        self.updated = True
+
+    def _apply_control(self, control):
+        if control.action == "charge":
+            self.power = complex(-control.real_power, control.reactive_power)
+        elif control.action == "discharge":
+            self.power = complex(control.real_power, control.reactive_power)
+        elif control.action == "idle":
+            self.power = complex(0.0, 0.0)
+        else:
+            raise ValueError(f"Unknown control action: '{control.action}'")
+
+    def apply_control(self, control_messages: Iterable[bytes]):
+        self.updated = False
+        for message in control_messages:
+            self._apply_control(ems.StorageControlMessage.from_json(message))
+            self.updated = True
+
+    def step(self,
+             time: float,
+             voltage: float,
+             soc: float) -> Optional[complex]:
+        self.time = time
+        self.soc = soc
+        if self.updated:
+            return self.power
+        return None
+
+    def next_update(self):
+        # What is the right interval to report the SOC to the EMS?
+        return self.time + 300
 
 
 def _get_controller(device):
@@ -144,10 +255,15 @@ def _get_controller(device):
         return CycleController(device)
     if device.controller == 'droop':
         return DroopController(**device.controller_params)
+    if device.controller == 'external':
+        return ExternalController(device)
+    else:
+        raise ValueError(f"Unknown controller: '{device.controller}'")
 
 
 def _start_controller(federate_config, grid_config, hours):
-    federate = helicsCreateValueFederateFromConfig(federate_config)
+    federate = helicsCreateCombinationFederateFromConfig(federate_config)
+    federate.register_endpoint("control")
     spec = GridSpecification.from_json(grid_config)
     device = spec.get_storage_by_name(federate.name)
     federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)
