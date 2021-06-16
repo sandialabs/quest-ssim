@@ -125,6 +125,7 @@ class CycleController(StorageController):
     def next_update(self):
         return helics_time_maxtime
 
+
 def _get_controller(device):
     """Return a StorageController for `device`.
 

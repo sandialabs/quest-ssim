@@ -9,7 +9,7 @@ from helics import (
 
 from ssim import reliability
 from ssim.grid import GridSpecification
-from ssim.opendss import Storage, DSSModel
+from ssim.opendss import DSSModel
 
 
 class ReliabilityInterface:
