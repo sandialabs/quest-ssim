@@ -14,6 +14,39 @@ from typing import Optional, List, Tuple
 Curve = Tuple[Tuple[float, float], ...]
 
 
+def _curve_from_dict(curve):
+    if curve.keys() < {"x", "y"}:
+        raise ValueError("Invalid curve specification. Must include keys "
+                         f"'x' and 'y', got {set(curve.keys())}.")
+    return tuple(zip(curve["x"], curve["y"]))
+
+
+def _get_curve(name, params):
+    """Return the curve associated with name in params.
+
+    Looks for a dictionary with keys "x" and "y" associated with the key
+    `name` in `params`. If `name` exists in `params` it is removed before
+    this function returns.
+
+    Parameters
+    ----------
+    name : str
+        Name of the curve in params.
+    params : dict
+        Dictionary of parameters.
+
+    Returns
+    -------
+    None or Curve
+        If `name` is found in `params` its value is used to construct a curve
+        that is returned. If `name` is not a key in `params` then None is
+        returned.
+    """
+    if name not in params:
+        return None
+    return _curve_from_dict(params.pop(name))
+
+
 @dataclass
 class StorageSpecification:
     """Description of a storage device connected to the grid."""
@@ -71,6 +104,7 @@ class StorageSpecification:
             params.pop("controller"),
             params.pop("phases", 3),
             params.pop("%stored", 50) / 100,
+            inverter_efficiency=_get_curve("inverter_efficiency", params),
             controller_params=params.pop("controller_params"),
             params=params
         )

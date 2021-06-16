@@ -8,11 +8,13 @@
       "kwrated": 100,
       "kwhrated": 1000,
       "%stored": 50,
-      "controller": "cycle",
+      "controller": "droop",
       "controller_params": {
         "p_droop": 5000,
         "q_droop": -500
-      }
+      },
+      "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                              "y":  [0.90, 0.94, 0.98, 0.99]}
     },
     {
       "name": "S2",
