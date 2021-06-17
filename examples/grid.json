@@ -35,6 +35,14 @@
       "mtbf": 10000,
       "min_repair": 1,
       "max_repair": 10
+    },
+    "switch": {
+      "mtbf": 10000,
+      "min_repair": 0.333,
+      "max_repair": 2.5,
+      "p_open": 0.8,
+      "p_closed": 0.1,
+      "p_current": 0.1
     }
   }
 }
