@@ -286,7 +286,7 @@ class DSSModel:
 
     def _set_time(self, time):
         time_delta = time - (self._last_solution_time or 0)
-        logging.debug(f"[%s] - delta: %s", time, time_delta)
+        logging.debug("[%s] - delta: %s", time, time_delta)
         # This is done using the opendssdirect.run_command() function rather
         # than the opendssdirect.Solution API because of a bug with the
         # Solution API that results in anomalous spikes in the total power
