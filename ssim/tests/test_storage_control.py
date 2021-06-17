@@ -28,50 +28,22 @@ def cycle_spec():
     )
 
 
-def test_DroopController_missing_params():
-    spec = StorageSpecification(
-        'foo',
-        'bus.bar',
-        10,
-        2.5,
-        'droop',
-        controller_params={'foo': 1}
-    )
-    message = "Missing required parameter '(q_droop|p_droop)' in " \
-              r"controller_params for device 'foo'\. Both 'p_droop' and " \
-              r"'q_droop' are required for the 'droop' controller\. " \
-              r"Got params: \{('.*',?)*\}\."
-    with pytest.raises(ValueError, match=message):
-        storage.DroopController(spec)
-    spec.controller_params['p_droop'] = 100
-    with pytest.raises(ValueError, match=message):
-        storage.DroopController(spec)
-    del spec.controller_params['p_droop']
-    spec.controller_params['q_droop'] = 10
-    with pytest.raises(ValueError, match=message):
-        storage.DroopController(spec)
-    spec.controller_params['p_droop'] = 100
-    spec.controller_params['q_droop'] = 10
-    storage.DroopController(spec)
-
-
 def test_DroopConrtoller_step(droop_spec):
-    controller = storage.DroopController(droop_spec)
-    assert controller.step(1, 1.0) == complex(0, 0)
-    assert controller.step(1, 0.0) == complex(5000, -500)
+    controller = storage.DroopController(**droop_spec.controller_params)
+    assert controller.step(1, 1.0, 0.5) == complex(0, 0)
+    assert controller.step(1, 0.0, 0.5) == complex(5000, -500)
 
 
 def test_storage__init_controller(droop_spec, cycle_spec):
-    controller = storage._init_controller(droop_spec)
+    controller = storage._get_controller(droop_spec)
     assert isinstance(controller, storage.DroopController)
-    controller = storage._init_controller(cycle_spec)
+    controller = storage._get_controller(cycle_spec)
     assert isinstance(controller, storage.CycleController)
 
 
 def test_CycleController_step(cycle_spec):
     controller = storage.CycleController(cycle_spec)
-    assert controller.step(0.0, 1.0) == complex(10, 0)
-    assert controller.next_update() == 8.0 * 3600
-    assert controller.step(3600, 1.0) == complex(10, 0)
-    assert controller.next_update() == 8.0 * 3600
-    assert controller.step(8.0 * 3600, 1.0) == complex(-10, 0)
+    assert controller.step(0.0, 1.0, 1.0) == complex(10, 0)
+    assert controller.step(1.0, 1.0, 0.5) == complex(10, 0)
+    assert controller.step(8.0 * 3600, 1.0, 0.2) == complex(-10, 0)
+    assert controller.step(9.0 * 3600, 1.0, 0.9) == complex(-10, 0)
