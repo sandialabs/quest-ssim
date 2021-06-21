@@ -8,11 +8,7 @@
       "kwrated": 100,
       "kwhrated": 1000,
       "%stored": 50,
-      "controller": "droop",
-      "controller_params": {
-        "p_droop": 5000,
-        "q_droop": -500
-      },
+      "controller": "external",
       "inverter_efficiency": {"x":  [10, 50, 90, 100],
                               "y":  [0.90, 0.94, 0.98, 0.99]}
     },
@@ -21,13 +17,9 @@
       "bus": "670",
       "phases": 3,
       "kwrated": 500,
-      "kwhrated": 50000,
+      "kwhrated": 50,
       "%stored": 50,
-      "controller": "droop",
-      "controller_params": {
-        "p_droop": 500,
-        "q_droop": -50
-      }
+      "controller": "external"
     }
   ],
   "reliability": {
@@ -44,5 +36,9 @@
       "p_closed": 0.1,
       "p_current": 0.1
     }
+  },
+  "ems": {
+    "peak_start": 12.0,
+    "peak_end": 23.0
   }
 }

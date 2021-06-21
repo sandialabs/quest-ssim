@@ -112,7 +112,7 @@ def _send_soc_to_ems(soc, time, federate):
     message.destination = "ems/control"
     message.original_source = f"{federate.name}/control"
     message.source = f"{federate.name}/control"
-    message.data = json.dumps({"soc": soc})
+    message.data = json.dumps({"name": federate.name, "soc": soc})
     message.time = time
     endpoint.send_data(message)
 
@@ -130,7 +130,7 @@ def _controller(federate, controller, hours):
         How long to run the controller.
     """
     federate.log_message(f"storage starting ({hours})", HelicsLogLevel.TRACE)
-    time = federate.request_time(0)
+    time = 0.0
     while time < (hours * 3600):
         federate.log_message(f"granted time: {time}", HelicsLogLevel.TRACE)
         voltage = federate.subscriptions[

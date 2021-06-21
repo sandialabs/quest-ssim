@@ -105,7 +105,7 @@ class StorageSpecification:
             params.pop("phases", 3),
             params.pop("%stored", 50) / 100,
             inverter_efficiency=_get_curve("inverter_efficiency", params),
-            controller_params=params.pop("controller_params"),
+            controller_params=params.pop("controller_params", dict()),
             params=params
         )
 
