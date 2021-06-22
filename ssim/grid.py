@@ -109,6 +109,24 @@ class StorageSpecification:
             params=params
         )
 
+@dataclass
+class InvControlSpecification:
+
+    #: Name of the InvControl element.
+    name: str
+
+    #: List of PVSystem and/or Storage elements to be controlled.
+    der_list: List[str]
+
+    #: Control mode to be enabled
+    inv_control_mode: str
+
+    #: Curve that defines behavior of the specified mode
+    function_curve: Optional[Curve] = None
+
+    #: Additional parameters
+    params: dict = field(default_factory=dict)
+
 
 @dataclass
 class PVSpecification:
