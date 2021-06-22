@@ -311,7 +311,7 @@ class DSSModel:
         for inv_control in gridspec.inv_control:
             system_params = inv_control.params.copy()
             if inv_control.function_curve is not None:
-                model.add_xycurve(f"eff_{inv_control.name}",
+                model.add_xycurve(f"func_{inv_control.name}",
                                   *zip(*inv_control.function_curve))
                 system_params["vvc_curve1"] = f"func_{inv_control.name}"
             model.add_inverter_controller(
