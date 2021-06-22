@@ -169,6 +169,7 @@ class GridSpecification:
         self.file = file
         self.storage_devices: List[StorageSpecification] = []
         self.pv_systems: List[PVSpecification] = []
+        self.inv_control: List[InvControlSpecification] = []
 
     def add_storage(self, specs: StorageSpecification):
         """Add a storage device to the grid specification.
@@ -189,6 +190,16 @@ class GridSpecification:
             Specifications for the PV system.
         """
         self.pv_systems.append(specs)
+
+    def add_inv_control(self, specs: InvControlSpecification):
+        """Add a InvControl element to the grid specification.
+
+        Parameters
+        ----------
+        specs : InvControlSpecification
+            Specifications for the InvControl element.
+        """
+        self.inv_control.append(specs)
 
     def get_storage_by_name(self, name):
         """Return the specification of the storage device named `name`.
