@@ -166,6 +166,36 @@ class LoadShapeClass(enum.Enum):
         return cls(value.lower())
 
 
+class InvControl:
+    """Representation of an inverter controller in OpenDSS.
+
+    Parameters
+    ----------
+    name : str
+        Name of the Inv Control element. Must be unique among all Inv
+        Control elements on the model.
+    der_list :
+        List of PV system elements to be controlled. If not specified all
+        PVSystem (and Storage) in the grid model are controlled by this
+        InvControl.
+    curve_name : str
+        Name of the XY curve that defines the behavior of the function.
+    inv_control_mode: str
+        Inverter control mode.
+    system_parameters : dict
+        Additional parameters.
+    """
+    def __init__(self, name: str, der_list, curve_name: str,
+                 inv_control_mode: str, system_parameters: dict):
+        self.name = name
+        self.der_list = der_list
+        self.curve_name = curve_name
+        self.inv_control_mode = inv_control_mode
+        dssutil.run_command(f"new invcontrol.{name}",
+                            {"derlist": der_list, "vvc_curve1": curve_name,
+                             "mode": inv_control_mode, **system_parameters})
+
+
 def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
     """Return a dictionary of opendss storage object parameters.
 
