@@ -227,6 +227,7 @@ class DSSModel:
         self._last_solution_time = None
         self._storage = {}
         self._pvsystems = {}
+        self._invcontrols={}
         self._failed_elements = set()
         self._max_step = 15 * 60  # 15 minutes
 
@@ -422,7 +423,24 @@ class DSSModel:
     def add_inverter_controller(self, name: str, der_list,
                                 inv_control_mode: str,
                                 system_parameters: Optional[dict] = None):
-        pass
+        """Add an Inv Controller to OpenDSS.
+
+                Parameters
+                __________
+                name: str
+                    Name of the inverter controller.
+                der_list : list
+                    List of DERs that will be controlled by this inverter controller/
+                inv_control_mode : str
+                    Inverter control mode to activate.
+                system_parameters : dict, optional
+                    Additional parameters. Keys must be valid OpenDSS InvControl object
+                    parameters.
+                """
+        control = InvControl(name, der_list, inv_control_mode,
+                             system_parameters)
+        self._invcontrols[name] = control
+
 
     @staticmethod
     def add_loadshape(name: str, file: PathLike,
