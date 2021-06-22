@@ -258,6 +258,14 @@ class DSSModel:
         Curve specified this way overrides the value provided in
         :py:attr:`StorageSpecification.params`.
 
+        For Inv controls, the function curve may be specified
+        either as a parameter in :py:attr:`grid.InvControlSpecification` or
+        in the :py:attr:`InvControlSpecification.function_curve` field. If
+        this field is specified then a new XYCurve will be created in the
+        OpenDSS model names "func_<invcontrol-name>". Curve specified this
+        way will override the value provided in
+        :py:attr:`InvControlSpecification.params'
+
         Parameters
         ----------
         gridspec : GridSpecification
@@ -300,6 +308,19 @@ class DSSModel:
                 pv_system.pmpp,
                 system_params
             )
+        for inv_control in gridspec.inv_control:
+            system_params = inv_control.params.copy()
+            if inv_control.function_curve is not None:
+                model.add_xycurve(f"eff_{inv_control.name}",
+                                  *zip(*inv_control.function_curve))
+                system_params["vvc_curve1"] = f"func_{inv_control.name}"
+            model.add_inverter_controller(
+                inv_control.name,
+                inv_control.der_list,
+                inv_control.inv_control_mode,
+                system_params
+            )
+
         return model
 
     @property
@@ -399,6 +420,11 @@ class DSSModel:
         system = PVSystem(name, bus, phases, pmpp_kw, kva_rating,
                           system_parameters)
         self._pvsystems[name] = system
+
+    def add_inverter_controller(self, name: str, der_list,
+                                inv_control_mode: str,
+                                system_parameters: Optional[dict] = None):
+        pass
 
     @staticmethod
     def add_loadshape(name: str, file: PathLike,
