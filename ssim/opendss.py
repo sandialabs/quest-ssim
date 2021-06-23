@@ -399,7 +399,7 @@ class DSSModel:
 
     def add_pvsystem(self, name: str, bus: str, phases: int,
                      kva_rating: float, pmpp_kw: float,
-                     system_parameters: Optional[dict] = None):
+                     system_parameters: Optional[dict] = None) -> PVSystem:
         """Add a PV System to OpenDSS.
 
         Parameters
@@ -421,10 +421,12 @@ class DSSModel:
         system = PVSystem(name, bus, phases, pmpp_kw, kva_rating,
                           system_parameters)
         self._pvsystems[name] = system
+        return system
 
     def add_inverter_controller(self, name: str, der_list,
                                 inv_control_mode: str,
-                                system_parameters: Optional[dict] = None):
+                                system_parameters:
+                                Optional[dict] = None) -> InvControl:
         """Add an Inv Controller to OpenDSS.
 
         Parameters
@@ -442,6 +444,7 @@ class DSSModel:
         control = InvControl(name, der_list, inv_control_mode,
                              system_parameters)
         self._invcontrols[name] = control
+        return control
 
     @staticmethod
     def add_loadshape(name: str, file: PathLike,
