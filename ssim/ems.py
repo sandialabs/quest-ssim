@@ -66,14 +66,25 @@ class EMS:
         self._actions = {}
         self.time = 0.0
 
-    def update(self, message):
+    def update_reliability(self, event):
+        """Update the state of the EMS in response to a reliability event.
+
+        Parameters
+        ----------
+        event : reliability.Event
+            Information about a single reliability event.
+        """
+        # TODO we don't actually have a model to update at this point.
+        pass
+
+    def update_control(self, message):
         """Update the state of the EMS.
 
         Parameters
         ----------
         message : dict
-            Dictionary with information used to update the EMS. This contains,
-            for example, the state of charge of a storage device.
+            Dict with keys "name" and "soc" specifying the name of a storage
+            device and its state of charge respectively.
         """
         self.soc[message["name"]] = message["soc"]
 

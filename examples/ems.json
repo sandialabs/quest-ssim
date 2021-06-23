@@ -8,6 +8,9 @@
   "endpoints": [
     {
       "name": "control"
+    },
+    {
+      "name": "reliability"
     }
   ]
 }

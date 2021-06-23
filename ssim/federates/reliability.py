@@ -34,18 +34,14 @@ class ReliabilityFederate:
         self._reliability_model = reliability_model
         self._endpoint = federate.get_endpoint_by_name("reliability")
 
-    def _event_message(self, event):
-        message = self._endpoint.create_message()
-        message.destination = "grid/reliability"
-        message.data = event.to_json()
-        return message
+    def _send_event_message(self, event):
+        self._endpoint.send_data(event.to_json(), "grid/reliability")
+        self._endpoint.send_data(event.to_json(), "ems/reliability")
 
     def step(self, time):
         """Advance the time of the reliability model to `time`."""
         for event in self._reliability_model.events(time):
-            message = self._event_message(event)
-            logging.debug("sending message: %s", message)
-            self._endpoint.send_data(message)
+            self._send_event_message(event)
 
     def run(self, hours: float):
         logging.info("Running reliability federate.")

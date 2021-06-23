@@ -4,9 +4,7 @@
   "core_type": "zmq",
   "endpoints": [
     {
-      "name": "reliability/reliability",
-      "destination": "grid/reliability",
-      "global": true
+      "name": "reliability"
     }
   ]
 }

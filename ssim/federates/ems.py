@@ -7,6 +7,7 @@ from helics import (
     helicsCreateMessageFederateFromConfig, helics_time_maxtime
 )
 
+from ssim import reliability
 from ssim.ems import EMS
 
 
@@ -25,17 +26,34 @@ class EMSFederate:
         self._ems = EMS(config)
         self.federate = federate
         self.control_endpoint = federate.get_endpoint_by_name("control")
+        self.reliability_endpoint = federate.get_endpoint_by_name(
+            "reliability"
+        )
 
-    def pending_messages(self):
+    def pending_control_messages(self):
         while self.control_endpoint.has_message():
             yield json.loads(self.control_endpoint.get_message().data)
 
+    def pending_reliability_messages(self):
+        while self.reliability_endpoint.has_message():
+            yield reliability.Event.from_json(
+                self.reliability_endpoint.get_message().data
+            )
+
     def _update_control_inputs(self):
-        for message in self.pending_messages():
+        for message in self.pending_control_messages():
             self.federate.log_message(
                 f"processing message: {message}", logging.DEBUG
             )
-            self._ems.update(message)
+            self._ems.update_control(message)
+
+    def _update_reliability(self):
+        for message in self.pending_reliability_messages():
+            self.federate.log_message(
+                f"got reliability message: {message}",
+                logging.DEBUG
+            )
+            self._ems.update_reliability(message)
 
     def _send_control_messages(self):
         for device, action in self._ems.control_actions():
@@ -55,6 +73,7 @@ class EMSFederate:
         time : float
             Time to advance to in seconds.
         """
+        self._update_reliability()
         self._update_control_inputs()
         self._ems.step(time)
         self._send_control_messages()
