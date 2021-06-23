@@ -155,6 +155,31 @@ class PVSpecification:
     # Maximum DC array output at changing temperature relative to `pmpp`.
     pt_curve: Optional[Curve] = None
 
+    @classmethod
+    def from_dict(cls, params: dict):
+        """Build a PVSpecification instance from a dict with OpenDSS keys.
+
+        Parameters
+        ----------
+        params: dict
+            Dictionary with keys that have the same names as OpenDSS PVSystem
+            parameters. Some additional keys are also expected that have the
+            same names as the PVSpecification fields they represent
+            (e.g. "inverter_efficiency" and "pt_curve").
+        """
+        # copy the dict so we can modify it with impunity
+        params = params.copy()
+        # pop the keys off so we are left with only the extra OpenDSS params
+        return cls(
+            params.pop("name"),
+            params.pop("bus"),
+            params.pop("pmpp"),
+            params.pop("kva_rated"),
+            params.pop("phases", 3),
+            inverter_efficiency=_get_curve("inverter_efficiency", params),
+            pt_curve=_get_curve("pt_curve", params),
+            params=params
+        )
 
 class GridSpecification:
     """Specification of the grid.
