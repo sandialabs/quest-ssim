@@ -258,4 +258,8 @@ class GridSpecification:
             grid.add_storage(
                 StorageSpecification.from_dict(device)
             )
+        for device in spec["pvsystem"]:
+            grid.add_pvsystem(
+                PVSpecification.from_dict(device)
+            )
         return grid
