@@ -30,6 +30,7 @@ class Storage(StorageDevice):
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
     """
+
     def __init__(self, name, bus, device_parameters, phases,
                  state=StorageState.IDLE):
         self.name = name
@@ -119,6 +120,7 @@ class PVSystem:
     system_parameters : dict
         Additional parameters
     """
+
     def __init__(self, name: str, bus: str, phases: int, pmpp: float,
                  inverter_kva: float, system_parameters: dict):
         self.name = name
@@ -183,11 +185,11 @@ class InvControl:
     system_parameters : dict
         Additional parameters.
     """
-    def __init__(self, name: str, der_list, curve_name: str,
-                 inv_control_mode: str, system_parameters: dict):
+
+    def __init__(self, name: str, der_list, inv_control_mode: str,
+                 system_parameters: dict):
         self.name = name
         self.der_list = der_list
-        self.curve_name = curve_name
         self.inv_control_mode = inv_control_mode
         dssutil.run_command(f"new invcontrol.{name}",
                             {"derlist": der_list, "mode": inv_control_mode,
@@ -216,6 +218,7 @@ def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
 
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
+
     def __init__(self,
                  dss_file: PathLike,
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
@@ -227,7 +230,7 @@ class DSSModel:
         self._last_solution_time = None
         self._storage = {}
         self._pvsystems = {}
-        self._invcontrols={}
+        self._invcontrols = {}
         self._failed_elements = set()
         self._max_step = 15 * 60  # 15 minutes
 
@@ -319,7 +322,6 @@ class DSSModel:
                 inv_control.inv_control_mode,
                 system_params
             )
-
         return model
 
     @property
@@ -425,22 +427,21 @@ class DSSModel:
                                 system_parameters: Optional[dict] = None):
         """Add an Inv Controller to OpenDSS.
 
-                Parameters
-                __________
-                name: str
-                    Name of the inverter controller.
-                der_list : list
-                    List of DERs that will be controlled by this inverter controller/
-                inv_control_mode : str
-                    Inverter control mode to activate.
-                system_parameters : dict, optional
-                    Additional parameters. Keys must be valid OpenDSS InvControl object
-                    parameters.
-                """
+        Parameters
+        __________
+        name: str
+            Name of the inverter controller.
+        der_list : list
+            List of DERs that will be controlled by this inverter controller.
+        inv_control_mode : str
+            Inverter control mode to activate.
+        system_parameters : dict, optional
+            Additional parameters. Keys must be valid OpenDSS InvControl
+            object parameters.
+        """
         control = InvControl(name, der_list, inv_control_mode,
                              system_parameters)
         self._invcontrols[name] = control
-
 
     @staticmethod
     def add_loadshape(name: str, file: PathLike,
