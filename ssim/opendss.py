@@ -536,6 +536,16 @@ class DSSModel:
         """
         return self._pvsystems
 
+    @property
+    def invcontrols(self):
+        """Return the InvControls that have been added to the grid model.
+
+        Does not return inverter controls that are defined in the opendss
+        model, only those that were added with
+        :py:meth:`DSSModel.add_invcontrol`.
+        """
+        return self._invcontrols
+
     @staticmethod
     def node_voltage(bus):
         """Return a list of node voltage magnitudes at `bus` [pu]."""
