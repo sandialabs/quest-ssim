@@ -191,6 +191,22 @@ class PVSystem:
                              "Pmpp": pmpp, "kVA": inverter_kva,
                              **system_parameters})
 
+    def _activate(self):
+        """Make this the active PV system in OpenDSS."""
+        dssdirect.PVsystems.Name(self.name)
+
+    @property
+    def kw(self) -> float:
+        """Current real power output. [kW]"""
+        self._activate()
+        return dssdirect.PVsystems.kW()
+
+    @property
+    def kvar(self) -> float:
+        """Current reactive power output/consumption system. [kVAR]"""
+        self._activate()
+        return dssdirect.PVsystems.kvar()
+
 
 class Generator:
     """Interface for OpenDSS Generator objects.
