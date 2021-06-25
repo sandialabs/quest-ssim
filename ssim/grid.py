@@ -315,7 +315,7 @@ class StorageStatus:
 @dataclass
 class PVStatus:
     """Status of a PV System."""
-    name: str
+    system_name: str
     kw: float
     kvar: float
 
