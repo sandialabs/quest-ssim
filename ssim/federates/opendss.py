@@ -11,7 +11,7 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.grid import GridSpecification
+from ssim.grid import GridSpecification, PVStatus
 from ssim.opendss import DSSModel
 
 
@@ -110,6 +110,47 @@ class StorageInterface:
         )
 
 
+class PVInterface:
+    """Manager for the output to other federates related to PV Systems
+
+    Parameters
+    ----------
+    federate : HelicsFederate
+        HELICS federate handle.
+    pvsystem : PVSystem
+        PVSystem instance providing access to the opendss model.
+    """
+    def __init__(self, federate, pvsystem):
+        self._federate = federate
+        self._system = pvsystem
+        self._control_endpoint = federate.register_endpoint(
+            f"pvsystem.{pvsystem.name}.control"
+        )
+
+    def update(self):
+        """Update PVSystem model in response to federate input.
+
+        Since PVSystems are not dispatchable this does nothing; however,
+        in the future it could be used to support curtailment or other
+        operations managed by the EMS.
+        """
+        pass
+
+    def publish(self):
+        """Send message to the EMS with the current status of the PV system.
+
+        Current real and reactive power are reported to the EMS.
+        """
+        status = PVStatus(
+            self._system.name,
+            self._system.kw,
+            self._system.kvar
+        )
+        self._control_endpoint.send_data(
+            status.to_json(), "ems/control"
+        )
+
+
 class EventLog:
     """A record of all events that have occured."""
     def __init__(self):
@@ -174,6 +215,10 @@ class GridFederate:
             for device in self._grid_model.storage_devices.values()
         ]
         self._event_log = EventLog()
+        self._pv_interface = [
+            PVInterface(federate, device)
+            for device in self._grid_model.pvsystems.values()
+        ]
         self._reliability = ReliabilityInterface(federate)
 
     def _update_storage(self):
@@ -189,6 +234,8 @@ class GridFederate:
         self._reliability.update_generators(
             self._grid_model.generators.values()
         )
+        for pvsystem in self._pv_interface:
+            pvsystem.publish()
         real, reactive = self._grid_model.total_power()
         self._federate.publications['grid/total_power'].publish(
             complex(real, reactive)
