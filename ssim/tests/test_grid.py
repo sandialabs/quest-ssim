@@ -29,3 +29,17 @@ def test_storage_spec_efficiency_curves(storage_spec_dict):
     del storage_spec_dict["inverter_efficiency"]
     spec = grid.StorageSpecification.from_dict(storage_spec_dict)
     assert spec.inverter_efficiency is None
+
+
+def test_PVStatus_from_json():
+    status = grid.PVStatus.from_json(
+        '{"system_name": "foo", "kw": 100.1, "kvar": -100.1}'
+    )
+    assert status.system_name == 'foo'
+    assert status.kw == 100.1
+    assert status.kvar == -100.1
+
+
+def test_PVStatus_to_json():
+    status = grid.PVStatus("foo", 1.1, 1.2)
+    assert grid.PVStatus.from_json(status.to_json()) == status
