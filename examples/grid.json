@@ -35,9 +35,9 @@
       "name": "PV1",
       "bus": "632",
       "phases": 3,
-      "pmpp": 100,
-      "kva_rated": 120,
-      "irradiance_profile": "triangle.csv",
+      "pmpp": 1000,
+      "kva_rated": 1200,
+      "irradiance_profile": "ieee13demo\\test_irradiance.csv",
       "inverter_efficiency": {"x":  [10, 50, 90, 100],
                               "y":  [0.90, 0.94, 0.98, 0.99]},
       "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
