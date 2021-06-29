@@ -250,7 +250,12 @@ class DSSModel:
         are specified then a new XYCurve will be created in the OpenDSS model
         named "eff_<pvsystem-name>" or "pt_<pvsystem-name>". Curve specified
         this way override the value provided in
-        :py:attr:`PVSpecification.params`.
+        :py:attr:`PVSpecification.params`. The irradiance profile for the PV
+        may be specified through a csv file in the
+        :py:attr: `grid.PVSpecification.irradiance_profile' field or as a
+        parameter in :py:attr:`grid.PVSpecification.params`. Either way a new
+        LoadShape will be created in the OpenDSS model named
+        "irrad_pv_<pvsystem-name>".
 
         Similarly, for the storage device, the efficiency curve may be
         specified as a parameter in :py:attr:`grid.StorageSpecification.params'
@@ -294,6 +299,11 @@ class DSSModel:
             )
         for pv_system in gridspec.pv_systems:
             system_params = pv_system.params.copy()
+            if pv_system.irradiance_profile is not None:
+                model.add_loadshape(f"irrad_pv_{pv_system.name}",
+                                    pv_system.irradiance_profile, 1, 24)
+                model.loadshapeclass = LoadShapeClass.DAILY
+                system_params["Daily"] = f"irrad_pv_{pv_system.name}"
             if pv_system.inverter_efficiency is not None:
                 model.add_xycurve(f"eff_pv_{pv_system.name}",
                                   *zip(*pv_system.inverter_efficiency))
