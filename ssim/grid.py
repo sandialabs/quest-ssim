@@ -143,6 +143,9 @@ class PVSpecification:
     #: Inverter kVA rating [kVA].
     kva_rated: float
 
+    #: List of irradiance values for PV system in :math:`kW/m^2`
+    irradiance_profile: List
+
     #: Number of phases the inverter is connected to.
     phases: int = 3
 
@@ -152,7 +155,7 @@ class PVSpecification:
     #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
     inverter_efficiency: Optional[Curve] = None
 
-    # Maximum DC array output at changing temperature relative to `pmpp`.
+    #: Maximum DC array output at changing temperature relative to `pmpp`.
     pt_curve: Optional[Curve] = None
 
     @classmethod
@@ -175,6 +178,7 @@ class PVSpecification:
             params.pop("bus"),
             params.pop("pmpp"),
             params.pop("kva_rated"),
+            params.pop("irradiance_profile"),
             params.pop("phases", 3),
             inverter_efficiency=_get_curve("inverter_efficiency", params),
             pt_curve=_get_curve("pt_curve", params),
