@@ -144,7 +144,7 @@ class PVSpecification:
     kva_rated: float
 
     #: List of irradiance values for PV system in :math:`kW/m^2`
-    irradiance_profile: List
+    irradiance_profile: Optional[PathLike] = None
 
     #: Number of phases the inverter is connected to.
     phases: int = 3
