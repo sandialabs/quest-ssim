@@ -251,6 +251,20 @@ def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
     assert dssdirect.XYCurves.XArray() == [0.0, 2.0, 3.0]
     assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]
 
+def test_DSSModel_pvsystem_irradiance_profiles(grid_spec, data_dir):
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv1",
+            bus="loadbus2",
+            pmpp=100,
+            kva_rated=100,
+            irradiance_profile= data_dir / "test_irradiance.csv"
+        )
+    )
+    opendss.DSSModel.from_grid_spec(grid_spec)
+    dssdirect.PVsystems.Name("pv1")
+    irrad_profile_name = dssdirect.run_command("? pvsystem.pv1.daily")
+    assert dssdirect.LoadShape.Name() == "irrad_pv_pv1"
 
 def test_DSSModel_storage_efficiency_curves(grid_spec):
     storage_params = {
