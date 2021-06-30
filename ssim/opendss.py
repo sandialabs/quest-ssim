@@ -433,11 +433,11 @@ class DSSModel:
         self._pvsystems[name] = system
         return system
 
-    def add_inverter_controller(self, name: str, der_list,
+    def add_inverter_controller(self, name: str, der_list: List,
                                 inv_control_mode: str,
-                                system_parameters:
-                                Optional[dict] = None) -> InvControl:
-        """Add an Inv Controller to OpenDSS.
+                                system_parameters: Optional[dict]
+                                = None) -> InvControl:
+        """Add an Inverter Controller to OpenDSS.
 
         Parameters
         __________

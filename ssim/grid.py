@@ -127,6 +127,25 @@ class InvControlSpecification:
     #: Additional parameters
     params: dict = field(default_factory=dict)
 
+    @classmethod
+    def from_dict(cls, params: dict):
+        """Build a InvControlSpecification from a dict with OpenDSS keys.
+
+        Parameters
+        ----------
+            Dictionary with keys that have the same names as OpenDSS
+            InvControl parameters.
+        """
+        # copy the dict so we can modify it with impunity
+        params = params.copy()
+        # pop the keys off so we are left with only the extra OpenDSS params.
+        return cls(
+            params.pop("name"),
+            params.pop("der_list"),
+            params.pop("inv_control_mode"),
+            function_curve=_get_curve("function_curve", params),
+            params=params
+        )
 
 @dataclass
 class PVSpecification:
