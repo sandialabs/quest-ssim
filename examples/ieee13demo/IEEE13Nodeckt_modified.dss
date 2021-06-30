@@ -126,8 +126,8 @@ New Load.670c Bus1=670.3    Phases=1 Conn=Wye  Model=1 kV=2.4  kW=117  kvar=68
 
 
 ! Added a load that changes
-new loadshape.day npts=24 interval=1.5 mult=(0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.0 1.0 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3 0.2 0.1 0.05 0.05 0.03) !hour=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23)
-New Load.671_new bus1=671.1.2.3 phases=3 kV=4.16 kw=1155 kvar=660 daily=day
+!new loadshape.day npts=24 interval=1.5 mult=(0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0 1.0 1.0 1.0 0.9 0.8 0.7 0.6 0.5 0.4 0.3 0.2 0.1 0.05 0.05 0.03) !hour=(0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23)
+!New Load.671_new bus1=671.1.2.3 phases=3 kV=4.16 kw=1155 kvar=660 daily=day
 
 !CAPACITOR DEFINITIONS
 New Capacitor.Cap1 Bus1=675 phases=3 kVAR=600 kV=4.16

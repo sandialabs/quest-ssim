@@ -10,8 +10,8 @@
       "%stored": 50,
       "controller": "droop",
       "controller_params": {
-        "p_droop": 5000,
-        "q_droop": -500
+        "p_droop": 0,
+        "q_droop": 0
       },
       "inverter_efficiency": {"x":  [10, 50, 90, 100],
                               "y":  [0.90, 0.94, 0.98, 0.99]}
@@ -25,8 +25,8 @@
       "%stored": 50,
       "controller": "droop",
       "controller_params": {
-        "p_droop": 500,
-        "q_droop": -50
+        "p_droop": 0,
+        "q_droop": 0
       }
     }
   ],
@@ -35,8 +35,8 @@
       "name": "PV1",
       "bus": "632",
       "phases": 3,
-      "pmpp": 1000,
-      "kva_rated": 1200,
+      "pmpp": 3000,
+      "kva_rated": 3600,
       "irradiance_profile": "ieee13demo\\test_irradiance.csv",
       "inverter_efficiency": {"x":  [10, 50, 90, 100],
                               "y":  [0.90, 0.94, 0.98, 0.99]},
