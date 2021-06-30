@@ -285,4 +285,8 @@ class GridSpecification:
             grid.add_pvsystem(
                 PVSpecification.from_dict(device)
             )
+        for device in spec["invcontrol"]:
+            grid.add_inv_control(
+                InvControlSpecification.from_dict(device)
+            )
         return grid
