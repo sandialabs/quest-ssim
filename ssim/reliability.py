@@ -2,13 +2,12 @@
 from __future__ import annotations
 import abc
 import enum
-import functools
 import itertools
 import json
-import logging
 import random
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Collection, Iterator
+from typing import Optional, List, Union
 
 import opendssdirect
 
@@ -27,6 +26,241 @@ class Mode(str, enum.Enum):
 class EventType(str, enum.Enum):
     FAIL = 'fail'
     RESTORE = 'restore'
+
+
+@dataclass
+class Repair:
+    """Representation of a repair."""
+
+    #: State of the connection to the grid following the repair.
+    connection: Mode
+
+    #: Additional repair information to be passed to the grid.
+    data: dict = field(default_factory=dict)
+
+
+@dataclass
+class Failure:
+    """Representation of an ongoing failure."""
+
+    #: Time required to repair the failure.
+    repair_time: float
+
+    #: Data for the repair event
+    repair: Repair
+
+    #: Status of the component's connection to the grid following the failure.
+    connection: Mode = Mode.OPEN
+
+    #: Additional failure information to be passed to the grid.
+    data: dict = field(default_factory=dict)
+
+
+class FailureMode(abc.ABC):
+    """Base class for failure modes."""
+    @abc.abstractmethod
+    def next_update(self) -> float:
+        """Next time to update the model and check for a failure.
+
+        Returns
+        -------
+        float
+            Next update time. [seconds]
+        """
+
+    @abc.abstractmethod
+    def update(self, time, **kwargs):
+        """Update the model.
+
+        Parameters
+        ----------
+        time : float
+            Current time. [seconds]
+        kwargs :
+            Additional state information for the model.
+        """
+
+    @property
+    @abc.abstractmethod
+    def failure(self) -> Optional[Failure]:
+        """Active failure, or None if no failure at the current time"""
+
+
+class AgingFailure(FailureMode):
+    """Generic aging-related failure mode.
+
+    Failures are sampled from an exponential distribution with the given mean
+    time before failure (`mtbf`). Repair times are sampled from a uniform
+    distribution between `min_repair` and `max_repair`.
+
+    Parameters
+    ----------
+    mtbf : float
+        Mean time before failure. [seconds]
+    min_repair : float
+        Minimum repair time. [seconds]
+    max_repair : float
+        Maximum repair time. [seconds]
+    failure_state : Mode or callable, defualt Mode.OPEN
+        State of the connection to the grid following a failure. If a callable
+        must accept no arguments and return a :py:class:`Mode`.
+    repair_state : Mode of callable, default Mode.CLOSED
+        State of the connection to the grid following repair.  If a callable
+        must accept no arguments and return a :py:class:`Mode`.
+    """
+    def __init__(self, mtbf, min_repair, max_repair,
+                 failure_state=Mode.OPEN,
+                 repair_state=Mode.CLOSED):
+        self.mtbf = mtbf
+        self.min_repair = min_repair
+        self.max_repair = max_repair
+        self._failure_state = failure_state
+        self._repair_state = repair_state
+        self._failure_time = 0.0
+        self._time = 0.0
+        self._sample_failure()
+
+    def _sample_failure(self):
+        self._failure_time = self._time + random.expovariate(
+            1.0 / self.mtbf
+        )
+        self._next_failure = Failure(
+            repair_time=random.uniform(self.min_repair, self.max_repair),
+            connection=self._get_failure_state(),
+            repair=Repair(connection=self._get_repair_state())
+        )
+
+    def _get_repair_state(self):
+        if callable(self._repair_state):
+            return self._repair_state()
+        return self._repair_state
+
+    def _get_failure_state(self):
+        if callable(self._failure_state):
+            return self._failure_state()
+        return self._failure_state
+
+    def _repair_completion_time(self):
+        return self._failure_time + self._next_failure.repair_time
+
+    def next_update(self) -> float:
+        if self._time < self._failure_time:
+            return self._failure_time
+        return self._repair_completion_time()
+
+    def update(self, time, **kwargs):
+        self._time = time
+        if time >= self._repair_completion_time():
+            self._sample_failure()
+
+    @property
+    def failure(self) -> Optional[Failure]:
+        if self._time >= self._failure_time:
+            return self._next_failure
+        return None
+
+
+class MultiModeReliabilityModel:
+    """A reliability model for a single component with multiple failure modes.
+
+    The model consists of a collection of failure modes that operate
+    concurrently. In other words, during normal operation every failure mode is
+    active and can trigger a failure of the component. When a failure mode is
+    triggered it returns a :py:class:`Failure` object and failures from all
+    other failure modes are suppressed until the restoration time specified by
+    :py:class:`Failure`. At that time all failure modes are reinstated and any
+    failures that would have occurred while the device was inoperable are
+    immediately applied.
+    """
+    def __init__(self):
+        self.time = 0.0
+        self._failure_time = None
+        self.active_failure: Optional[Failure] = None
+        self._pending_failures: deque[Failure] = deque()
+        self._failure_modes: List[FailureMode] = []
+
+    def add_failure_mode(self, mode: FailureMode):
+        """Add a new failure mode to the reliability model."""
+        self._failure_modes.append(mode)
+
+    def update(self, time, **kwargs):
+        """Advance the failure mode models to the current time.
+
+        Parameters
+        ----------
+        time : float
+            Current time. [seconds]
+        kwargs
+            Can be used to pass additional information to the failure mode models.
+        """
+        self.time = time
+        for failure_mode in self._failure_modes:
+            failure_mode.update(time, **kwargs)
+            failure = failure_mode.failure
+            if failure is not None:
+                self._pending_failures.appendleft(failure)
+
+    def next_update(self) -> float:
+        """Return the time when the model needs to update next.
+
+        This may or may not correspond to the time of a reliability event,
+        if the reliability model needs information about the operation of the
+        component then this can be used to ensure that information is
+        periodically updated.
+
+        Returns
+        -------
+        float
+            Time of the next update [seconds].
+        """
+        next_failure_mode_update = min(
+            mode.next_update() for mode in self._failure_modes
+        )
+        if self.active_failure is not None:
+            return min(
+                next_failure_mode_update,
+                self._failure_time + self.active_failure.repair_time
+            )
+        return next_failure_mode_update
+
+    def repair_complete(self) -> bool:
+        """Return True if the repair time for the active failure has passed."""
+        if self.active_failure is None:
+            return True
+        repair_time = self.active_failure.repair_time + self._failure_time
+        return repair_time <= self.time
+
+    def next_event(self) -> Optional[Union[Repair, Failure]]:
+        """Return the next reliability event affecting this component.
+
+        Returns
+        -------
+        Failure or Repair or None
+            If no events are scheduled at the present time, then None is
+            returned, otherwise a :py:class:`Failure` or :py:class`Repair`
+            event is returned.
+        """
+        if self.active_failure is None and self.has_pending_failure():
+            # make the first pending failure active and return it
+            self._failure_time = self.time
+            self.active_failure = self._pending_failures.pop()
+            return self.active_failure
+        if self.active_failure is not None and self.repair_complete():
+            repair = self.active_failure.repair
+            self.active_failure = None
+            self._failure_time = None
+            return repair
+        # no repair and no failure
+        return None
+
+    def has_pending_failure(self):
+        """Return True if one of the failure modes has generated a failure."""
+        return len(self._pending_failures) > 0
+
+    def is_failed(self) -> bool:
+        """Return True if there is an active failure or a pending failure."""
+        return ((self.active_failure is not None)
+                or (len(self._pending_failures) > 0))
 
 
 @dataclass
@@ -72,240 +306,94 @@ class Event:
         )
 
 
-class ReliabilityModel(abc.ABC):
-    """Abstract base class for reliability models."""
-
-    @abc.abstractmethod
-    def peek(self) -> float:
-        """Return the time of the next event."""
-
-    @abc.abstractmethod
-    def events(self, time) -> Iterator[Event]:
-        """Return all events that occur at or prior to `time`.
-
-        Events should only be returned once.
-        """
-
-
-class GridReliabilityModel(ReliabilityModel):
-    """Overarching model of reliability for the full grid.
-
-    Subsumes reliability models for all components that make up the
-    grid.
-    """
-    def __init__(self, components: Collection[ReliabilityModel]):
-        self._components = components
-
-    @classmethod
-    def from_json(cls, file: str):
-        """Build a grid reliability model from the grid config.
-
-        To build a grid reliability model we need to iterate over every
-        grid component and construct a wear-out model for it.
-        """
-        with open(file) as f:
+class GridReliabilityModel:
+    def __init__(self, config_file):
+        with open(config_file) as f:
             config = json.load(f)
+        self._model_params = config["reliability"]
         dssutil.load_model(config["dss_file"])
-        reliability = config["reliability"]
         lines = list(
             dssutil.iterate_properties(opendssdirect.Lines, ["IsSwitch"])
         )
-        line_reliability_models = [
-            LineReliability(
-                name,
-                reliability["line"]
+        self._lines = {
+            line: self._make_line_reliability_model()
+            for line, properties in lines if not properties.IsSwitch
+        }
+        self._switches = {
+            switch: self._make_switch_reliability_model(switch)
+            for switch, properties in lines if properties.IsSwitch
+        }
+
+    def _make_line_reliability_model(self):
+        """Construct a line reliability model"""
+        rm = MultiModeReliabilityModel()
+        rm.add_failure_mode(
+            AgingFailure(
+                self._model_params["line"]["mtbf"]*3600,
+                self._model_params["line"]["min_repair"]*3600,
+                self._model_params["line"]["max_repair"]*3600
             )
-            for name, properties in lines if not properties.IsSwitch
-        ]
-        switch_reliability_models = [
-            SwitchReliability(
-                name,
-                reliability["switch"],
-                _switch_state_normal(name)
-            )
-            for name, properties in lines if properties.IsSwitch
-        ]
-        logging.warning("created line reliability model for %s lines",
-                        len(line_reliability_models))
-        return cls(
-            line_reliability_models + switch_reliability_models
         )
+        return rm
+
+    def _make_switch_reliability_model(self, switch):
+        rm = MultiModeReliabilityModel()
+        print(f"making reliability model for switch: {switch}")
+        rm.add_failure_mode(
+            AgingFailure(
+                self._model_params["switch"]["mtbf"]*3600,
+                self._model_params["switch"]["min_repair"]*3600,
+                self._model_params["switch"]["max_repair"]*3600,
+                failure_state=lambda: _random_mode(
+                    self._model_params["switch"]["p_open"],
+                    self._model_params["switch"]["p_closed"]
+                ),
+                repair_state=_switch_state_normal(switch)
+            )
+        )
+        return rm
 
     def peek(self):
-        return min(component.peek() for component in self._components)
-
-    def events(self, time: float) -> Iterator[Event]:
-        """Return an iterator over tne events that occur at `time`.
-
-        Parameters
-        ----------
-        time : float
-            Time in seconds.
-        """
-        component_events = itertools.chain(
-            *(component.events(time) for component in self._components)
+        return min(
+            model.next_update() for model in self.all_models()
         )
-        for event in component_events:
-            yield event
 
-
-class WearOutModel:
-    """Generic wear-out model.
-
-    Parameters
-    ----------
-    failure_rate : float
-        Failure rate.
-    min_repair_time : float
-        Minimum time to repair
-    max_repair_time : float
-        Maximum time to repair
-    """
-    def __init__(self, failure_rate, min_repair_time, max_repair_time):
-        self._failure_distribution = functools.partial(
-            random.expovariate, failure_rate
-        )
-        self._repair_distribution = functools.partial(
-            random.uniform, min_repair_time, max_repair_time
-        )
-        self._next_event_time = self._failure_distribution()
-        self._next_event_type = EventType.FAIL
-
-    @property
     def events(self):
-        """Iterate over all events"""
-        while True:
-            yield self._next_event_type, self._next_event_time
-            self._sample_next_event()
+        for component, model in self._all_components():
+            event = model.next_event()
+            if event is not None:
+                yield _make_event(event, f"{component}")
 
-    def _sample_next_event(self):
-        if self._next_event_type is EventType.FAIL:
-            self._next_event_type = EventType.RESTORE
-            self._next_event_time += self._repair_distribution()
-        else:
-            self._next_event_type = EventType.FAIL
-            self._next_event_time += self._failure_distribution()
-
-    def reset(self, time):
-        """Reset the model by sampling a new failure event at `time`."""
-        self._next_event_time = time + self._failure_distribution()
-        self._next_event_type = EventType.FAIL
-
-
-class SwitchReliability(ReliabilityModel):
-    """Model of switch wear-out.
-
-    Parameters
-    ----------
-    name : str
-        Name of the switch.
-    params : dict
-        Failure model parameters. Must contain keys 'mtbf', 'p_open', and
-        'p_closed', 'min_repair', 'max_repair'
-
-        - 'mtbf' is the mean time before failure [hours]
-        - 'p_open' is the probability the switch will fail open
-        - 'p_closed' is the probability the switch will fail closed
-        - 'p_current' is the probability the switch will fail in its current
-           state
-        - 'min_repair' is the minimum time to repair the switch [hours]
-        - 'max_repair' is the maximum time to repair the switch [hours]
-    normal_state : Mode
-        State of the switch during normal operation. This is the state the
-        switch will be returned to when it is restored following a failure.
-    """
-    def __init__(self, name, params, normal_state):
-        if params['p_open'] + params['p_closed'] + params['p_current'] != 1.0:
-            raise ValueError(
-                "params 'p_open', 'p_closed', and 'p_current' must sum to 1.0."
-            )
-        self.switch_name = name
-        self._wear_out = WearOutModel(
-            1.0 / (params['mtbf'] * 3600.0),
-            params['min_repair'] * 3600.0,
-            params['max_repair'] * 3600.0
+    def _all_components(self):
+        return itertools.chain(
+            self._lines.items(),
+            self._switches.items()
         )
-        self._p_open = params['p_open']
-        self._p_closed = params['p_closed']
-        self._p_current = params['p_current']
-        self._repair_state = normal_state
-        if params.get('repair_state') == 'closed':
-            self._repair_state = Mode.CLOSED
-        elif params.get('repair_state') == 'current':
-            self._repair_state = Mode.CURRENT
-        elif params.get('repair_state') == 'open':
-            self._repair_state = Mode.OPEN
 
-    def _sample_failure_mode(self):
-        # return a random failure mode
-        p = random.uniform(0, 1)
-        if p < self._p_open:
-            return Mode.OPEN
-        if p < self._p_open + self._p_closed:
-            return Mode.CLOSED
-        return Mode.CURRENT
-
-    def peek(self) -> float:
-        return next(self._wear_out.events)[1]
-
-    def _make_event(self, event_type):
-        if event_type is EventType.FAIL:
-            return Event(
-                event_type, self._sample_failure_mode(), self.switch_name
-            )
-        return Event(event_type, self._repair_state, self.switch_name)
-
-    def events(self, time) -> Iterator[Event]:
-        for event, t in self._wear_out.events:
-            if t > time:
-                break
-            yield self._make_event(event)
-
-
-class LineReliability(ReliabilityModel):
-    """Model of the reliability of a line.
-
-    Line failure times are sampled from an exponential distribution.
-
-    Line repair times are sampled from a uniform distribution plus a fixed
-    offset.
-
-    Parameters
-    ----------
-    line_name : str
-        Name of the line. Used to construct the reliability events.
-    params : dict
-        Must have keys 'mtbf', 'min_repair', and 'max_repair'.
-
-        - 'mtbf' mean time before failure [hours]
-        - 'min_repair' minimum time to repair the line [hours]
-        - 'max_repair' maximum time required to repair the line [hours]
-    """
-    def __init__(self,
-                 line_name: str,
-                 params: dict):
-        failure_rate = 1.0 / (3600.0 * params["mtbf"])
-        min_repair_time = params["min_repair"] * 3600.0
-        max_repair_time = params["max_repair"] * 3600.0
-        self._wear_out = WearOutModel(
-            failure_rate, min_repair_time, max_repair_time
+    def all_models(self):
+        return itertools.chain(
+            self._lines.values(),
+            self._switches.values()
         )
-        self.line_name = line_name
 
-    def peek(self):
-        return next(self._wear_out.events)[1]
+    def update(self, time):
+        for model in self.all_models():
+            model.update(time)
 
-    def _make_event(self, event_type):
-        if event_type is EventType.FAIL:
-            return Event(event_type, Mode.OPEN, self.line_name)
-        return Event(event_type, Mode.CLOSED, self.line_name)
 
-    def events(self, time):
-        # Sample new events until the time of the next event is in the future.
-        for event, t in self._wear_out.events:
-            if t > time:
-                break
-            yield self._make_event(event)
+def _make_event(event, element):
+    if isinstance(event, Failure):
+        return Event(EventType.FAIL, event.connection, element, event.data)
+    return Event(EventType.RESTORE, event.connection, element, event.data)
+
+
+def _random_mode(p_open, p_closed):
+    p = random.uniform(0, 1)
+    if p < p_open:
+        return Mode.OPEN
+    if p < p_open + p_closed:
+        return Mode.CLOSED
+    return Mode.CURRENT
 
 
 def _switch_state_normal(name):
