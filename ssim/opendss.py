@@ -312,6 +312,7 @@ class DSSModel:
                 model.add_xycurve(f"pt_{pv_system.name}",
                                   *zip(*pv_system.pt_curve))
                 system_params["P-TCurve"] = f"pt_{pv_system.name}"
+                system_params["kV"] = 4.16
             model.add_pvsystem(
                 pv_system.name,
                 pv_system.bus,
@@ -326,6 +327,11 @@ class DSSModel:
                 model.add_xycurve(f"func_{inv_control.name}",
                                   *zip(*inv_control.function_curve))
                 system_params["vvc_curve1"] = f"func_{inv_control.name}"
+                system_params["deltaQ_factor"] = -1.0
+                system_params["RateofChangeMode"] = "LPF"
+                system_params["LPFTau"] = 10
+                system_params["voltage_curvex_ref"] = "ravg"
+                system_params["avgwindowlen"] = "15s"
             model.add_inverter_controller(
                 inv_control.name,
                 inv_control.der_list,
@@ -382,7 +388,7 @@ class DSSModel:
         """
         self._set_time(time)
         dssdirect.Solution.Solve()
-        dssdirect.Meters.SampleAll()  # sample all meters, but don't save.
+        #dssdirect.Meters.SampleAll()  # sample all meters, but don't save.
         self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,

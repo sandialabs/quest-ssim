@@ -18,7 +18,7 @@
     },
     {
       "name": "S2",
-      "bus": "670",
+      "bus": "671",
       "phases": 3,
       "kwrated": 500,
       "kwhrated": 50000,
@@ -33,7 +33,7 @@
   "pvsystem": [
     {
       "name": "PV1",
-      "bus": "632",
+      "bus": "671",
       "phases": 3,
       "pmpp": 3000,
       "kva_rated": 3600,
