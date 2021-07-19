@@ -148,6 +148,7 @@ class InvControlSpecification:
             params=params
         )
 
+
 @dataclass
 class PVSpecification:
 
@@ -315,7 +316,7 @@ class StorageStatus:
 @dataclass
 class PVStatus:
     """Status of a PV System."""
-    system_name: str
+    name: str
     kw: float
     kvar: float
 
