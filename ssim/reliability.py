@@ -7,8 +7,9 @@ import json
 import random
 from collections import deque
 from dataclasses import dataclass, field
-from typing import Optional, List, Union
+from typing import Optional, List, Union, Tuple
 
+import numpy as np
 import opendssdirect
 
 from ssim import dssutil
@@ -140,24 +141,96 @@ class AgingFailure(FailureMode):
             return self._failure_state()
         return self._failure_state
 
-    def _repair_completion_time(self):
-        return self._failure_time + self._next_failure.repair_time
-
     def next_update(self) -> float:
         if self._time < self._failure_time:
             return self._failure_time
-        return self._repair_completion_time()
+        return np.inf
 
     def update(self, time, **kwargs):
         self._time = time
-        if time >= self._repair_completion_time():
-            self._sample_failure()
+
+    def reset(self):
+        self._sample_failure()
 
     @property
     def failure(self) -> Optional[Failure]:
         if self._time >= self._failure_time:
             return self._next_failure
         return None
+
+
+class OperatingWearOut(FailureMode):
+    """Failure mode conditioned on operating time (as opposed to wall time).
+
+    Parameters
+    ----------
+    mtbf : float
+        Mean time before failure (operating time) [hours].
+    min_repair : float
+        minimum repair time (wall time) [hours].
+    max_repair : float
+        maximum repair time (wall time) [hours].
+    """
+    def __init__(self, mtbf, min_repair, max_repair,
+                 failure_state = Mode.OPEN,
+                 repair_state = Mode.CLOSED):
+        self.mtbf = mtbf
+        self.min_repair = min_repair
+        self.max_repair = max_repair
+        self._failure_state = failure_state
+        self._repair_state = repair_state
+        self._failure_time = 0.0
+        self._failure_wall_time = None
+        self._wall_time = 0.0
+        self._operating_time = 0.0
+        self._sample_failure()
+
+    def _sample_failure(self):
+        self._failure_time = self._operating_time + random.expovariate(
+            1.0 / self.mtbf
+        )
+        self._failure_wall_time = None
+        self._next_failure = Failure(
+            repair_time=random.uniform(self.min_repair, self.max_repair),
+            connection=self._get_failure_state(),
+            repair=Repair(connection=self._get_repair_state())
+        )
+
+    def _get_repair_state(self):
+        if callable(self._repair_state):
+            return self._repair_state()
+        return self._repair_state
+
+    def _get_failure_state(self):
+        if callable(self._failure_state):
+            return self._failure_state()
+        return self._failure_state
+
+    def _minimum_wall_time_to_failure(self):
+        """Return the earliest wall time when the device could fail if it runs
+        continuously starting at the current time."""
+        remaining_operating_time = self._failure_time - self._operating_time
+        return self._wall_time + remaining_operating_time
+
+    def next_update(self) -> float:
+        if self._operating_time < self._failure_time:
+            return self._minimum_wall_time_to_failure()
+        return np.inf
+
+    def update(self, time, **kwargs):
+        if "operating_time" not in kwargs:
+            raise ValueError("missing value 'operating_time' in kwargs")
+        self._wall_time = time
+        self._operating_time = kwargs["operating_time"] * 3600
+
+    @property
+    def failure(self) -> Optional[Failure]:
+        if self._operating_time >= self._failure_time:
+            return self._next_failure
+        return None
+
+    def reset(self):
+        self._sample_failure()
 
 
 class MultiModeReliabilityModel:
@@ -176,8 +249,10 @@ class MultiModeReliabilityModel:
         self.time = 0.0
         self._failure_time = None
         self.active_failure: Optional[Failure] = None
-        self._pending_failures: deque[Failure] = deque()
+        self._active_failure_mode: Optional[FailureMode] = None
+        self._pending_failures: deque[Tuple[Failure, FailureMode]] = deque()
         self._failure_modes: List[FailureMode] = []
+        self._deferred_failure_modes = []
 
     def add_failure_mode(self, mode: FailureMode):
         """Add a new failure mode to the reliability model."""
@@ -198,7 +273,16 @@ class MultiModeReliabilityModel:
             failure_mode.update(time, **kwargs)
             failure = failure_mode.failure
             if failure is not None:
-                self._pending_failures.appendleft(failure)
+                self._pending_failures.appendleft((failure, failure_mode))
+                # stop updating models that have already triggered failures
+                self._deferred_failure_modes.insert(0, failure_mode)
+                self._failure_modes.remove(failure_mode)
+
+    def _all_failure_modes(self):
+        return itertools.chain(
+            self._failure_modes,
+            self._deferred_failure_modes
+        )
 
     def next_update(self) -> float:
         """Return the time when the model needs to update next.
@@ -214,7 +298,7 @@ class MultiModeReliabilityModel:
             Time of the next update [seconds].
         """
         next_failure_mode_update = min(
-            mode.next_update() for mode in self._failure_modes
+            mode.next_update() for mode in self._all_failure_modes()
         )
         if self.active_failure is not None:
             return min(
@@ -243,24 +327,29 @@ class MultiModeReliabilityModel:
         if self.active_failure is None and self.has_pending_failure():
             # make the first pending failure active and return it
             self._failure_time = self.time
-            self.active_failure = self._pending_failures.pop()
+            self.active_failure, self._active_failure_mode = \
+                self._pending_failures.pop()
             return self.active_failure
         if self.active_failure is not None and self.repair_complete():
             repair = self.active_failure.repair
             self.active_failure = None
+            self._active_failure_mode.reset()
+            self._failure_modes.insert(0, self._active_failure_mode)
+            self._deferred_failure_modes.remove(self._active_failure_mode)
+            self._active_failure_mode = None
             self._failure_time = None
             return repair
         # no repair and no failure
         return None
 
-    def has_pending_failure(self):
+    def has_pending_failure(self) -> bool:
         """Return True if one of the failure modes has generated a failure."""
         return len(self._pending_failures) > 0
 
     def is_failed(self) -> bool:
         """Return True if there is an active failure or a pending failure."""
         return ((self.active_failure is not None)
-                or (len(self._pending_failures) > 0))
+                or self.has_pending_failure())
 
 
 @dataclass
@@ -316,13 +405,43 @@ class GridReliabilityModel:
             dssutil.iterate_properties(opendssdirect.Lines, ["IsSwitch"])
         )
         self._lines = {
-            line: self._make_line_reliability_model()
+            f"line.{line}": self._make_line_reliability_model()
             for line, properties in lines if not properties.IsSwitch
         }
         self._switches = {
-            switch: self._make_switch_reliability_model(switch)
+            f"line.{switch}": self._make_switch_reliability_model(switch)
             for switch, properties in lines if properties.IsSwitch
         }
+        self._generators = {
+            f"generator.{generator}": self._make_generator_reliability_model(
+                generator
+            )
+            for generator in opendssdirect.Generators.AllNames()
+        }
+
+    def _make_generator_reliability_model(self, generator):
+        rm = MultiModeReliabilityModel()
+        if "aging" in self._model_params["generator"]:
+            aging_params = self._model_params["generator"]["aging"]
+            rm.add_failure_mode(
+                AgingFailure(
+                    aging_params["mtbf"]*3600,
+                    aging_params["min_repair"]*3600,
+                    aging_params["max_repair"]*3600
+                )
+            )
+        if "operating_wear_out" in self._model_params["generator"]:
+            wearout_params = self._model_params["generator"][
+                "operating_wear_out"
+            ]
+            rm.add_failure_mode(
+                OperatingWearOut(
+                    wearout_params["mtbf"]*3600,
+                    wearout_params["min_repair"]*3600,
+                    wearout_params["max_repair"]*3600
+                )
+            )
+        return rm
 
     def _make_line_reliability_model(self):
         """Construct a line reliability model"""
@@ -367,18 +486,24 @@ class GridReliabilityModel:
     def _all_components(self):
         return itertools.chain(
             self._lines.items(),
-            self._switches.items()
+            self._switches.items(),
+            self._generators.items()
         )
 
     def all_models(self):
         return itertools.chain(
-            self._lines.values(),
-            self._switches.values()
+            model for _, model in self._all_components()
         )
 
-    def update(self, time):
-        for model in self.all_models():
+    def update(self, time, generator_status):
+        for model in itertools.chain(self._lines.values(),
+                                     self._switches.values()):
             model.update(time)
+        for status in generator_status:
+            self._generators[f"generator.{status.name}"].update(
+                time,
+                operating_time=status.operating_time
+            )
 
 
 def _make_event(event, element):
