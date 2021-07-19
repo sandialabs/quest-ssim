@@ -1,5 +1,6 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
+import logging
 
 from helics import (
     HelicsCombinationFederate, helics_time_maxtime,
@@ -28,6 +29,25 @@ class ReliabilityInterface:
         self.endpoint = federate.get_endpoint_by_name(
             "reliability"
         )
+        self._federate = federate
+
+    def update_generators(self, generators):
+        """Send updated GeneratorStatus messages to the reliability federate.
+
+        These messages include the cumulative number of hours the generator
+        has been running which can be used to update the reliability model for
+        each individual generator.
+
+        Messages are sent from the "grid/reliability" endpoint to the
+        "reliability/reliability" endpoint.
+        """
+        for generator in generators:
+            self._federate.log_message(f"updating generator {generator.name}:"
+                                       f" {generator.status}",
+                                       logging.DEBUG)
+            self.endpoint.send_data(
+                generator.status.to_json(), "reliability/reliability"
+            )
 
     @property
     def events(self):
@@ -127,25 +147,45 @@ class GridFederate:
                 storage.device.bus
             )
             storage.publish(voltage)
+        self._reliability.update_generators(
+            self._grid_model.generators.values()
+        )
         real, reactive = self._grid_model.total_power()
         self._federate.publications['grid/total_power'].publish(
             complex(real, reactive)
         )
 
+    def _apply_failure(self, event):
+        component_type, component_name = event.element.split(".")
+        if component_type == "line":
+            self._grid_model.fail_line(
+                component_name,
+                terminal=event.data.get("terminal", 1),
+                how=event.mode
+            )
+        elif component_type == "generator":
+            self._grid_model.fail_generator(component_name)
+
+    def _apply_repair(self, event):
+        component_type, component_name = event.element.split(".")
+        if component_type == "line":
+            self._grid_model.restore_line(
+                component_name,
+                terminal=event.data.get("terminal", 1),
+                how=event.mode
+            )
+        elif component_type == "generator":
+            self._grid_model.restore_generator(
+                component_name,
+                enable=event.data.get("enable", True)
+            )
+
     def _apply_reliability_event(self, event: reliability.Event):
         """Apply a reliability event to the grid model."""
         if event.type is reliability.EventType.FAIL:
-            self._grid_model.fail_line(
-                event.element,
-                terminal=event.data.get("terminal", 1),
-                how=event.mode
-            )
+            self._apply_failure(event)
         else:
-            self._grid_model.restore_line(
-                event.element,
-                terminal=event.data.get("terminal", 1),
-                how=event.mode
-            )
+            self._apply_repair(event)
 
     def _update_reliability(self):
         for event in self._reliability.events:
