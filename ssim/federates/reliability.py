@@ -7,6 +7,7 @@ from helics import (
     helicsCreateMessageFederateFromConfig
 )
 
+from ssim import grid
 from ssim.reliability import GridReliabilityModel
 
 
@@ -40,10 +41,24 @@ class ReliabilityFederate:
         message.data = event.to_json()
         return message
 
+    def _pending_messages(self):
+        while self._endpoint.has_message():
+            yield self._endpoint.get_message()
+
+    def _generator_status_messages(self):
+        for message in self._pending_messages():
+            status = grid.GeneratorStatus.from_json(message.data)
+            self._federate.log_message(f"generator status: {status}",
+                                       logging.DEBUG)
+            yield grid.GeneratorStatus.from_json(message.data)
+
     def step(self, time):
         """Advance the time of the reliability model to `time`."""
         self._federate.log_message(f"stepping @ {time}", logging.DEBUG)
-        self._reliability_model.update(time)
+        self._reliability_model.update(
+            time,
+            list(self._generator_status_messages())
+        )
         for event in self._reliability_model.events():
             self._federate.log_message(
                 f"publishing event {event} @ {time}", logging.DEBUG)
