@@ -172,8 +172,8 @@ class OperatingWearOut(FailureMode):
         maximum repair time (wall time) [hours].
     """
     def __init__(self, mtbf, min_repair, max_repair,
-                 failure_state = Mode.OPEN,
-                 repair_state = Mode.CLOSED):
+                 failure_state=Mode.OPEN,
+                 repair_state=Mode.CLOSED):
         self.mtbf = mtbf
         self.min_repair = min_repair
         self.max_repair = max_repair
@@ -266,7 +266,7 @@ class MultiModeReliabilityModel:
         time : float
             Current time. [seconds]
         kwargs
-            Can be used to pass additional information to the failure mode models.
+            Can be used to pass additional information to the failure modes.
         """
         self.time = time
         for failure_mode in self._failure_modes:
