@@ -109,6 +109,43 @@ class StorageSpecification:
             params=params
         )
 
+@dataclass
+class InvControlSpecification:
+
+    #: Name of the InvControl element.
+    name: str
+
+    #: List of PVSystem and/or Storage elements to be controlled.
+    der_list: List[str]
+
+    #: Control mode to be enabled
+    inv_control_mode: str
+
+    #: Curve that defines behavior of the specified mode
+    function_curve: Optional[Curve] = None
+
+    #: Additional parameters
+    params: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, params: dict):
+        """Build a InvControlSpecification from a dict with OpenDSS keys.
+
+        Parameters
+        ----------
+            Dictionary with keys that have the same names as OpenDSS
+            InvControl parameters.
+        """
+        # copy the dict so we can modify it with impunity
+        params = params.copy()
+        # pop the keys off so we are left with only the extra OpenDSS params.
+        return cls(
+            params.pop("name"),
+            params.pop("der_list"),
+            params.pop("inv_control_mode"),
+            function_curve=_get_curve("function_curve", params),
+            params=params
+        )
 
 @dataclass
 class PVSpecification:
@@ -125,6 +162,9 @@ class PVSpecification:
     #: Inverter kVA rating [kVA].
     kva_rated: float
 
+    #: List of irradiance values for PV system in :math:`kW/m^2`
+    irradiance_profile: Optional[PathLike] = None
+
     #: Number of phases the inverter is connected to.
     phases: int = 3
 
@@ -134,9 +174,35 @@ class PVSpecification:
     #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
     inverter_efficiency: Optional[Curve] = None
 
-    # Maximum DC array output at changing temperature relative to `pmpp`.
+    #: Maximum DC array output at changing temperature relative to `pmpp`.
     pt_curve: Optional[Curve] = None
 
+    @classmethod
+    def from_dict(cls, params: dict):
+        """Build a PVSpecification instance from a dict with OpenDSS keys.
+
+        Parameters
+        ----------
+        params: dict
+            Dictionary with keys that have the same names as OpenDSS PVSystem
+            parameters. Some additional keys are also expected that have the
+            same names as the PVSpecification fields they represent
+            (e.g. "inverter_efficiency" and "pt_curve").
+        """
+        # copy the dict so we can modify it with impunity
+        params = params.copy()
+        # pop the keys off so we are left with only the extra OpenDSS params
+        return cls(
+            params.pop("name"),
+            params.pop("bus"),
+            params.pop("pmpp"),
+            params.pop("kva_rated"),
+            params.pop("irradiance_profile"),
+            params.pop("phases", 3),
+            inverter_efficiency=_get_curve("inverter_efficiency", params),
+            pt_curve=_get_curve("pt_curve", params),
+            params=params
+        )
 
 class GridSpecification:
     """Specification of the grid.
@@ -151,6 +217,7 @@ class GridSpecification:
         self.file = file
         self.storage_devices: List[StorageSpecification] = []
         self.pv_systems: List[PVSpecification] = []
+        self.inv_control: List[InvControlSpecification] = []
 
     def add_storage(self, specs: StorageSpecification):
         """Add a storage device to the grid specification.
@@ -171,6 +238,16 @@ class GridSpecification:
             Specifications for the PV system.
         """
         self.pv_systems.append(specs)
+
+    def add_inv_control(self, specs: InvControlSpecification):
+        """Add a InvControl element to the grid specification.
+
+        Parameters
+        ----------
+        specs : InvControlSpecification
+            Specifications for the InvControl element.
+        """
+        self.inv_control.append(specs)
 
     def get_storage_by_name(self, name):
         """Return the specification of the storage device named `name`.
@@ -203,5 +280,13 @@ class GridSpecification:
         for device in spec["storage"]:
             grid.add_storage(
                 StorageSpecification.from_dict(device)
+            )
+        for device in spec["pvsystem"]:
+            grid.add_pvsystem(
+                PVSpecification.from_dict(device)
+            )
+        for device in spec["invcontrol"]:
+            grid.add_inv_control(
+                InvControlSpecification.from_dict(device)
             )
         return grid
