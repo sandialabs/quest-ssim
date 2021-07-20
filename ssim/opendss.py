@@ -153,7 +153,7 @@ class Generator:
         self.type = int(
             dssutil.get_property(f"generator.{self.name}.class")
         )
-        self._is_operational = True
+        self.is_operational = True
 
     def _activate(self):
         dssdirect.Generators.Name(self.name)
@@ -184,12 +184,12 @@ class Generator:
         return dssdirect.CktElement.Enabled()
 
     def turn_on(self):
-        if self._is_operational:
+        if self.is_operational:
             self._activate()
             dssdirect.CktElement.Enabled(True)
 
     def turn_off(self):
-        if self._is_operational:
+        if self.is_operational:
             self._activate()
             dssdirect.CktElement.Enabled(False)
 
@@ -802,6 +802,7 @@ class DSSModel:
         self._fail_element(f"generator.{name}", 1, 'open')
         # Disable the generator so it does not accumulate run-time while it
         # is out of service.
+        self.generators[name].is_operational = False
         dssdirect.Circuit.SetActiveElement(f"generator.{name}")
         dssdirect.CktElement.Enabled(False)
 
@@ -822,6 +823,7 @@ class DSSModel:
             on now that it is back in operation.
         """
         self._restore_element(f"generator.{name}", 1, 'closed')
+        self.generators[name].is_operational = True
         if enable:
             dssdirect.Circuit.SetActiveElement(f"generator.{name}")
             dssdirect.CktElement.Enabled(True)
