@@ -802,9 +802,8 @@ class DSSModel:
         self._fail_element(f"generator.{name}", 1, 'open')
         # Disable the generator so it does not accumulate run-time while it
         # is out of service.
+        self.generators[name].turn_off()
         self.generators[name].is_operational = False
-        dssdirect.Circuit.SetActiveElement(f"generator.{name}")
-        dssdirect.CktElement.Enabled(False)
 
     def restore_generator(self, name: str, enable=False):
         """Repair a generator.
@@ -825,5 +824,4 @@ class DSSModel:
         self._restore_element(f"generator.{name}", 1, 'closed')
         self.generators[name].is_operational = True
         if enable:
-            dssdirect.Circuit.SetActiveElement(f"generator.{name}")
-            dssdirect.CktElement.Enabled(True)
+            self.generators[name].turn_on()
