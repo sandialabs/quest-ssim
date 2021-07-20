@@ -65,9 +65,22 @@
       "mtbf": 10000,
       "min_repair": 0.333,
       "max_repair": 2.5,
-      "p_open": 0.8,
-      "p_closed": 0.1,
-      "p_current": 0.1
-    }
+      "p_open": 0.5,
+      "p_closed": 0.5,
+      "p_current": 0.0
+    },
+    "generator":
+      {
+        "aging": {
+          "mtbf": 5000,
+          "min_repair": 1.0,
+          "max_repair": 1.0
+        },
+        "operating_wear_out": {
+          "mtbf": 1000,
+          "min_repair": 2.0,
+          "max_repair": 2.0
+        }
+      }
   }
 }
