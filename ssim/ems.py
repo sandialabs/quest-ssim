@@ -1,5 +1,84 @@
-"""Energy Management System."""
+"""Energy Management System.
+
+The EMS executes at a fixed interval to determine power set-points for all
+storage devices and generators connected to the grid. To determine these
+set points the EMS needs to know the following:
+
+- Current demand
+- Forecasted demand
+- Current renewable generation
+- Forecasted renewable generation
+"""
 import json
+
+
+class HeuristicEMS:
+    def __init__(self, storage_devices, minimum_soc=0.2):
+        self._minimum_soc = minimum_soc
+        self._actual_demand = 0.0
+        self._actual_generation = 0.0
+        self._storage_soc = {
+            device.name: device.soc for device in storage_devices
+        }
+        self._storage_kw = {
+            device.name: device.kw for device in storage_devices
+        }
+        self._storage_kw_rated = {
+            device.name: device.kwrated for device in storage_devices
+        }
+
+    def update_actual_generation(self, generation):
+        self._actual_generation = sum(generation.values())
+
+    def update_actual_demand(self, demand):
+        self._actual_demand = sum(demand.values())
+
+    def update_generation_forecast(self, generation_forecast):
+        # not using forecasts yet
+        pass
+
+    def update_demand_forecast(self, demand_forecast):
+        # not using forecasts yet
+        pass
+
+    def update_storage(self, name, storage_kw, storage_soc):
+        self._storage_soc[name] = storage_soc
+        self._storage_kw[name] = storage_kw
+
+    def _charge_device(self, device):
+        if self._storage_soc[device] < 1.0:
+            target_power = min(
+                self._storage_kw_rated[device], self._excess_generation
+            )
+            self._excess_generation -= target_power
+            return StorageControlMessage.charge(target_power)
+        return StorageControlMessage.idle()
+
+    def _discharge_device(self, device):
+        if self._storage_soc[device] > self._minimum_soc:
+            target_power = min(
+                self._storage_kw_rated[device], abs(self._excess_generation)
+            )
+            self._excess_generation += target_power
+            return StorageControlMessage.discharge(target_power)
+        return StorageControlMessage.idle()
+
+    def _dispatch_device(self, storage_name):
+        if self._excess_generation > 0.0:
+            return self._charge_device(storage_name)
+        if self._excess_generation == 0.0:
+            return StorageControlMessage.idle()
+        if self._excess_generation < 0.0:
+            return self._discharge_device(storage_name)
+
+    def dispatch_storage(self):
+        """Dispatch storage devices in a fixed, arbitrary order based on excess
+        generation.
+        """
+        self._excess_generation = self._actual_generation - self._actual_demand
+        return {
+            name: self._dispatch_device(name) for name in self._storage_soc
+        }
 
 
 class StorageControlMessage:
@@ -34,6 +113,18 @@ class StorageControlMessage:
         """Construct a StorageControlMessage from a JSON string."""
         action = json.loads(data)
         return cls(action['action'], action['kW'], action['kVAR'])
+
+    @classmethod
+    def charge(cls, kw, kvar=0.0):
+        return cls('charge', kw, kvar)
+
+    @classmethod
+    def discharge(cls, kw, kvar=0.0):
+        return cls('discharge', kw, kvar)
+
+    @classmethod
+    def idle(cls):
+        return cls('idle', 0.0, 0.0)
 
     def to_json(self):
         return json.dumps({'action': self.action,
