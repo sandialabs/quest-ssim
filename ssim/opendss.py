@@ -285,17 +285,17 @@ class DSSModel:
         """
         model = DSSModel(gridspec.file)
         for storage_device in gridspec.storage_devices:
-            system_params = _opendss_storage_params(storage_device)
+            storage_params = _opendss_storage_params(storage_device)
             if storage_device.inverter_efficiency is not None:
                 model.add_xycurve(f"eff_storage_{storage_device.name}",
                                   *zip(*storage_device.inverter_efficiency))
-                system_params["EffCurve"] = \
+                storage_params["EffCurve"] = \
                     f"eff_storage_{storage_device.name}"
             model.add_storage(
                 storage_device.name,
                 storage_device.bus,
                 storage_device.phases,
-                system_params
+                storage_params
             )
         for pv_system in gridspec.pv_systems:
             system_params = pv_system.params.copy()
@@ -322,21 +322,21 @@ class DSSModel:
                 system_params
             )
         for inv_control in gridspec.inv_control:
-            system_params = inv_control.params.copy()
+            control_params = inv_control.params.copy()
             if inv_control.function_curve is not None:
                 model.add_xycurve(f"func_{inv_control.name}",
                                   *zip(*inv_control.function_curve))
-                system_params["vvc_curve1"] = f"func_{inv_control.name}"
-                system_params["deltaQ_factor"] = -1.0
-                system_params["RateofChangeMode"] = "LPF"
-                system_params["LPFTau"] = 10
-                system_params["voltage_curvex_ref"] = "ravg"
-                system_params["avgwindowlen"] = "15s"
+                control_params["vvc_curve1"] = f"func_{inv_control.name}"
+                control_params["deltaQ_factor"] = -1.0
+                control_params["RateofChangeMode"] = "LPF"
+                control_params["LPFTau"] = 10
+                control_params["voltage_curvex_ref"] = "ravg"
+                control_params["avgwindowlen"] = "15s"
             model.add_inverter_controller(
                 inv_control.name,
                 inv_control.der_list,
                 inv_control.inv_control_mode,
-                system_params
+                control_params
             )
         return model
 
