@@ -204,6 +204,7 @@ class PVSpecification:
             params=params
         )
 
+
 class GridSpecification:
     """Specification of the grid.
 
