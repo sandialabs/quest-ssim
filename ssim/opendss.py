@@ -388,7 +388,6 @@ class DSSModel:
         """
         self._set_time(time)
         dssdirect.Solution.Solve()
-        #dssdirect.Meters.SampleAll()  # sample all meters, but don't save.
         self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,
