@@ -252,13 +252,13 @@ class DSSModel:
         this way override the value provided in
         :py:attr:`PVSpecification.params`. The irradiance profile for the PV
         may be specified through a csv file in the
-        :py:attr: `grid.PVSpecification.irradiance_profile' field or as a
+        :py:attr: `grid.PVSpecification.irradiance_profile` field or as a
         parameter in :py:attr:`grid.PVSpecification.params`. Either way a new
         LoadShape will be created in the OpenDSS model named
         "irrad_pv_<pvsystem-name>".
 
         Similarly, for the storage device, the efficiency curve may be
-        specified as a parameter in :py:attr:`grid.StorageSpecification.params'
+        specified as a parameter in :py:attr:`grid.StorageSpecification.params`
         or in the :py:attr:`StorageSpecification.inverter_efficiency'. If
         either of these fields are specified then a new XYCurve will be
         created in the OpenDSS model named "eff_storage_<storagedevice-name>".
@@ -271,7 +271,7 @@ class DSSModel:
         this field is specified then a new XYCurve will be created in the
         OpenDSS model names "func_<invcontrol-name>". Curve specified this
         way will override the value provided in
-        :py:attr:`InvControlSpecification.params'
+        :py:attr:`InvControlSpecification.params`
 
         Parameters
         ----------
@@ -446,7 +446,7 @@ class DSSModel:
         """Add an Inverter Controller to OpenDSS.
 
         Parameters
-        __________
+        ----------
         name: str
             Name of the inverter controller.
         der_list : list
