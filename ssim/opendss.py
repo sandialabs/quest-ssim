@@ -312,7 +312,6 @@ class DSSModel:
                 model.add_xycurve(f"pt_{pv_system.name}",
                                   *zip(*pv_system.pt_curve))
                 system_params["P-TCurve"] = f"pt_{pv_system.name}"
-                system_params["kV"] = 4.16
             model.add_pvsystem(
                 pv_system.name,
                 pv_system.bus,
