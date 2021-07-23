@@ -200,6 +200,34 @@ def test_DSSModel_from_gridspec_pvsystem(grid_spec):
     dssdirect.Circuit.SetActiveBus("loadbus2")
     assert "PVSystem.pv2" in dssdirect.Bus.AllPCEatBus()
 
+def test_DSSModel_from_gridspec_inverter_controller(grid_spec):
+    pv_params = {
+        "kV": 12.47,
+        "irrad": 1000,
+        "temperature": 25,
+    }
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv1",
+            bus="loadbus1.1.2.3",
+            pmpp=100.0,
+            kva_rated=80.0,
+            params=pv_params
+        )
+    )
+    grid_spec.add_inv_control(
+        grid.InvControlSpecification(
+            name="invcontrol1",
+            der_list=["PVSystem.pv1"],
+            inv_control_mode="voltvar",
+            function_curve=((0.5, 1.0), (0.95, 1.0), (1.0, 0.0),
+                            (1.05, -1.0), (1.5, -1.0))
+        )
+    )
+    model = opendss.DSSModel.from_grid_spec(grid_spec)
+    list_of_ders = dssdirect.run_command("? invcontrol.invcontrol1.derlist")
+    assert list_of_ders == '[PVSystem.pv1]'
+
 
 def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
     grid_spec.add_pvsystem(
@@ -223,6 +251,20 @@ def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
     assert dssdirect.XYCurves.XArray() == [0.0, 2.0, 3.0]
     assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]
 
+def test_DSSModel_pvsystem_irradiance_profiles(grid_spec, data_dir):
+    grid_spec.add_pvsystem(
+        grid.PVSpecification(
+            name="pv1",
+            bus="loadbus2",
+            pmpp=100,
+            kva_rated=100,
+            irradiance_profile= data_dir / "test_irradiance.csv"
+        )
+    )
+    opendss.DSSModel.from_grid_spec(grid_spec)
+    dssdirect.PVsystems.Name("pv1")
+    irrad_profile_name = dssdirect.run_command("? pvsystem.pv1.daily")
+    assert dssdirect.LoadShape.Name() == "irrad_pv_pv1"
 
 def test_DSSModel_storage_efficiency_curves(grid_spec):
     storage_params = {

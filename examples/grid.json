@@ -8,26 +8,51 @@
       "kwrated": 100,
       "kwhrated": 1000,
       "%stored": 50,
+      "kV": 4.16,
       "controller": "droop",
       "controller_params": {
-        "p_droop": 5000,
-        "q_droop": -500
+        "p_droop": 0,
+        "q_droop": 0
       },
       "inverter_efficiency": {"x":  [10, 50, 90, 100],
                               "y":  [0.90, 0.94, 0.98, 0.99]}
     },
     {
       "name": "S2",
-      "bus": "670",
+      "bus": "671",
       "phases": 3,
       "kwrated": 500,
       "kwhrated": 50000,
       "%stored": 50,
+      "kV": 4.16,
       "controller": "droop",
       "controller_params": {
-        "p_droop": 500,
-        "q_droop": -50
+        "p_droop": 0,
+        "q_droop": 0
       }
+    }
+  ],
+  "pvsystem": [
+    {
+      "name": "PV1",
+      "bus": "671",
+      "phases": 3,
+      "pmpp": 3000,
+      "kva_rated": 3600,
+      "kV": 4.16,
+      "irradiance_profile": "ieee13demo\\test_irradiance.csv",
+      "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                              "y":  [0.90, 0.94, 0.98, 0.99]},
+      "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
+    }
+  ],
+  "invcontrol": [
+    {
+      "name": "InvCtrl1",
+      "der_list": ["PVsystem.PV1"],
+      "inv_control_mode": "voltvar",
+      "function_curve": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
+                         "y":  [1.0, 1.0, 0.0, -1.0, -1.0]}
     }
   ],
   "reliability": {

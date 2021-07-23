@@ -30,6 +30,7 @@ class Storage(StorageDevice):
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
     """
+
     def __init__(self, name, bus, device_parameters, phases,
                  state=StorageState.IDLE):
         self.name = name
@@ -119,6 +120,7 @@ class PVSystem:
     system_parameters : dict
         Additional parameters
     """
+
     def __init__(self, name: str, bus: str, phases: int, pmpp: float,
                  inverter_kva: float, system_parameters: dict):
         self.name = name
@@ -166,6 +168,34 @@ class LoadShapeClass(enum.Enum):
         return cls(value.lower())
 
 
+class InvControl:
+    """Representation of an inverter controller in OpenDSS.
+
+    Parameters
+    ----------
+    name : str
+        Name of the Inv Control element. Must be unique among all Inv
+        Control elements on the model.
+    der_list :
+        List of PV system elements to be controlled. If not specified all
+        PVSystem (and Storage) in the grid model are controlled by this
+        InvControl.
+    inv_control_mode: str
+        Inverter control mode.
+    system_parameters : dict
+        Additional parameters.
+    """
+
+    def __init__(self, name: str, der_list, inv_control_mode: str,
+                 system_parameters: dict):
+        self.name = name
+        self.der_list = der_list
+        self.inv_control_mode = inv_control_mode
+        dssutil.run_command(f"new invcontrol.{name}",
+                            {"derlist": der_list, "mode": inv_control_mode,
+                             **system_parameters})
+
+
 def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
     """Return a dictionary of opendss storage object parameters.
 
@@ -188,6 +218,7 @@ def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
 
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
+
     def __init__(self,
                  dss_file: PathLike,
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
@@ -199,6 +230,7 @@ class DSSModel:
         self._last_solution_time = None
         self._storage = {}
         self._pvsystems = {}
+        self._invcontrols = {}
         self._failed_elements = set()
         self._max_step = 15 * 60  # 15 minutes
 
@@ -218,15 +250,28 @@ class DSSModel:
         are specified then a new XYCurve will be created in the OpenDSS model
         named "eff_<pvsystem-name>" or "pt_<pvsystem-name>". Curve specified
         this way override the value provided in
-        :py:attr:`PVSpecification.params`.
+        :py:attr:`PVSpecification.params`. The irradiance profile for the PV
+        may be specified through a csv file in the
+        :py:attr: `grid.PVSpecification.irradiance_profile` field or as a
+        parameter in :py:attr:`grid.PVSpecification.params`. Either way a new
+        LoadShape will be created in the OpenDSS model named
+        "irrad_pv_<pvsystem-name>".
 
         Similarly, for the storage device, the efficiency curve may be
-        specified as a parameter in :py:attr:`grid.StorageSpecification.params'
+        specified as a parameter in :py:attr:`grid.StorageSpecification.params`
         or in the :py:attr:`StorageSpecification.inverter_efficiency'. If
         either of these fields are specified then a new XYCurve will be
         created in the OpenDSS model named "eff_storage_<storagedevice-name>".
         Curve specified this way overrides the value provided in
         :py:attr:`StorageSpecification.params`.
+
+        For Inv controls, the function curve may be specified
+        either as a parameter in :py:attr:`grid.InvControlSpecification` or
+        in the :py:attr:`InvControlSpecification.function_curve` field. If
+        this field is specified then a new XYCurve will be created in the
+        OpenDSS model names "func_<invcontrol-name>". Curve specified this
+        way will override the value provided in
+        :py:attr:`InvControlSpecification.params`
 
         Parameters
         ----------
@@ -240,20 +285,25 @@ class DSSModel:
         """
         model = DSSModel(gridspec.file)
         for storage_device in gridspec.storage_devices:
-            system_params = _opendss_storage_params(storage_device)
+            storage_params = _opendss_storage_params(storage_device)
             if storage_device.inverter_efficiency is not None:
                 model.add_xycurve(f"eff_storage_{storage_device.name}",
                                   *zip(*storage_device.inverter_efficiency))
-                system_params["EffCurve"] = \
+                storage_params["EffCurve"] = \
                     f"eff_storage_{storage_device.name}"
             model.add_storage(
                 storage_device.name,
                 storage_device.bus,
                 storage_device.phases,
-                system_params
+                storage_params
             )
         for pv_system in gridspec.pv_systems:
             system_params = pv_system.params.copy()
+            if pv_system.irradiance_profile is not None:
+                model.add_loadshape(f"irrad_pv_{pv_system.name}",
+                                    pv_system.irradiance_profile, 1, 24)
+                loadshape_class = str(model.loadshapeclass)
+                system_params[loadshape_class] = f"irrad_pv_{pv_system.name}"
             if pv_system.inverter_efficiency is not None:
                 model.add_xycurve(f"eff_pv_{pv_system.name}",
                                   *zip(*pv_system.inverter_efficiency))
@@ -269,6 +319,33 @@ class DSSModel:
                 pv_system.kva_rated,
                 pv_system.pmpp,
                 system_params
+            )
+        for inv_control in gridspec.inv_control:
+            control_params = inv_control.params.copy()
+            if inv_control.function_curve is not None:
+                model.add_xycurve(f"func_{inv_control.name}",
+                                  *zip(*inv_control.function_curve))
+                control_params["vvc_curve1"] = f"func_{inv_control.name}"
+                control_params["deltaQ_factor"] = control_params.get(
+                    "deltaQ_factor", -1.0
+                )
+                control_params["RateofChangeMode"] = control_params.get(
+                    "RateofChangeMode", "LPF"
+                )
+                control_params["LPFTau"] = control_params.get(
+                    "LPFTau", 10
+                )
+                control_params["voltage_curvex_ref"] = control_params.get(
+                    "voltage_curvex_ref", "ravg"
+                )
+                control_params["avgwindowlen"] = control_params.get(
+                    "avgwindowlen", "15s"
+                )
+            model.add_inverter_controller(
+                inv_control.name,
+                inv_control.der_list,
+                inv_control.inv_control_mode,
+                control_params
             )
         return model
 
@@ -320,7 +397,6 @@ class DSSModel:
         """
         self._set_time(time)
         dssdirect.Solution.Solve()
-        dssdirect.Meters.SampleAll()  # sample all meters, but don't save.
         self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,
@@ -347,7 +423,7 @@ class DSSModel:
 
     def add_pvsystem(self, name: str, bus: str, phases: int,
                      kva_rating: float, pmpp_kw: float,
-                     system_parameters: Optional[dict] = None):
+                     system_parameters: Optional[dict] = None) -> PVSystem:
         """Add a PV System to OpenDSS.
 
         Parameters
@@ -369,6 +445,30 @@ class DSSModel:
         system = PVSystem(name, bus, phases, pmpp_kw, kva_rating,
                           system_parameters)
         self._pvsystems[name] = system
+        return system
+
+    def add_inverter_controller(self, name: str, der_list: List,
+                                inv_control_mode: str,
+                                system_parameters: Optional[dict]
+                                = None) -> InvControl:
+        """Add an Inverter Controller to OpenDSS.
+
+        Parameters
+        ----------
+        name: str
+            Name of the inverter controller.
+        der_list : list
+            List of DERs that will be controlled by this inverter controller.
+        inv_control_mode : str
+            Inverter control mode to activate.
+        system_parameters : dict, optional
+            Additional parameters. Keys must be valid OpenDSS InvControl
+            object parameters.
+        """
+        control = InvControl(name, der_list, inv_control_mode,
+                             system_parameters)
+        self._invcontrols[name] = control
+        return control
 
     @staticmethod
     def add_loadshape(name: str, file: PathLike,
@@ -459,6 +559,16 @@ class DSSModel:
         to the model with :py:meth:`DSSModel.add_pvsystem` are returned.
         """
         return self._pvsystems
+
+    @property
+    def invcontrols(self):
+        """Return the InvControls that have been added to the grid model.
+
+        Does not return inverter controls that are defined in the opendss
+        model, only those that were added with
+        :py:meth:`DSSModel.add_invcontrol`.
+        """
+        return self._invcontrols
 
     @staticmethod
     def node_voltage(bus):
