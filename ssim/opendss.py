@@ -302,8 +302,8 @@ class DSSModel:
             if pv_system.irradiance_profile is not None:
                 model.add_loadshape(f"irrad_pv_{pv_system.name}",
                                     pv_system.irradiance_profile, 1, 24)
-                model.loadshapeclass = LoadShapeClass.DAILY
-                system_params["Daily"] = f"irrad_pv_{pv_system.name}"
+                loadshape_class = str(model.loadshapeclass)
+                system_params[loadshape_class] = f"irrad_pv_{pv_system.name}"
             if pv_system.inverter_efficiency is not None:
                 model.add_xycurve(f"eff_pv_{pv_system.name}",
                                   *zip(*pv_system.inverter_efficiency))
