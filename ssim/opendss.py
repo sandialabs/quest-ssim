@@ -326,11 +326,21 @@ class DSSModel:
                 model.add_xycurve(f"func_{inv_control.name}",
                                   *zip(*inv_control.function_curve))
                 control_params["vvc_curve1"] = f"func_{inv_control.name}"
-                control_params["deltaQ_factor"] = -1.0
-                control_params["RateofChangeMode"] = "LPF"
-                control_params["LPFTau"] = 10
-                control_params["voltage_curvex_ref"] = "ravg"
-                control_params["avgwindowlen"] = "15s"
+                control_params["deltaQ_factor"] = control_params.get(
+                    "deltaQ_factor", -1.0
+                )
+                control_params["RateofChangeMode"] = control_params.get(
+                    "RateofChangeMode", "LPF"
+                )
+                control_params["LPFTau"] = control_params.get(
+                    "LPFTau", 10
+                )
+                control_params["voltage_curvex_ref"] = control_params.get(
+                    "voltage_curvex_ref", "ravg"
+                )
+                control_params["avgwindowlen"] = control_params.get(
+                    "avgwindowlen", "15s"
+                )
             model.add_inverter_controller(
                 inv_control.name,
                 inv_control.der_list,
