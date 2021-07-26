@@ -7,6 +7,7 @@ from typing import Any, List, Dict, Optional
 
 import opendssdirect as dssdirect
 
+from ssim import grid
 from ssim.grid import GridSpecification, StorageSpecification
 from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
@@ -30,7 +31,6 @@ class Storage(StorageDevice):
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
     """
-
     def __init__(self, name, bus, device_parameters, phases,
                  state=StorageState.IDLE):
         self.name = name
@@ -101,6 +101,10 @@ class Storage(StorageDevice):
     def kwh_rated(self) -> float:
         return float(self._get("kwhrated"))
 
+    @property
+    def status(self) -> grid.StorageStatus:
+        return grid.StorageStatus(self.name, self.soc, self.kw, self.kvar)
+
 
 class PVSystem:
     """Representation of a PV system in OpenDSS.
@@ -120,7 +124,6 @@ class PVSystem:
     system_parameters : dict
         Additional parameters
     """
-
     def __init__(self, name: str, bus: str, phases: int, pmpp: float,
                  inverter_kva: float, system_parameters: dict):
         self.name = name
@@ -132,6 +135,86 @@ class PVSystem:
                             {"bus1": bus, "phases": phases,
                              "Pmpp": pmpp, "kVA": inverter_kva,
                              **system_parameters})
+
+
+class Generator:
+    """Interface for OpenDSS Generator objects.
+
+    Parameters
+    ----------
+    name : str
+        Name of the generator.
+    """
+    def __init__(self, name):
+        if name not in dssdirect.Generators.AllNames():
+            raise ValueError(f"Generator {name} does not exist.")
+        self.name = name
+        self._activate()
+        self.type = int(
+            dssutil.get_property(f"generator.{self.name}.class")
+        )
+        self.is_operational = True
+
+    def _activate(self):
+        dssdirect.Generators.Name(self.name)
+
+    @property
+    def kw(self):
+        self._activate()
+        return dssdirect.Generators.kW()
+
+    @kw.setter
+    def kw(self, kw):
+        self._activate()
+        dssdirect.Generators.kW(kw)
+
+    @property
+    def kvar(self) -> float:
+        self._activate()
+        return dssdirect.Generators.kvar()
+
+    @kvar.setter
+    def kvar(self, kvar: float):
+        self._activate()
+        dssdirect.Generators.kvar(kvar)
+
+    @property
+    def online(self) -> bool:
+        self._activate()
+        return dssdirect.CktElement.Enabled()
+
+    def turn_on(self):
+        if self.is_operational:
+            self._activate()
+            dssdirect.CktElement.Enabled(True)
+
+    def turn_off(self):
+        if self.is_operational:
+            self._activate()
+            dssdirect.CktElement.Enabled(False)
+
+    def _read_meter(self) -> dict:
+        self._activate()
+        return dict(
+            zip(dssdirect.Generators.RegisterNames(),
+                dssdirect.Generators.RegisterValues())
+        )
+
+    @property
+    def hours_operating(self) -> float:
+        """Return the total hours the generator has been in operation."""
+        meter = self._read_meter()
+        return meter["Hours"]
+
+    @property
+    def status(self):
+        return grid.GeneratorStatus(
+            self.name,
+            self.kw,
+            self.kvar,
+            self.hours_operating,
+            self.online
+        )
 
 
 @enum.unique
@@ -218,7 +301,6 @@ def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
 
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
-
     def __init__(self,
                  dss_file: PathLike,
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
@@ -231,6 +313,9 @@ class DSSModel:
         self._storage = {}
         self._pvsystems = {}
         self._invcontrols = {}
+        self.generators = {
+            name: Generator(name) for name in dssdirect.Generators.AllNames()
+        }
         self._failed_elements = set()
         self._max_step = 15 * 60  # 15 minutes
 
@@ -396,7 +481,14 @@ class DSSModel:
             Time at which to solve. [seconds]
         """
         self._set_time(time)
-        dssdirect.Solution.Solve()
+        try:
+            dssdirect.Solution.Solve()
+        except dssdirect.DSSException as e:
+            max_iter = dssdirect.Solution.MaxControlIterations()
+            if dssdirect.Solution.ControlIterations() < max_iter:
+                raise e
+            else:
+                logging.info("Max control iterations exceeded.")
         self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,
@@ -702,3 +794,41 @@ class DSSModel:
             'open', 'closed', or 'current'.
         """
         self._restore_element(f"line.{name}", terminal, how)
+
+    def fail_generator(self, name: str):
+        """Fail a generator.
+
+        Disables the generator so it cannot produce power and marks it as
+        failed to prevent its activation until it ahs been repaired.
+
+        Parameters
+        ----------
+        name : str
+            Name of the generator
+        """
+        self._fail_element(f"generator.{name}", 1, 'open')
+        # Disable the generator so it does not accumulate run-time while it
+        # is out of service.
+        self.generators[name].turn_off()
+        self.generators[name].is_operational = False
+
+    def restore_generator(self, name: str, enable=False):
+        """Repair a generator.
+
+        The repaired generator is reconnected to the grid, but it remains
+        disabled. The generator will remain disabled until it is explicitly
+        turned on (i.e. by the EMS).
+
+        Parameters
+        ----------
+        name : str
+            Name of the generator
+        enable : bool, default False
+            If True, the generator is re-enabled. If False the generator
+            remains disabled, leaving it to some other system to turn it back
+            on now that it is back in operation.
+        """
+        self._restore_element(f"generator.{name}", 1, 'closed')
+        self.generators[name].is_operational = True
+        if enable:
+            self.generators[name].turn_on()

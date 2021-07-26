@@ -3,6 +3,7 @@
 Contains a grid specification that can be used to construct
 data structures and models used by the various simulation federates.
 """
+import dataclasses
 import json
 import pathlib
 from dataclasses import dataclass, field
@@ -105,7 +106,7 @@ class StorageSpecification:
             params.pop("phases", 3),
             params.pop("%stored", 50) / 100,
             inverter_efficiency=_get_curve("inverter_efficiency", params),
-            controller_params=params.pop("controller_params"),
+            controller_params=params.pop("controller_params", dict()),
             params=params
         )
 
@@ -291,3 +292,59 @@ class GridSpecification:
                 InvControlSpecification.from_dict(device)
             )
         return grid
+
+
+@dataclass
+class StorageStatus:
+    """Status of a storage system."""
+    name: str
+    soc: float
+    kw: float
+    kvar: float
+
+    def to_json(self):
+        return json.dumps(dataclasses.asdict(self))
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))
+
+
+@dataclass
+class PVStatus:
+    """Status of a PV System."""
+    name: str
+    kw: float
+    kvar: float
+
+    def to_json(self):
+        return json.dumps(dataclasses.asdict(self))
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))
+
+
+@dataclass
+class GeneratorStatus:
+    """Status of a Fossil Generator."""
+    name: str
+
+    #: Real power output from the generator
+    kw: float
+
+    #: Reactive power output from the generator.
+    kvar: float
+
+    #: Cumulative time the generator has been in operation. [hours]
+    operating_time: float
+
+    #: True if the generator is online and can respond to dispatch commands.
+    online: bool = True
+
+    def to_json(self):
+        return json.dumps(dataclasses.asdict(self))
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))
