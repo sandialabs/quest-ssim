@@ -481,7 +481,14 @@ class DSSModel:
             Time at which to solve. [seconds]
         """
         self._set_time(time)
-        dssdirect.Solution.Solve()
+        try:
+            dssdirect.Solution.Solve()
+        except dssdirect.DSSException as e:
+            max_iter = dssdirect.Solution.MaxControlIterations()
+            if dssdirect.Solution.ControlIterations() < max_iter:
+                raise e
+            else:
+                logging.info("Max control iterations exceeded.")
         self._last_solution_time = time
 
     def add_storage(self, name: str, bus: str, phases: int,
