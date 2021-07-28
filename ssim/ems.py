@@ -34,6 +34,19 @@ class GridModel:
         )
         self._network = nx.Graph()
         self._initialize_network(config)
+        self._initialize_generators()
+
+    def _initialize_generators(self):
+        generator = dssdirect.Generators.First()
+        while generator > 0:
+            generator_name = dssdirect.Generators.Name()
+            generator_bus = dssdirect.CktElement.BusNames()[0]
+            node = self._network.nodes[generator_bus.split(".")[0]]
+            if "generators" in node:
+                node["generators"].add(generator_name)
+            else:
+                node["generators"] = {generator_name}
+            generator = dssdirect.Generators.Next()
 
     def _initialize_network(self, spec):
         _, busses = zip(
@@ -75,6 +88,19 @@ class GridModel:
             connected to that component.
         """
         return nx.connected_components(self._network)
+
+    def connected_generators(self, component):
+        """Iterator over all generators connected to busses in a component.
+
+        Parameters
+        ----------
+        component : set
+            Set of busses that form a connected component in the grid.
+        """
+        for node_name in component:
+            node = self._network.nodes[node_name]
+            for generator in node.get("generators", set()):
+                yield generator
 
     def connect(self, bus1, bus2):
         """Connect `bus1` to `bus2`."""
