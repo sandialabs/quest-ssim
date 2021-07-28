@@ -11,6 +11,79 @@ set points the EMS needs to know the following:
 """
 import json
 
+import opendssdirect as dssdirect
+
+import networkx as nx
+
+from ssim.grid import GridSpecification
+from ssim.opendss import DSSModel
+from ssim import dssutil
+
+
+class GridModel:
+    """Model of the state of the grid.
+
+    Parameters
+    ----------
+    config : Pathlike
+        Path to the grid configuration file.
+    """
+    def __init__(self, config):
+        self._model = DSSModel.from_grid_spec(
+            GridSpecification.from_json(config)
+        )
+        self._network = nx.Graph()
+        self._initialize_network(config)
+
+    def _initialize_network(self, spec):
+        _, busses = zip(
+            *dssutil.iterate_properties(
+                dssdirect.Lines,
+                ("Bus1", "Bus2", "IsSwitch")
+            )
+        )
+        # TODO Identify switches and do NOT add an edge if the switch is open
+        self._network.add_edges_from(
+            (edge.Bus1.split(".")[0], edge.Bus2.split(".")[0])
+            for edge in busses
+        )
+        transformer_number = dssdirect.Transformers.First()
+        while transformer_number > 0:
+            bus1, bus2 = dssdirect.CktElement.BusNames()
+            # add the edge, removing node names
+            print(f"adding edge: {bus1}--{bus2}")
+            self._network.add_edge(bus1.split(".")[0], bus2.split(".")[0])
+            transformer_number = dssdirect.Transformers.Next()
+        # TODO Look for other power-delivery elements that have two busses
+        #      specified. Transformers are the most common, but
+        #      capacitors, reactors can be connected in series or as shunts.
+        #      PD Elements that are shunts do not need to be included in the
+        #      grid topology model.
+
+    @property
+    def num_components(self):
+        """Return the number of distinct connected components."""
+        return nx.number_connected_components(self._network)
+
+    def components(self):
+        """Return an iterator over the connected components.
+
+        Return
+        ------
+        Iterable of set
+            Each component is represented by a set of busses that are
+            connected to that component.
+        """
+        return nx.connected_components(self._network)
+
+    def connect(self, bus1, bus2):
+        """Connect `bus1` to `bus2`."""
+        self._network.add_edge(bus1, bus2)
+
+    def disconnect(self, bus1, bus2):
+        """Remove the direct connection between `bus1` and `bus2`"""
+        self._network.remove_edge(bus1, bus2)
+
 
 class HeuristicEMS:
     def __init__(self, storage_devices, minimum_soc=0.2):
