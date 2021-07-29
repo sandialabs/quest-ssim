@@ -33,20 +33,25 @@ class GridModel:
             GridSpecification.from_json(config)
         )
         self._network = nx.Graph()
+        self._devices = {}
         self._initialize_network(config)
-        self._initialize_generators()
 
-    def _initialize_generators(self):
-        generator = dssdirect.Generators.First()
-        while generator > 0:
-            generator_name = dssdirect.Generators.Name()
-            generator_bus = dssdirect.CktElement.BusNames()[0]
-            node = self._network.nodes[generator_bus.split(".")[0]]
-            if "generators" in node:
-                node["generators"].add(generator_name)
-            else:
-                node["generators"] = {generator_name}
-            generator = dssdirect.Generators.Next()
+    def _initialize_devices(self):
+        for element in dssdirect.Circuit.AllElementNames():
+            dssdirect.Circuit.SetActiveElement(element)
+            node = dssdirect.CktElement.BusNames()[0]
+            bus = node.split(".")[0]
+            _, name = element.split(".")
+            element = element.lower()
+            if element.startswith("storage."):
+                self._devices[element] = bus
+                self._network.nodes[bus]["storage"].add(name)
+            elif element.startswith("pvsystem."):
+                self._devices[element] = bus
+                self._network.nodes[bus]["pvsystems"].add(name)
+            elif element.startswith("generator."):
+                self._devices[element] = bus
+                self._network.nodes[bus]["generators"].add(name)
 
     def _initialize_network(self, spec):
         _, busses = zip(
@@ -72,6 +77,12 @@ class GridModel:
         #      capacitors, reactors can be connected in series or as shunts.
         #      PD Elements that are shunts do not need to be included in the
         #      grid topology model.
+        # initialize the sets of connected devices at each node
+        for node in self._network.nodes.values():
+            node["storage"] = set()
+            node["generators"] = set()
+            node["pvsystems"] = set()
+        self._initialize_devices()
 
     @property
     def num_components(self):
@@ -89,6 +100,12 @@ class GridModel:
         """
         return nx.connected_components(self._network)
 
+    def _connected_elements(self, component, element_type):
+        for node_name in component:
+            node = self._network.nodes[node_name]
+            for generator in node.get(element_type, set()):
+                yield generator
+
     def connected_generators(self, component):
         """Iterator over all generators connected to busses in a component.
 
@@ -97,10 +114,27 @@ class GridModel:
         component : set
             Set of busses that form a connected component in the grid.
         """
-        for node_name in component:
-            node = self._network.nodes[node_name]
-            for generator in node.get("generators", set()):
-                yield generator
+        return self._connected_elements(component, "generators")
+
+    def connected_storage(self, component):
+        """Iterator over all storage devices connected to busses in `component`
+
+        Parameters
+        ----------
+        component : set
+            Set of busses that from a connected component in the grid.
+        """
+        return self._connected_elements(component, "storage")
+
+    def connected_pvsystems(self, component):
+        """Iterator over all PV systems connected to busses in `component`.
+
+        Parameters
+        ----------
+        component : set
+            Set of busses that form a connected component in the grid.
+        """
+        return self._connected_elements(component, "pvsystems")
 
     def connect(self, bus1, bus2):
         """Connect `bus1` to `bus2`."""
