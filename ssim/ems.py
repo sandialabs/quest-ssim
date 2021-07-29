@@ -34,7 +34,7 @@ class GridModel:
         )
         self._network = nx.Graph()
         self._devices = {}
-        self._initialize_network(config)
+        self._initialize_network()
 
     def _initialize_devices(self):
         for element in dssdirect.Circuit.AllElementNames():
@@ -53,7 +53,7 @@ class GridModel:
                 self._devices[element] = bus
                 self._network.nodes[bus]["generators"].add(name)
 
-    def _initialize_network(self, spec):
+    def _initialize_network(self):
         _, busses = zip(
             *dssutil.iterate_properties(
                 dssdirect.Lines,
