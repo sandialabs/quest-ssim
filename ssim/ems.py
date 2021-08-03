@@ -34,13 +34,14 @@ class GridModel:
         )
         self._network = nx.Graph()
         self._devices = {}
+        self._edges = {}
         self._initialize_network()
 
     def _initialize_devices(self):
         for element in dssdirect.Circuit.AllElementNames():
             dssdirect.Circuit.SetActiveElement(element)
             node = dssdirect.CktElement.BusNames()[0]
-            bus = node.split(".")[0]
+            bus = _node_to_bus(node)
             _, name = element.split(".")
             element = element.lower()
             if element.startswith("storage."):
@@ -54,23 +55,22 @@ class GridModel:
                 self._network.nodes[bus]["generators"].add(name)
 
     def _initialize_network(self):
-        _, busses = zip(
-            *dssutil.iterate_properties(
-                dssdirect.Lines,
-                ("Bus1", "Bus2", "IsSwitch")
+        self._edges = {
+            f"line.{name}": tuple(map(_node_to_bus, nodes))
+            for name, nodes in dssutil.iterate_properties(
+                dssdirect.Lines, ("Bus1", "Bus2")
             )
-        )
+        }
         # TODO Identify switches and do NOT add an edge if the switch is open
-        self._network.add_edges_from(
-            (edge.Bus1.split(".")[0], edge.Bus2.split(".")[0])
-            for edge in busses
-        )
+        self._network.add_edges_from(self._edges.values())
         transformer_number = dssdirect.Transformers.First()
         while transformer_number > 0:
-            bus1, bus2 = dssdirect.CktElement.BusNames()
+            name = dssdirect.Transformers.Name()
+            bus1, bus2 = map(_node_to_bus, dssdirect.CktElement.BusNames())
             # add the edge, removing node names
             print(f"adding edge: {bus1}--{bus2}")
-            self._network.add_edge(bus1.split(".")[0], bus2.split(".")[0])
+            self._network.add_edge(bus1, bus2)
+            self._edges[f"transformer.{name}"] = (bus1, bus2)
             transformer_number = dssdirect.Transformers.Next()
         # TODO Look for other power-delivery elements that have two busses
         #      specified. Transformers are the most common, but
@@ -160,6 +160,11 @@ class GridModel:
     def disconnect(self, bus1, bus2):
         """Remove the direct connection between `bus1` and `bus2`"""
         self._network.remove_edge(bus1, bus2)
+
+
+def _node_to_bus(node_name):
+    """Return an OpenDSS bus name, stripped of all node names."""
+    return node_name.split(".", maxsplit=1)[0]
 
 
 class HeuristicEMS:
