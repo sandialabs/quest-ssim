@@ -84,6 +84,23 @@ class GridModel:
             node["pvsystems"] = set()
         self._initialize_devices()
 
+    def node(self, element):
+        """Return the name of the node that `element` is associated with.
+
+        Parameters
+        ----------
+        element : str
+            Name of the element. Should be formatted in opendss-style, with
+            the element type, a '.', and the element name. For example,
+            'storage.foo'.
+
+        Returns
+        -------
+        str
+            Name of the node `element` is connected to.
+        """
+        return self._devices[element.lower()]
+
     @property
     def num_components(self):
         """Return the number of distinct connected components."""
