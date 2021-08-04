@@ -42,17 +42,12 @@ class GridModel:
             dssdirect.Circuit.SetActiveElement(element)
             node = dssdirect.CktElement.BusNames()[0]
             bus = _node_to_bus(node)
-            _, name = element.split(".")
+            element_type, name = element.split(".", maxsplit=1)
             element = element.lower()
-            if element.startswith("storage."):
+            element_set = self._network[bus].get(element_type, None)
+            if element_set is not None:
+                element_set.add(name)
                 self._devices[element] = bus
-                self._network.nodes[bus]["storage"].add(name)
-            elif element.startswith("pvsystem."):
-                self._devices[element] = bus
-                self._network.nodes[bus]["pvsystems"].add(name)
-            elif element.startswith("generator."):
-                self._devices[element] = bus
-                self._network.nodes[bus]["generators"].add(name)
 
     def _initialize_network(self):
         self._edges = {
@@ -80,8 +75,9 @@ class GridModel:
         # initialize the sets of connected devices at each node
         for node in self._network.nodes.values():
             node["storage"] = set()
-            node["generators"] = set()
-            node["pvsystems"] = set()
+            node["generator"] = set()
+            node["pvsystem"] = set()
+            node["failed_devices"] = set()
         self._initialize_devices()
 
     def node(self, element):
@@ -131,7 +127,7 @@ class GridModel:
         component : set
             Set of busses that form a connected component in the grid.
         """
-        return self._connected_elements(component, "generators")
+        return self._connected_elements(component, "generator")
 
     def connected_storage(self, component):
         """Iterator over all storage devices connected to busses in `component`
@@ -151,7 +147,7 @@ class GridModel:
         component : set
             Set of busses that form a connected component in the grid.
         """
-        return self._connected_elements(component, "pvsystems")
+        return self._connected_elements(component, "pvsystem")
 
     def connect(self, bus1, bus2):
         """Connect `bus1` to `bus2`."""
@@ -182,6 +178,24 @@ class GridModel:
         """
         bus1, bus2 = self._edges[edge]
         self.connect(bus1, bus2)
+
+    def disable_element(self, element):
+        element = element.lower()
+        element_node = self._network.nodes[self._devices[element]]
+        element_type, element_name = element.split(".", maxsplit=1)
+        devices = element_node.get(element_type, None)
+        if devices is not None:
+            devices.remove(element_name)
+            element_node["failed_devices"].add(element)
+
+    def enable_element(self, element):
+        element = element.lower()
+        element_node = self._network.nodes[self._devices[element]]
+        element_type, element_name = element.split(".", maxsplit=1)
+        devices = element_node.get(element_type, None)
+        if devices is not None:
+            devices.add(element_name)
+            element_node["failed_devices"].remove(element)
 
 
 def _node_to_bus(node_name):
