@@ -157,6 +157,21 @@ class GridModel:
         """Remove the direct connection between `bus1` and `bus2`"""
         self._network.remove_edge(bus1, bus2)
 
+    def is_edge(self, name):
+        """Return true if `name` is the name of an edge in the network.
+
+        Parameters
+        ----------
+        name : str
+            Name of the grid element.
+
+        Returns
+        -------
+        bool
+            True if the `name` is the name of an edge, otherwise False.
+        """
+        return name in self._edges.keys()
+
     def disable_edge(self, edge):
         """Remove the edge from the network.
 
