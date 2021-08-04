@@ -161,6 +161,28 @@ class GridModel:
         """Remove the direct connection between `bus1` and `bus2`"""
         self._network.remove_edge(bus1, bus2)
 
+    def disable_edge(self, edge):
+        """Remove the edge from the network.
+
+        Parameters
+        ----------
+        edge : str
+            Name of the edge to remove. (i.e. line or transformer name).
+        """
+        bus1, bus2 = self._edges[edge]
+        self.disconnect(bus1, bus2)
+
+    def enable_edge(self, edge):
+        """Restore the edge, if it has been disabled.
+
+        Parameters
+        ----------
+        edge : str
+            Name of the edge to remove. (i.e. line or transformer name).
+        """
+        bus1, bus2 = self._edges[edge]
+        self.connect(bus1, bus2)
+
 
 def _node_to_bus(node_name):
     """Return an OpenDSS bus name, stripped of all node names."""
