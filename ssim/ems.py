@@ -25,26 +25,43 @@ class GridModel:
 
     Parameters
     ----------
-    config : Pathlike
-        Path to the grid configuration file.
+    gridspec : GridSpecification
+        Specification of the grid and connected devices.
     """
-    def __init__(self, config):
-        self._model = DSSModel.from_grid_spec(
-            GridSpecification.from_json(config)
-        )
+    def __init__(self, gridspec):
+        self._model = DSSModel.from_grid_spec(gridspec)
+        self._gridspec = gridspec
         self._network = nx.Graph()
         self._devices = {}
         self._edges = {}
         self._initialize_network()
+
+    @classmethod
+    def from_json(cls, config):
+        """Construct a grid model based on the configuration in `config`.
+
+        Parameters
+        ----------
+        config : str or PathLike
+            Path to a JSON config file.
+
+        Returns
+        -------
+        GridModel
+            Initialized model of the grid and extra devices specified
+            in `config`
+        """
+        spec = GridSpecification.from_json(config)
+        return cls(spec)
 
     def _initialize_devices(self):
         for element in dssdirect.Circuit.AllElementNames():
             dssdirect.Circuit.SetActiveElement(element)
             node = dssdirect.CktElement.BusNames()[0]
             bus = _node_to_bus(node)
-            element_type, name = element.split(".", maxsplit=1)
             element = element.lower()
-            element_set = self._network[bus].get(element_type, None)
+            element_type, name = element.split(".", maxsplit=1)
+            element_set = self._network.nodes[bus].get(element_type, None)
             if element_set is not None:
                 element_set.add(name)
                 self._devices[element] = bus
@@ -63,7 +80,6 @@ class GridModel:
             name = dssdirect.Transformers.Name()
             bus1, bus2 = map(_node_to_bus, dssdirect.CktElement.BusNames())
             # add the edge, removing node names
-            print(f"adding edge: {bus1}--{bus2}")
             self._network.add_edge(bus1, bus2)
             self._edges[f"transformer.{name}"] = (bus1, bus2)
             transformer_number = dssdirect.Transformers.Next()
@@ -116,8 +132,8 @@ class GridModel:
     def _connected_elements(self, component, element_type):
         for node_name in component:
             node = self._network.nodes[node_name]
-            for generator in node.get(element_type, set()):
-                yield generator
+            for element in node.get(element_type, set()):
+                yield element
 
     def connected_generators(self, component):
         """Iterator over all generators connected to busses in a component.
