@@ -165,6 +165,21 @@ class GridModel:
         """
         return self._connected_elements(component, "storage")
 
+    def storage_spec(self, storage_name):
+        """Return the specs for the storage device.
+
+        Parameters
+        ----------
+        storage_name : str
+            Name of the storage device.
+
+        Returns
+        -------
+        grid.StorageSpecification
+            Specification of the storage device.
+        """
+        return self._gridspec.get_storage_by_name(storage_name)
+
     def connected_pvsystems(self, component):
         """Iterator over all PV systems connected to busses in `component`.
 
