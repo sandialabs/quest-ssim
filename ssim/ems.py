@@ -140,8 +140,13 @@ class GridModel:
 
         Parameters
         ----------
-        component : set
+        component : Iterable of str
             Set of busses that form a connected component in the grid.
+
+        Returns
+        -------
+        Generator
+            Names of generators connected to busses in `component`.
         """
         return self._connected_elements(component, "generator")
 
@@ -150,8 +155,13 @@ class GridModel:
 
         Parameters
         ----------
-        component : set
+        component : Iterable of str
             Set of busses that from a connected component in the grid.
+
+        Returns
+        -------
+        Generator
+            Names of all the storage devices connected to nodes in `component`.
         """
         return self._connected_elements(component, "storage")
 
@@ -160,8 +170,13 @@ class GridModel:
 
         Parameters
         ----------
-        component : set
+        component : Iterable of str
             Set of busses that form a connected component in the grid.
+
+        Returns
+        -------
+        Generator
+            Names of PVSystems connected to busses in `component`
         """
         return self._connected_elements(component, "pvsystem")
 
