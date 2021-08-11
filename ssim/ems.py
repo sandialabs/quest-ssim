@@ -129,6 +129,24 @@ class GridModel:
         """
         return nx.connected_components(self._network)
 
+    def component_from_element(self, element):
+        """Return the connected component that contains element.
+
+        Parameters
+        ----------
+        element : str
+            Name of the element.
+
+        Returns
+        -------
+        set
+            Set of nodes in the component tha includes `element`
+        """
+        return nx.node_connected_component(
+            self._network,
+            self.node(element)
+        )
+
     def _connected_elements(self, component, element_type):
         for node_name in component:
             node = self._network.nodes[node_name]
@@ -278,6 +296,35 @@ class HeuristicEMS:
         self._storage_kw_rated = {
             device.name: device.kwrated for device in storage_devices
         }
+
+    @classmethod
+    def from_existing(cls, storage_devices, ems_instances):
+        """Create a new HeuristicEMS instance based on existing instances.
+
+        The state of charge of each storage device is copied from one of the
+        instances in `ems_instances`.
+
+        Parameters
+        ----------
+        storage_devices : Iterable of StorageSpecification
+            Storage devices that are to be managed by this EMS.
+        ems_instances : Iterable of HeuristicEMS
+            Existing EMS instances to get storage state from.
+
+        Returns
+        -------
+        HeuristicEMS
+            New EMS instance.
+        """
+        new_ems = cls(
+            storage_devices,
+            minimum_soc=min(ems._minimum_soc for ems in ems_instances)
+        )
+        for device in storage_devices:
+            for ems in ems_instances:
+                if device in ems._storage_soc:
+                    new_ems._storage_soc = ems._storage_soc[device]
+                    new_ems._storage_kw = ems._storage_soc[device]
 
     def update_actual_generation(self, generation):
         self._actual_generation = sum(generation.values())
