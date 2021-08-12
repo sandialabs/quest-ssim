@@ -204,6 +204,7 @@ class GridFederate:
         self._update_reliability()
         self._update_storage()
         self._grid_model.solve(time)
+        self._grid_model.record_state()
         self._publish()
 
     def run(self, hours: float):
@@ -214,6 +215,10 @@ class GridFederate:
                 self._grid_model.next_update()
             )
             self.step(current_time)
+
+    def finalize(self):
+        """Clean up the grid state and save output files."""
+        self._grid_model.save_record()
 
 
 def run():
@@ -247,4 +252,5 @@ def run():
     helicsFederateLogDebugMessage(federate, "Model initialized")
     federate.enter_executing_mode()
     grid_federate.run(args.hours)
+    grid_federate.finalize()
     federate.finalize()

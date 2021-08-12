@@ -1,8 +1,11 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
+import csv
 import enum
+from functools import lru_cache, cached_property
 import logging
 from os import PathLike
+from pathlib import Path
 from typing import Any, List, Dict, Optional
 
 import opendssdirect as dssdirect
@@ -299,6 +302,141 @@ def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
     return {**params, **storage_spec.params}
 
 
+class BusRecorder:
+    """Recorder for data from a subset of busses.
+
+    Records the following information from all specified busses:
+
+    - minimum voltage [pu]
+    - maximum voltage [pu]
+    - name of bus with maximum voltage
+    - name of bus with minimum voltage
+    - total load [kW]
+    - total PV generation [kW]
+
+    Parameters
+    ----------
+    name : str
+        Name of the recorder.
+    busses : Iterable of str, optional
+        Set of busses to record. If None, then all busses are used.
+    """
+    def __init__(self, name, busses=None):
+        if busses is None:
+            self.busses = set(dssdirect.Circuit.AllBusNames())
+        else:
+            self.busses = set(busses)
+        self._times = []
+        self._min_voltage = []
+        self._max_voltage = []
+        self._min_node = []
+        self._max_node = []
+        self._load_kw = []
+        self._load_kvar = []
+        self._pv_kw = []
+        self._pv_kvar = []
+        self.name = name
+
+    @cached_property
+    def pvsystems(self):
+        pvsystems = []
+        for bus in self.busses:
+            dssdirect.Circuit.SetActiveBus(bus)
+            for pce in dssdirect.Bus.AllPCEatBus():
+                if pce.startswith("PVSystem."):
+                    pvsystems.append(pce.split(".")[1])
+        return pvsystems
+
+    @cached_property
+    def loads(self):
+        loads = []
+        for bus in self.busses:
+            dssdirect.Circuit.SetActiveBus(bus)
+            for pce in dssdirect.Bus.AllPCEatBus():
+                if pce.startswith("Load."):
+                    loads.append(pce.split(".")[1])
+        return loads
+
+    @cached_property
+    def nodes(self):
+        nodes = []
+        for bus in self.busses:
+            dssdirect.Circuit.SetActiveBus(bus)
+            bus_nodes = dssdirect.Bus.Nodes()
+            nodes.extend(f"{bus}.{node}" for node in bus_nodes)
+        return nodes
+
+    def sample(self, time):
+        """Record data at the given time.
+
+        Parameters
+        ----------
+        time : float
+            The current time in seconds.
+        """
+        self._times.append(time)
+        total_kw = 0.0
+        total_kvar = 0.0
+        for load in self.loads:
+            dssdirect.Loads.Name(load)
+            total_kw += dssdirect.Loads.kW()
+            total_kvar += dssdirect.Loads.kvar()
+        self._load_kw.append(total_kw)
+        self._load_kvar.append(total_kvar)
+        pv_kw = 0.0
+        pv_kvar = 0.0
+        for pvsystem in self.pvsystems:
+            dssdirect.PVsystems.Name(pvsystem)
+            pv_kw += dssdirect.PVsystems.kW()
+            pv_kvar += dssdirect.PVsystems.kvar()
+        self._pv_kw.append(pv_kw)
+        self._pv_kvar.append(pv_kvar)
+        node_voltages = all_node_voltages(time)
+        select_voltage = {node: node_voltages[node] for node in self.nodes}
+        minimum_voltage = 10.0
+        maximum_voltage = 0.0
+        minimum_node = None
+        maximum_node = None
+        for node, voltage in select_voltage.items():
+            if voltage == 0.0:
+                # ignore any busses that are not energized
+                continue
+            if voltage < minimum_voltage:
+                minimum_voltage = voltage
+                minimum_node = node
+            if voltage > maximum_voltage:
+                maximum_voltage = voltage
+                maximum_node = node
+        self._min_node.append(minimum_node)
+        self._min_voltage.append(minimum_voltage)
+        self._max_node.append(maximum_node)
+        self._max_voltage.append(maximum_voltage)
+
+    def to_csv(self, output_file):
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", "vmin", "vmax", "vmin_node", "vmax_node",
+                             "load_kw", "load_kvar",
+                             "pv_kw", "pv_kvar"))
+            writer.writerows(
+                zip(self._times, self._min_voltage, self._max_voltage,
+                    self._min_node, self._max_node,
+                    self._load_kw, self._load_kvar,
+                    self._pv_kw, self._pv_kvar)
+            )
+
+
+@lru_cache(maxsize=1)
+def all_node_voltages(time):
+    """Return a dict of per-unit voltage at all nodes in the active circuit."""
+    # NOTE the parameter `time` is unused. it is provided only to facilitate
+    #      caching the results.
+    return dict(
+        zip(dssdirect.Circuit.AllNodeNames(),
+            dssdirect.Circuit.AllBusMagPu())
+    )
+
+
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
     def __init__(self,
@@ -317,6 +455,7 @@ class DSSModel:
             name: Generator(name) for name in dssdirect.Generators.AllNames()
         }
         self._failed_elements = set()
+        self._recorder = BusRecorder("all-busses")
         self._max_step = 15 * 60  # 15 minutes
 
     @classmethod
@@ -490,6 +629,26 @@ class DSSModel:
             else:
                 logging.info("Max control iterations exceeded.")
         self._last_solution_time = time
+
+    def record_state(self):
+        """Record the values of interest at the last solution."""
+        self._recorder.sample(self._last_solution_time)
+
+    def save_record(self, output_dir: Optional[PathLike] = None):
+        """Save the recorded simulation values to a file.
+
+        Saves the recorded values from the simulation to a CSV file
+        named "grid_state.csv" in `output_dir`.
+
+        Parameters
+        ----------
+        output_dir : PathLike, optional
+            Directory to save the record in. If not specified then the
+            current directory is used.
+        """
+        if output_dir is None:
+            output_dir = Path(".")
+        self._recorder.to_csv(output_dir / "grid_state.csv")
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
