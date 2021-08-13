@@ -1,34 +1,32 @@
 {
-  "dss_file": "ieee13demo\\ieee13nodeckt_modified.dss",
+  "dss_file": "ieee13demo\\ieee13nodeckt.dss",
   "storage": [
     {
       "name": "S1",
       "bus": "632",
       "phases": 3,
-      "kwrated": 100,
-      "kwhrated": 1000,
+      "kwrated": 500,
+      "kwhrated": 5000,
       "%stored": 50,
       "kV": 4.16,
       "controller": "droop",
       "controller_params": {
-        "p_droop": 0,
-        "q_droop": 0
-      },
-      "inverter_efficiency": {"x":  [10, 50, 90, 100],
-                              "y":  [0.90, 0.94, 0.98, 0.99]}
+        "p_droop": 1000,
+        "q_droop": -2500
+      }
     },
     {
       "name": "S2",
       "bus": "671",
       "phases": 3,
       "kwrated": 500,
-      "kwhrated": 50000,
+      "kwhrated": 5000,
       "%stored": 50,
       "kV": 4.16,
       "controller": "droop",
       "controller_params": {
-        "p_droop": 0,
-        "q_droop": 0
+        "p_droop": 500,
+        "q_droop": -250
       }
     }
   ],
@@ -56,17 +54,18 @@
     }
   ],
   "reliability": {
+    "seed": 238924,
     "line": {
       "mtbf": 10000,
       "min_repair": 1,
       "max_repair": 10
     },
     "switch": {
-      "mtbf": 10000,
+      "mtbf": 10,
       "min_repair": 0.333,
       "max_repair": 2.5,
-      "p_open": 0.5,
-      "p_closed": 0.5,
+      "p_open": 1.0,
+      "p_closed": 0.0,
       "p_current": 0.0
     },
     "generator":

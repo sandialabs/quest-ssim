@@ -400,6 +400,9 @@ class GridReliabilityModel:
         with open(config_file) as f:
             config = json.load(f)
         self._model_params = config["reliability"]
+        seed = self._model_params.get("seed")
+        if seed is not None:
+            random.seed(seed)
         dssutil.load_model(config["dss_file"])
         lines = list(
             dssutil.iterate_properties(opendssdirect.Lines, ["IsSwitch"])
