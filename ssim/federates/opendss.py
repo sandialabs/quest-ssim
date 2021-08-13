@@ -1,6 +1,8 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
+import csv
 import logging
+from pathlib import Path
 
 from helics import (
     HelicsCombinationFederate, helics_time_maxtime,
@@ -108,6 +110,42 @@ class StorageInterface:
         )
 
 
+class EventLog:
+    """A record of all events that have occured."""
+    def __init__(self):
+        self._events = []
+
+    def add_event(self, time, event):
+        """Add an event to the event log.
+
+        Parameters
+        ----------
+        time : float
+            Time at which the event occured.
+        event : reliability.Event
+            The reliability event.
+        """
+        self._events.append(
+            (time, event.type.value, event.element, event.mode.value)
+        )
+
+    def to_csv(self, output_dir=None):
+        """Save the event log to a file in `output_dir`.
+
+        Parameters
+        ---------
+        output_dir : PathLike, optional
+            The directory to save the output file in. If not
+            specified, the current directory is used.
+        """
+        if output_dir is None:
+            output_dir = Path(".")
+        with open(output_dir / "event_log.csv", 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", "type", "element", "connection"))
+            writer.writerows(self._events)
+
+
 class GridFederate:
     """Manage HELICS interfaces for reliability and storage devices.
 
@@ -135,6 +173,7 @@ class GridFederate:
             StorageInterface(federate, device)
             for device in self._grid_model.storage_devices.values()
         ]
+        self._event_log = EventLog()
         self._reliability = ReliabilityInterface(federate)
 
     def _update_storage(self):
@@ -187,8 +226,9 @@ class GridFederate:
         else:
             self._apply_repair(event)
 
-    def _update_reliability(self):
+    def _update_reliability(self, time):
         for event in self._reliability.events:
+            self._event_log.add_event(time, event)
             self._apply_reliability_event(event)
 
     def step(self, time: float):
@@ -201,7 +241,7 @@ class GridFederate:
         """
         self._federate.log_message(
             f"granted time: {time}", HelicsLogLevel.INTERFACES)
-        self._update_reliability()
+        self._update_reliability(time)
         self._update_storage()
         self._grid_model.solve(time)
         self._grid_model.record_state()
@@ -219,6 +259,7 @@ class GridFederate:
     def finalize(self):
         """Clean up the grid state and save output files."""
         self._grid_model.save_record()
+        self._event_log.to_csv()
 
 
 def run():
