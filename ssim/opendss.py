@@ -1,11 +1,14 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
+from collections import namedtuple
 import csv
 import enum
 from functools import lru_cache, cached_property
 import logging
+import math
 from os import PathLike
 from pathlib import Path
+import re
 from typing import Any, List, Dict, Optional
 
 import opendssdirect as dssdirect
@@ -655,7 +658,10 @@ class DSSModel:
         if self._last_solution_time is None:
             # The model has never been solved, its next step should be at 0 s.
             return 0
-        return self._last_solution_time + self._max_step
+        return min(
+            self._last_solution_time + self._max_step,
+            self.next_action()
+        )
 
     def last_update(self) -> Optional[float]:
         """Return the time of the most recent power flow calculation."""
@@ -911,6 +917,16 @@ class DSSModel:
         return dssdirect.Circuit.TotalPower()
 
     @staticmethod
+    def next_action():
+        """Return the time of the next control action.
+
+        If no pending action, :py:attr:`math.inf` is returned.
+        """
+        if dssdirect.CtrlQueue.QueueSize() > 0:
+            return min([_action_time(action) for action in dssdirect.CtrlQueue.Queue()[1:]])
+        return math.inf
+
+    @staticmethod
     def _switch_terminal(full_name: str, terminal: int, how: str):
         if how not in {'open', 'closed', 'current'}:
             raise ValueError("`how` must be one of 'open', 'closed', "
@@ -1043,3 +1059,20 @@ class DSSModel:
         self.generators[name].is_operational = True
         if enable:
             self.generators[name].turn_on()
+
+
+def _action_time(action):
+    """Get the scheduled time from an OpenDSS control queue entry
+
+    Parameters
+    ----------
+    action : str
+        OpenDSS control queue entry. Comma separated string.
+
+    Returns
+    -------
+    float
+        Scheduled time [seconds].
+    """
+    _, hour, second, _, _, _ = action.split(",")
+    return float(hour) * 3600 + float(second)
