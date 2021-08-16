@@ -16,6 +16,55 @@ from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
 
 
+ControlEvent = namedtuple("ControlEvent", ("time", "element", "action"))
+
+
+def _parse_control_event(event_record: str) -> ControlEvent:
+    """Parse a string containing an opendss event record."""
+    m = re.match(r"Hour=(?P<hour>\d+), "
+                 r"Sec=(?P<sec>\d+(\.\d*)?), "
+                 r"ControlIter=\d+, "
+                 r"Element=(?P<element>[a-zA-Z0-9\.]+), "
+                 r"([a-zA-Z0-9\.]+,)? Action=(?P<action>.*)",
+                 event_record)
+    hours = float(m.group("hour"))
+    seconds = float(m.group("sec"))
+    time = hours * 3600 + seconds
+    element = m.group("element")
+    action = m.group("action")
+    return ControlEvent(time, element, action)
+
+
+class ControlLog:
+    """Record of control actions that have been executed by OpenDSS."""
+    def __init__(self):
+        self._log_index = 0
+        self.events = []
+
+    def update(self):
+        """Add any new control actions to the control log."""
+        event_log = dssdirect.Solution.EventLog()
+        while self._log_index < len(event_log):
+            self.events.append(
+                _parse_control_event(event_log[self._log_index])
+            )
+            self._log_index += 1
+
+    def to_csv(self, output_file):
+        """Save the control log to a CSV file.
+
+        Parameters
+        ----------
+        output_file : str or PathLike
+            Path to the output file. If the file exists it will be truncated
+            before writing.
+        """
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(ControlEvent._fields)
+            writer.writerows(self.events)
+
+
 class Storage(StorageDevice):
     """Implementation of a storage device in OpenDSS.
 
@@ -457,6 +506,7 @@ class DSSModel:
         self._failed_elements = set()
         self._recorder = BusRecorder("all-busses")
         self._max_step = 15 * 60  # 15 minutes
+        self._control_log = ControlLog()
 
     @classmethod
     def from_grid_spec(cls, gridspec: GridSpecification) -> DSSModel:
@@ -633,6 +683,7 @@ class DSSModel:
     def record_state(self):
         """Record the values of interest at the last solution."""
         self._recorder.sample(self._last_solution_time)
+        self._control_log.update()
 
     def save_record(self, output_dir: Optional[PathLike] = None):
         """Save the recorded simulation values to a file.
@@ -649,6 +700,7 @@ class DSSModel:
         if output_dir is None:
             output_dir = Path(".")
         self._recorder.to_csv(output_dir / "grid_state.csv")
+        self._control_log.to_csv(output_dir / "control_log.csv")
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
