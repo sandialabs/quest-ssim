@@ -1,0 +1,35 @@
+{
+  "federates": [
+    {
+      "directory": ".",
+      "exec": "helics_broker -f 4 --loglevel=7",
+      "host": "localhost",
+      "name": "broker"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate --hours 1025 grid-demo632.json ../federate-config/s1.json",
+      "host": "localhost",
+      "name": "s1"
+    },
+    {
+      "directory": ".",
+      "exec": "grid-federate --hours 1025 grid-demo632.json ../federate-config/grid-federate.json",
+      "host": "localhost",
+      "name": "grid"
+    },
+    {
+      "directory": ".",
+      "exec": "reliability-federate --hours 1025 grid-demo632.json ../federate-config/reliability.json",
+      "host": "localhost",
+      "name": "reliability"
+    },
+    {
+      "directory": ".",
+      "exec": "logger-federate --hours 1025 grid-demo632.json ../federate-config/logger.json",
+      "host": "localhost",
+      "name": "logger"
+    }
+  ],
+  "name": "ssim_demo"
+}
