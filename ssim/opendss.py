@@ -1,11 +1,14 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
+from collections import namedtuple
 import csv
 import enum
 from functools import lru_cache, cached_property
 import logging
+import math
 from os import PathLike
 from pathlib import Path
+import re
 from typing import Any, List, Dict, Optional
 
 import opendssdirect as dssdirect
@@ -14,6 +17,55 @@ from ssim import grid
 from ssim.grid import GridSpecification, StorageSpecification
 from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
+
+
+ControlEvent = namedtuple("ControlEvent", ("time", "element", "action"))
+
+
+def _parse_control_event(event_record: str) -> ControlEvent:
+    """Parse a string containing an opendss event record."""
+    m = re.match(r"Hour=(?P<hour>\d+), "
+                 r"Sec=(?P<sec>\d+(\.\d*)?), "
+                 r"ControlIter=\d+, "
+                 r"Element=(?P<element>[a-zA-Z0-9\.]+), "
+                 r"([a-zA-Z0-9\.]+, )?Action=(?P<action>.*)",
+                 event_record)
+    hours = float(m.group("hour"))
+    seconds = float(m.group("sec"))
+    time = hours * 3600 + seconds
+    element = m.group("element")
+    action = m.group("action")
+    return ControlEvent(time, element, action)
+
+
+class ControlLog:
+    """Record of control actions that have been executed by OpenDSS."""
+    def __init__(self):
+        self._log_index = 0
+        self.events = []
+
+    def update(self):
+        """Add any new control actions to the control log."""
+        event_log = dssdirect.Solution.EventLog()
+        while self._log_index < len(event_log):
+            self.events.append(
+                _parse_control_event(event_log[self._log_index])
+            )
+            self._log_index += 1
+
+    def to_csv(self, output_file):
+        """Save the control log to a CSV file.
+
+        Parameters
+        ----------
+        output_file : str or PathLike
+            Path to the output file. If the file exists it will be truncated
+            before writing.
+        """
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(ControlEvent._fields)
+            writer.writerows(self.events)
 
 
 class Storage(StorageDevice):
@@ -457,6 +509,7 @@ class DSSModel:
         self._failed_elements = set()
         self._recorder = BusRecorder("all-busses")
         self._max_step = 15 * 60  # 15 minutes
+        self._control_log = ControlLog()
 
     @classmethod
     def from_grid_spec(cls, gridspec: GridSpecification) -> DSSModel:
@@ -605,7 +658,10 @@ class DSSModel:
         if self._last_solution_time is None:
             # The model has never been solved, its next step should be at 0 s.
             return 0
-        return self._last_solution_time + self._max_step
+        return min(
+            self._last_solution_time + self._max_step,
+            self.next_action()
+        )
 
     def last_update(self) -> Optional[float]:
         """Return the time of the most recent power flow calculation."""
@@ -633,6 +689,7 @@ class DSSModel:
     def record_state(self):
         """Record the values of interest at the last solution."""
         self._recorder.sample(self._last_solution_time)
+        self._control_log.update()
 
     def save_record(self, output_dir: Optional[PathLike] = None):
         """Save the recorded simulation values to a file.
@@ -649,6 +706,7 @@ class DSSModel:
         if output_dir is None:
             output_dir = Path(".")
         self._recorder.to_csv(output_dir / "grid_state.csv")
+        self._control_log.to_csv(output_dir / "control_log.csv")
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
@@ -858,6 +916,30 @@ class DSSModel:
         """
         return dssdirect.Circuit.TotalPower()
 
+    def next_action(self):
+        """Return the time of the next control action.
+
+        If no pending action, :py:attr:`math.inf` is returned.
+        """
+        if dssdirect.CtrlQueue.QueueSize() > 0:
+            # OpenDSS rounds the scheduled action times when they are
+            # returned by the CtrlQueue API. To ensure the simulation moves
+            # forward we detect when the next action time is in the past
+            # (i.e. it is less than or equal to the last solution time).
+            # In this case the only way to ensure we evaluate a solution at
+            # the scheduled control time is to step the simulation forward by
+            # 1 second intervals. This results in a few extra solutions, but
+            # the number is bounded by the longest control delay so it is not
+            # too bad.
+            next_action = min(
+                _action_time(action)
+                for action in dssdirect.CtrlQueue.Queue()[1:]
+            )
+            if self._last_solution_time >= next_action:
+                return self._last_solution_time + 1.0
+            return next_action
+        return math.inf
+
     @staticmethod
     def _switch_terminal(full_name: str, terminal: int, how: str):
         if how not in {'open', 'closed', 'current'}:
@@ -991,3 +1073,20 @@ class DSSModel:
         self.generators[name].is_operational = True
         if enable:
             self.generators[name].turn_on()
+
+
+def _action_time(action):
+    """Get the scheduled time from an OpenDSS control queue entry
+
+    Parameters
+    ----------
+    action : str
+        OpenDSS control queue entry. Comma separated string.
+
+    Returns
+    -------
+    float
+        Scheduled time [seconds].
+    """
+    _, hour, second, _, _, _ = action.split(",")
+    return float(hour) * 3600 + float(second)

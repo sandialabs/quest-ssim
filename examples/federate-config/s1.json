@@ -3,7 +3,7 @@
   "core_name": "s1_core",
   "log_level": 7,
   "core_type": "zmq",
-  "time_delta": 1.0,
+  "time_delta": 0.1,
   "subscriptions": [
     {
       "key": "grid/storage.S1.soc",
