@@ -599,6 +599,7 @@ class DSSModel:
             An opendss grid model that matches the specification in `gridspec`.
         """
         model = DSSModel(gridspec.file)
+        model.add_voltage_recorder(gridspec.busses_to_log)
         for storage_device in gridspec.storage_devices:
             storage_params = _opendss_storage_params(storage_device)
             if storage_device.inverter_efficiency is not None:

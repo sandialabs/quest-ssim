@@ -1,5 +1,6 @@
 {
     "dss_file": "../ieee13demo/ieee13nodeckt.dss",
+    "busses_to_log": ["670", "632", "680", "646", "611"],
     "storage": [],
     "pvsystem": [
         {
