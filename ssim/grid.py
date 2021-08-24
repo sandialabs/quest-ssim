@@ -220,6 +220,7 @@ class GridSpecification:
         self.storage_devices: List[StorageSpecification] = []
         self.pv_systems: List[PVSpecification] = []
         self.inv_control: List[InvControlSpecification] = []
+        self.busses_to_log: List[str] = []
 
     def add_storage(self, specs: StorageSpecification):
         """Add a storage device to the grid specification.
@@ -279,6 +280,7 @@ class GridSpecification:
         with open(file) as f:
             spec = json.load(f)
         grid = cls(pathlib.Path(spec["dss_file"]))
+        grid.busses_to_log = set(spec.get("busses_to_log", []))
         for device in spec["storage"]:
             grid.add_storage(
                 StorageSpecification.from_dict(device)

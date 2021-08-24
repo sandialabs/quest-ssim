@@ -27,8 +27,8 @@ def _parse_control_event(event_record: str) -> ControlEvent:
     m = re.match(r"Hour=(?P<hour>\d+), "
                  r"Sec=(?P<sec>\d+(\.\d*)?), "
                  r"ControlIter=\d+, "
-                 r"Element=(?P<element>[a-zA-Z0-9\.]+), "
-                 r"([a-zA-Z0-9\.]+, )?Action=(?P<action>.*)",
+                 r"Element=(?P<element>[a-zA-Z0-9.]+), "
+                 r"([a-zA-Z0-9.]+, )?Action=(?P<action>.*)",
                  event_record)
     hours = float(m.group("hour"))
     seconds = float(m.group("sec"))
@@ -431,8 +431,9 @@ class BusRecorder:
         total_kvar = 0.0
         for load in self.loads:
             dssdirect.Loads.Name(load)
-            total_kw += dssdirect.Loads.kW()
-            total_kvar += dssdirect.Loads.kvar()
+            kw, kvar = dssdirect.CktElement.TotalPowers()
+            total_kw += kw
+            total_kvar += kvar
         self._load_kw.append(total_kw)
         self._load_kvar.append(total_kvar)
         pv_kw = 0.0
@@ -450,7 +451,7 @@ class BusRecorder:
         minimum_node = None
         maximum_node = None
         for node, voltage in select_voltage.items():
-            if voltage == 0.0:
+            if voltage < 0.1:
                 # ignore any busses that are not energized
                 continue
             if voltage < minimum_voltage:
@@ -476,6 +477,44 @@ class BusRecorder:
                     self._load_kw, self._load_kvar,
                     self._pv_kw, self._pv_kvar)
             )
+
+
+class VoltageRecorder:
+    """Record voltages at a set of busses.
+
+    Unlike :py:class:`BusRecorder` this records the voltage at every bus
+    without any aggregation.
+
+    Parameters
+    ----------
+    busses : Iterable of str
+        Set of busses to record.
+    """
+    def __init__(self, busses):
+        self.times = []
+        self.voltage = {bus: [] for bus in busses}
+
+    def _voltage(self, bus):
+        """Return the average voltage over all nodes at `bus`."""
+        dssdirect.Circuit.SetActiveBus(bus)
+        v_complex_pu = dssdirect.Bus.PuVoltage()
+        num_nodes = len(v_complex_pu) // 2
+        return sum(
+            dssdirect.CmathLib.cabs(real, imag)
+            for real, imag in zip(
+                v_complex_pu[::2], v_complex_pu[1::2])
+        ) / num_nodes
+
+    def sample(self, time):
+        self.times.append(time)
+        for bus, voltages in self.voltage.items():
+            voltages.append(self._voltage(bus))
+
+    def to_csv(self, output_path):
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", *self.voltage.keys()))
+            writer.writerows(zip(self.times, *self.voltage.values()))
 
 
 @lru_cache(maxsize=1)
@@ -561,6 +600,7 @@ class DSSModel:
             An opendss grid model that matches the specification in `gridspec`.
         """
         model = DSSModel(gridspec.file)
+        model.add_voltage_recorder(gridspec.busses_to_log)
         for storage_device in gridspec.storage_devices:
             storage_params = _opendss_storage_params(storage_device)
             if storage_device.inverter_efficiency is not None:
@@ -686,10 +726,16 @@ class DSSModel:
                 logging.info("Max control iterations exceeded.")
         self._last_solution_time = time
 
+    def add_voltage_recorder(self, busses):
+        """Monitor voltage at each bus in `busses`."""
+        self._voltage_recorder = VoltageRecorder(busses)
+
     def record_state(self):
         """Record the values of interest at the last solution."""
         self._recorder.sample(self._last_solution_time)
         self._control_log.update()
+        if self._voltage_recorder is not None:
+            self._voltage_recorder.sample(self._last_solution_time)
 
     def save_record(self, output_dir: Optional[PathLike] = None):
         """Save the recorded simulation values to a file.
@@ -707,6 +753,8 @@ class DSSModel:
             output_dir = Path(".")
         self._recorder.to_csv(output_dir / "grid_state.csv")
         self._control_log.to_csv(output_dir / "control_log.csv")
+        if self._voltage_recorder is not None:
+            self._voltage_recorder.to_csv(output_dir / "bus_voltage.csv")
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
