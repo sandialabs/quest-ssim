@@ -27,8 +27,8 @@ def _parse_control_event(event_record: str) -> ControlEvent:
     m = re.match(r"Hour=(?P<hour>\d+), "
                  r"Sec=(?P<sec>\d+(\.\d*)?), "
                  r"ControlIter=\d+, "
-                 r"Element=(?P<element>[a-zA-Z0-9\.]+), "
-                 r"([a-zA-Z0-9\.]+, )?Action=(?P<action>.*)",
+                 r"Element=(?P<element>[a-zA-Z0-9.]+), "
+                 r"([a-zA-Z0-9.]+, )?Action=(?P<action>.*)",
                  event_record)
     hours = float(m.group("hour"))
     seconds = float(m.group("sec"))
