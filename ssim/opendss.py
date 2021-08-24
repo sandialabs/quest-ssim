@@ -431,8 +431,9 @@ class BusRecorder:
         total_kvar = 0.0
         for load in self.loads:
             dssdirect.Loads.Name(load)
-            total_kw += dssdirect.Loads.kW()
-            total_kvar += dssdirect.Loads.kvar()
+            kw, kvar = dssdirect.CktElement.TotalPowers()
+            total_kw += kw
+            total_kvar += kvar
         self._load_kw.append(total_kw)
         self._load_kvar.append(total_kvar)
         pv_kw = 0.0
@@ -450,7 +451,7 @@ class BusRecorder:
         minimum_node = None
         maximum_node = None
         for node, voltage in select_voltage.items():
-            if voltage == 0.0:
+            if voltage < 0.1:
                 # ignore any busses that are not energized
                 continue
             if voltage < minimum_voltage:
