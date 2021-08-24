@@ -617,8 +617,9 @@ class DSSModel:
         for pv_system in gridspec.pv_systems:
             system_params = pv_system.params.copy()
             if pv_system.irradiance_profile is not None:
+                npts = _count_lines(pv_system.irradiance_profile)
                 model.add_loadshape(f"irrad_pv_{pv_system.name}",
-                                    pv_system.irradiance_profile, 1, 24)
+                                    pv_system.irradiance_profile, 0, npts)
                 loadshape_class = str(model.loadshapeclass)
                 system_params[loadshape_class] = f"irrad_pv_{pv_system.name}"
             if pv_system.inverter_efficiency is not None:
@@ -1121,6 +1122,12 @@ class DSSModel:
         self.generators[name].is_operational = True
         if enable:
             self.generators[name].turn_on()
+
+
+def _count_lines(file_path):
+    """Return the number of lines in the file."""
+    with open(file_path, "r") as f:
+        return len(f.readlines())
 
 
 def _action_time(action):
