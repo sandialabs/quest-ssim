@@ -916,14 +916,28 @@ class DSSModel:
         """
         return dssdirect.Circuit.TotalPower()
 
-    @staticmethod
-    def next_action():
+    def next_action(self):
         """Return the time of the next control action.
 
         If no pending action, :py:attr:`math.inf` is returned.
         """
         if dssdirect.CtrlQueue.QueueSize() > 0:
-            return min([_action_time(action) for action in dssdirect.CtrlQueue.Queue()[1:]])
+            # OpenDSS rounds the scheduled action times when they are
+            # returned by the CtrlQueue API. To ensure the simulation moves
+            # forward we detect when the next action time is in the past
+            # (i.e. it is less than or equal to the last solution time).
+            # In this case the only way to ensure we evaluate a solution at
+            # the scheduled control time is to step the simulation forward by
+            # 1 second intervals. This results in a few extra solutions, but
+            # the number is bounded by the longest control delay so it is not
+            # too bad.
+            next_action = min(
+                _action_time(action)
+                for action in dssdirect.CtrlQueue.Queue()[1:]
+            )
+            if self._last_solution_time >= next_action:
+                return self._last_solution_time + 1.0
+            return next_action
         return math.inf
 
     @staticmethod
