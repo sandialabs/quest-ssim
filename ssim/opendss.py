@@ -496,14 +496,7 @@ class VoltageRecorder:
 
     def _voltage(self, bus):
         """Return the average voltage over all nodes at `bus`."""
-        dssdirect.Circuit.SetActiveBus(bus)
-        v_complex_pu = dssdirect.Bus.PuVoltage()
-        num_nodes = len(v_complex_pu) // 2
-        return sum(
-            dssdirect.CmathLib.cabs(real, imag)
-            for real, imag in zip(
-                v_complex_pu[::2], v_complex_pu[1::2])
-        ) / num_nodes
+        return _mean_node_voltage(bus)
 
     def sample(self, time):
         self.times.append(time)
@@ -937,6 +930,22 @@ class DSSModel:
         return list(voltage / base_voltage for voltage in voltages[::2])
 
     @staticmethod
+    def mean_node_voltage(bus):
+        """Return the mean per-unit node voltage for all nodes at `bus`.
+
+        Parameters
+        ----------
+        bus : str
+            Name of the bus. Must not include any node names.
+
+        Returns
+        -------
+        float
+            Per-unit voltage.
+        """
+        return _mean_node_voltage(bus)
+
+    @staticmethod
     def positive_sequence_voltage(bus):
         """Return positive sequence voltage at `bus` [pu]."""
         dssdirect.Circuit.SetActiveBus(bus.split('.')[0])  # remove node names
@@ -1128,6 +1137,18 @@ def _count_lines(file_path):
     """Return the number of lines in the file."""
     with open(file_path, "r") as f:
         return len(f.readlines())
+
+
+def _mean_node_voltage(bus):
+    """Return the mean voltage at every node in `bus`. [pu]"""
+    dssdirect.Circuit.SetActiveBus(bus)
+    v_complex_pu = dssdirect.Bus.PuVoltage()
+    num_nodes = len(v_complex_pu) // 2
+    return sum(
+        dssdirect.CmathLib.cabs(real, imag)
+        for real, imag in zip(
+            v_complex_pu[::2], v_complex_pu[1::2])
+    ) / num_nodes
 
 
 def _action_time(action):

@@ -182,7 +182,7 @@ class GridFederate:
 
     def _publish(self):
         for storage in self._storage_interface:
-            voltage = self._grid_model.positive_sequence_voltage(
+            voltage = self._grid_model.mean_node_voltage(
                 storage.device.bus
             )
             storage.publish(voltage)
