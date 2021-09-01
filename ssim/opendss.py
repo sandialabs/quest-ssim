@@ -479,6 +479,45 @@ class BusRecorder:
             )
 
 
+class PDERecorder:
+    """Record loading across power delivery elements.
+
+    Parameters
+    ----------
+    names : Iterable of str, optional
+        Names of the power delivery elements to monitor.
+    """
+    def __init__(self, names=None):
+        if names is None:
+            names = dssdirect.PDElements.AllNames()
+        self._names = tuple(names)
+        self._loading = []
+
+    def to_csv(self, output_file):
+        """Save the data to a CSV file.
+
+        Parameters
+        ----------
+        output_file : str or pathlike
+            Path to the output file.
+        """
+        with open(output_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", *self._names))
+            writer.writerows(self._loading)
+
+    def _pde_loading(self):
+        loading = dict(zip(dssdirect.PDElements.AllNames(),
+                           dssdirect.PDElements.AllPctNorm()))
+        for name in self._names:
+            yield loading[name]
+
+    def sample(self, time):
+        self._loading.append(
+            (time, *self._pde_loading())
+        )
+
+
 class VoltageRecorder:
     """Record voltages at a set of busses.
 
@@ -540,6 +579,7 @@ class DSSModel:
         }
         self._failed_elements = set()
         self._recorder = BusRecorder("all-busses")
+        self._loading_recorder = None
         self._max_step = 15 * 60  # 15 minutes
         self._control_log = ControlLog()
 
@@ -594,6 +634,7 @@ class DSSModel:
         """
         model = DSSModel(gridspec.file)
         model.add_voltage_recorder(gridspec.busses_to_log)
+        model.add_loading_recorder()
         for storage_device in gridspec.storage_devices:
             storage_params = _opendss_storage_params(storage_device)
             if storage_device.inverter_efficiency is not None:
@@ -730,6 +771,8 @@ class DSSModel:
         self._control_log.update()
         if self._voltage_recorder is not None:
             self._voltage_recorder.sample(self._last_solution_time)
+        if self._loading_recorder is not None:
+            self._loading_recorder.sample(self._last_solution_time)
 
     def save_record(self, output_dir: Optional[PathLike] = None):
         """Save the recorded simulation values to a file.
@@ -749,6 +792,8 @@ class DSSModel:
         self._control_log.to_csv(output_dir / "control_log.csv")
         if self._voltage_recorder is not None:
             self._voltage_recorder.to_csv(output_dir / "bus_voltage.csv")
+        if self._loading_recorder is not None:
+            self._loading_recorder.to_csv(output_dir / "pde_loading.csv")
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
@@ -1131,6 +1176,9 @@ class DSSModel:
         self.generators[name].is_operational = True
         if enable:
             self.generators[name].turn_on()
+
+    def add_loading_recorder(self):
+        self._loading_recorder = PDERecorder()
 
 
 def _count_lines(file_path):
