@@ -117,12 +117,19 @@ class LoggingFederate:
 
 
 class PowerLogger(HelicsLogger):
-    """Logging federate state for logging total power on the grid."""
-    def __init__(self):
+    """Logging federate state for logging total power on the grid.
+
+    Parameters
+    ----------
+    output_dir : PathLike
+        Directory where output files will be written.
+    """
+    def __init__(self, output_dir=None):
         self.time = []
         self.active_power = []
         self.reactive_power = []
         self._total_power = None
+        self._output_dir = output_dir or Path(".")
 
     def initialize(self, federate: HelicsValueFederate):
         self._total_power = federate.register_subscription(
@@ -143,7 +150,12 @@ class PowerLogger(HelicsLogger):
         )
 
     def finalize(self):
-        pass
+        with open(self._output_dir / "total_power.csv", 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", "kW", "kVAR"))
+            writer.writerows(
+                zip(self.time, self.active_power, self.reactive_power)
+            )
 
 
 class VoltageLogger(HelicsLogger):
