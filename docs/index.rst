@@ -17,11 +17,11 @@ Use Helics CLI to run the simulator. HELICS CLI can be installed with::
 An example configuration is provided in ``examples/federation.json`` (shown
 below):
 
-.. literalinclude:: ../examples/federation.json
+.. literalinclude:: ../examples/demo_670/federation.json
 
 Running this with::
 
- helics run --path examples/federation.json
+ helics run --path examples/demo_670/federation.json
 
 will start the grid federate, two storage controllers, the reliability
 federate, and the logger federate. When the simulation finishes a variety of

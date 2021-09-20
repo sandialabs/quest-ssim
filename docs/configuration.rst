@@ -53,7 +53,7 @@ parameters (for example ``"%stored"``).
 Example Grid Configuration File
 -------------------------------
 
-.. literalinclude:: ../examples/grid.json
+.. literalinclude:: ../examples/demo_670/grid.json
 
 .. _federate_config:
 
@@ -65,9 +65,9 @@ of the logger federate, each of federate must have its publications,
 subscriptions and endpoints specified in the config file. For storage devices
 the configuration looks like this:
 
-.. literalinclude:: ../examples/s1.json
+.. literalinclude:: ../examples/federate-config/s1.json
 
 For the grid federate (with two connected storage devices as shown in
 :ref:`grid_example`) the federate configuration looks like this:
 
-.. literalinclude:: ../examples/grid-federate.json
+.. literalinclude:: ../examples/federate-config/grid-federate.json
