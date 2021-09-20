@@ -8,7 +8,8 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.ems import EMS
+from ssim.grid import GridSpecification
+from ssim.ems import CompositeHeuristicEMS
 
 
 class EMSFederate:
@@ -19,11 +20,10 @@ class EMSFederate:
     federate : HelicsMessageFederate
         HELICS federate handle. Must have a registered endpoint named
         "control".
-    config : str
-        Path to the grid configuration file.
+    grid_spec : GridSpecification
     """
-    def __init__(self, federate, config):
-        self._ems = EMS(config)
+    def __init__(self, federate, grid_spec):
+        self._ems = CompositeHeuristicEMS(grid_spec)
         self.federate = federate
         self.control_endpoint = federate.get_endpoint_by_name("control")
         self.reliability_endpoint = federate.get_endpoint_by_name(
@@ -31,31 +31,29 @@ class EMSFederate:
         )
 
     def pending_control_messages(self):
+        """Iterator over messages received on the control endpoint."""
         while self.control_endpoint.has_message():
             yield json.loads(self.control_endpoint.get_message().data)
 
     def pending_reliability_messages(self):
+        """Iterator over messages received on the reliability endpoint."""
         while self.reliability_endpoint.has_message():
             yield reliability.Event.from_json(
                 self.reliability_endpoint.get_message().data
             )
 
     def _update_control_inputs(self):
-        for message in self.pending_control_messages():
-            self.federate.log_message(
-                f"processing message: {message}", logging.DEBUG
-            )
-            self._ems.update_control(message)
+        self._ems.update(self.pending_control_messages())
 
     def _update_reliability(self):
-        for message in self.pending_reliability_messages():
-            self.federate.log_message(
-                f"got reliability message: {message}",
-                logging.DEBUG
-            )
-            self._ems.update_reliability(message)
+        self._ems.apply_reliability_events(
+            self.pending_reliability_messages()
+        )
 
     def _send_control_messages(self):
+        # TODO revisit this. what is `device`? Does this work for
+        # control messages to the grid? Generator dispatch? Switch
+        # actions?
         for device, action in self._ems.control_actions():
             self.federate.log_message(
                 f"sending control message: {action}", logging.DEBUG

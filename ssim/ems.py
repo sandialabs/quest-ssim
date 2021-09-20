@@ -4,10 +4,18 @@ The EMS executes at a fixed interval to determine power set-points for all
 storage devices and generators connected to the grid. To determine these
 set points the EMS needs to know the following:
 
-- Current demand
-- Forecasted demand
-- Current renewable generation
+- Actual load
+- Forecasted load
+- Actual renewable generation
 - Forecasted renewable generation
+- Actual state of all devices on the grid (and grid topology)
+- Fuel levels for fossil generators
+
+The goal is to develop a framework into which we can plug in different
+EMS realizations, without needing to do any work to reinvent the data
+management components. To get to this point we should define some
+manager classes to handle the data streams.
+
 """
 import json
 
@@ -17,11 +25,21 @@ import networkx as nx
 
 from ssim.grid import GridSpecification
 from ssim.opendss import DSSModel
-from ssim import dssutil
+from ssim import dssutil, reliability
 
 
 class GridModel:
-    """Model of the state of the grid.
+    """Network model of the state of the grid.
+
+    Represents the grid as an undirected graph. Vertexes correspond to
+    busses, edges to power delivery elements (lines, switches, and
+    transformers). Internally maintains a mapping between component
+    names and edges or nodes in the grid as well as indexes to look up
+    the node to which grid components are connected.
+
+    The network is initialized by loading the grid specification into
+    an OpenDSS model and iterating the power delivery and power conversion
+    elements in the OpenDSS model.
 
     Parameters
     ----------
@@ -83,11 +101,6 @@ class GridModel:
             self._network.add_edge(bus1, bus2)
             self._edges[f"transformer.{name}"] = (bus1, bus2)
             transformer_number = dssdirect.Transformers.Next()
-        # TODO Look for other power-delivery elements that have two busses
-        #      specified. Transformers are the most common, but
-        #      capacitors, reactors can be connected in series or as shunts.
-        #      PD Elements that are shunts do not need to be included in the
-        #      grid topology model.
         # initialize the sets of connected devices at each node
         for node in self._network.nodes.values():
             node["storage"] = set()
@@ -276,10 +289,121 @@ class GridModel:
             devices.add(element_name)
             element_node["failed_devices"].remove(element)
 
+    def _apply_event(self, event):
+        """Apply a single reliability event to the grid model.
+
+        Parameters
+        ----------
+        event : reliability.Event
+        """
+        if self.is_edge(event.element):
+            self._apply_topology_event(event)
+        else:
+            self._apply_component_event(event)
+
+    def _apply_component_event(self, event):
+        if event.type is reliability.EventType.FAIL:
+            self.disable_element(event.element)
+        else:
+            self.enable_element(event.element)
+
+    def _apply_topology_event(self, event):
+        if event.type is reliability.EventType.FAIL:
+            self.disable_edge(event.element)
+        else:
+            self.enable_edge(event.element)
+
+    def apply_reliability_events(self, events):
+        """Apply all reliability events in `events` to the grid model.
+
+        Parameters
+        ----------
+        events : Iterable of reliability.Event
+        """
+        for event in events:
+            self._apply_event(event)
+
 
 def _node_to_bus(node_name):
     """Return an OpenDSS bus name, stripped of all node names."""
     return node_name.split(".", maxsplit=1)[0]
+
+
+class CompositeHeuristicEMS:
+    """A collection of HeuristicEMS instances.
+
+    For each connected component in the grid there is a
+    :py:class:`HeuristicEMS` instance to manage the generators and storage
+    connected to that component. As the grid topology changes new EMS
+    instances are constructed (when a component splits), and old EMS
+    instances are combined (when components merge).
+
+    Parameters
+    ----------
+    grid_spec : GridSpecification
+        Grid specification
+    """
+    def __init__(self, grid_spec):
+        self._grid_model = GridModel(grid_spec)
+        self._component_ems = {
+            tuple(component): self._new_ems(component)
+            for component in self._grid_model.components()
+        }
+
+    def _new_ems(self, component):
+        """Create a new EMS to manage a subset of the grid.
+
+        Parameters
+        ----------
+        component : tuple of str
+            The set up busses the EMS will be responsible for.
+
+        Returns
+        -------
+        EMS
+        """
+        storage_devices = self._grid_model.connected_storage(component)
+        return HeuristicEMS(storage_devices)
+
+    def apply_reliability_events(self, events):
+        """Notify the EMS of a set of reliability events.
+
+        Parameters
+        ----------
+        events : Iterable of ReliabilityEvent
+            Set of events to apply.
+        """
+        self._grid_model.apply_reliability_events(events)
+        old_ems_instances = self._component_ems
+        self._component_ems = {}
+        for component in map(tuple, self._grid_model.components()):
+            if component in self._component_ems:
+                # the component still exists in the grid, unchanged
+                self._component_ems[component] = old_ems_instances[component]
+            else:
+                self._component_ems[component] = self._new_ems(component)
+
+    def update(self, messages):
+        """Update EMS model with newly received control messages.
+
+        Parameters
+        ----------
+        messages : Iterable of dict
+        """
+        for message in messages:
+            # identify the message type (what are the possible types? Status Messages?
+
+    def next_update(self):
+        """TODO Return the next time the EMS needs to update."""
+        pass
+
+    def control_actions(self):
+        """TODO Return the set of control actions to be applied in the grid."""
+        pass
+
+    def step(self, time):
+        """TODO Generate a new set of control actions at `time`."""
+        pass
 
 
 class HeuristicEMS:
@@ -429,94 +553,3 @@ class StorageControlMessage:
         return json.dumps({'action': self.action,
                            'kW': self.real_power,
                            'kVAR': self.reactive_power})
-
-
-class EMS:
-    """Energy Management System.
-
-    Parameters
-    ----------
-    config : str
-        Path to the grid configuration file.
-    """
-    def __init__(self, config):
-        with open(config) as f:
-            grid_config = json.load(f)
-        self.storage = {
-            storage["name"]: {"capacity": storage["kwhrated"],
-                              "kw": storage["kwrated"]}
-            for storage in grid_config["storage"]
-        }
-        self.soc = {
-            storage["name"]: storage["%stored"] / 100
-            for storage in grid_config["storage"]
-        }
-        self.peak_start = grid_config["ems"]["peak_start"]
-        self.peak_end = grid_config["ems"]["peak_end"]
-        self._actions = {}
-        self.time = 0.0
-
-    def update_reliability(self, event):
-        """Update the state of the EMS in response to a reliability event.
-
-        Parameters
-        ----------
-        event : reliability.Event
-            Information about a single reliability event.
-        """
-        # TODO we don't actually have a model to update at this point.
-        pass
-
-    def update_control(self, message):
-        """Update the state of the EMS.
-
-        Parameters
-        ----------
-        message : dict
-            Dict with keys "name" and "soc" specifying the name of a storage
-            device and its state of charge respectively.
-        """
-        self.soc[message["name"]] = message["soc"]
-
-    def _do_discharge(self):
-        for device, soc in self.soc.items():
-            if soc > 0:
-                self._actions[device] = \
-                    StorageControlMessage(
-                        "discharge",
-                        self.storage[device]["kw"],
-                        0.0
-                    )
-            else:
-                self._actions[device] = StorageControlMessage("idle", 0.0, 0.0)
-
-    def _do_charge(self):
-        for device, soc in self.soc.items():
-            if soc < 1.0:
-                self._actions[device] = \
-                    StorageControlMessage(
-                        "charge",
-                        self.storage[device]["kw"],
-                        0.0
-                    )
-            else:
-                self._actions[device] = StorageControlMessage("idle", 0.0, 0.0)
-
-    def _on_peak(self, time):
-        if self.peak_start < self.peak_end:
-            return self.peak_start <= time % 24 <= self.peak_end
-        return not(self.peak_end < time % 24 < self.peak_start)
-
-    def step(self, time):
-        """Determine what control actions to take next."""
-        self.time = time
-        if self._on_peak(time / 3600):
-            self._do_discharge()
-        else:
-            self._do_charge()
-
-    def control_actions(self):
-        return self._actions.items()
-
-    def next_update(self):
-        return self.time + 300
