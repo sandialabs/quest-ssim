@@ -2,7 +2,7 @@
 from pathlib import Path
 
 import pytest
-from ssim import ems, grid
+from ssim import ems, grid, reliability
 
 
 @pytest.fixture
@@ -65,3 +65,52 @@ def test_enable_non_existing_generator(grid_model, all_busses):
     with pytest.raises(KeyError):
         grid_model.enable_element("generator.fake")
     assert {'gen1'} == set(grid_model.connected_generators(all_busses))
+
+
+def test_apply_reliability_events(grid_model):
+    line2_failure = reliability.Event(
+        reliability.EventType.FAIL,
+        reliability.Mode.OPEN,
+        "line.line2"
+    )
+    line3_failure = reliability.Event(
+        reliability.EventType.FAIL,
+        reliability.Mode.OPEN,
+        "line.line3"
+    )
+    gen1_failure = reliability.Event(
+        reliability.EventType.FAIL,
+        reliability.Mode.CLOSED,
+        "generator.gen1"
+    )
+    repair_line2 = reliability.Event(
+        reliability.EventType.RESTORE,
+        reliability.Mode.CLOSED,
+        "line.line2"
+    )
+    repair_line3 = reliability.Event(
+        reliability.EventType.RESTORE,
+        reliability.Mode.CLOSED,
+        "line.line3"
+    )
+    repair_gen1 = reliability.Event(
+        reliability.EventType.RESTORE,
+        reliability.Mode.CLOSED,
+        "generator.gen1"
+    )
+    grid_model.apply_reliability_events(
+        [line2_failure, line3_failure, gen1_failure]
+    )
+    assert grid_model.num_components == 3
+    grid_model.apply_reliability_events(
+        [repair_gen1]
+    )
+    assert grid_model.num_components == 3
+    for component in grid_model.components():
+        if "regbus" in component:
+            generators = set(grid_model.connected_generators(component))
+            assert "gen1" in generators
+    grid_model.apply_reliability_events(
+        [repair_line2, repair_line3]
+    )
+    assert grid_model.num_components == 1

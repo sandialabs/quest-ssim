@@ -308,7 +308,7 @@ class GridModel:
             self.enable_element(event.element)
 
     def _apply_topology_event(self, event):
-        if event.type is reliability.EventType.FAIL:
+        if event.mode is reliability.Mode.OPEN:
             self.disable_edge(event.element)
         else:
             self.enable_edge(event.element)
@@ -384,14 +384,13 @@ class CompositeHeuristicEMS:
                 self._component_ems[component] = self._new_ems(component)
 
     def update(self, messages):
-        """Update EMS model with newly received control messages.
+        """Update EMS state based on status updates and other control messages.
 
         Parameters
         ----------
         messages : Iterable of dict
         """
-        for message in messages:
-            # identify the message type (what are the possible types? Status Messages?
+        pass
 
     def next_update(self):
         """TODO Return the next time the EMS needs to update."""
