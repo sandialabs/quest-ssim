@@ -1,0 +1,14 @@
+{
+  "name": "reliability",
+  "core_name": "reliability_core",
+  "core_type": "zmq",
+  "log_level": 1,
+  "time_delta": 1,
+  "endpoints": [
+    {
+      "name": "reliability/reliability",
+      "destination": "grid/reliability",
+      "global": true
+    }
+  ]
+}
