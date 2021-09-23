@@ -1,0 +1,10 @@
+{
+  "name": "S1",
+  "subscriptions": [
+    "grid/S1.soc",
+    "grid/S1.voltage"
+  ],
+  "publications": [
+    "power"
+  ]
+}

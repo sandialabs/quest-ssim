@@ -1,7 +1,9 @@
-import argparse
-import json
 from abc import ABC, abstractmethod
+import argparse
+import csv
+import json
 import logging
+from pathlib import Path
 from typing import Set, List
 
 from helics import (
@@ -115,12 +117,19 @@ class LoggingFederate:
 
 
 class PowerLogger(HelicsLogger):
-    """Logging federate state for logging total power on the grid."""
-    def __init__(self):
+    """Logging federate state for logging total power on the grid.
+
+    Parameters
+    ----------
+    output_dir : PathLike
+        Directory where output files will be written.
+    """
+    def __init__(self, output_dir=None):
         self.time = []
         self.active_power = []
         self.reactive_power = []
         self._total_power = None
+        self._output_dir = output_dir or Path(".")
 
     def initialize(self, federate: HelicsValueFederate):
         self._total_power = federate.register_subscription(
@@ -141,7 +150,12 @@ class PowerLogger(HelicsLogger):
         )
 
     def finalize(self):
-        pass
+        with open(self._output_dir / "total_power.csv", 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", "kW", "kVAR"))
+            writer.writerows(
+                zip(self.time, self.active_power, self.reactive_power)
+            )
 
 
 class VoltageLogger(HelicsLogger):
@@ -152,10 +166,12 @@ class VoltageLogger(HelicsLogger):
     busses : Set[str]
         Set of busses to monitor.
     """
-    def __init__(self, busses: Set[str]):
+    def __init__(self, busses: Set[str], output_dir=None, name="storage"):
         self.time = []
         self.bus_voltage = {bus: [] for bus in busses}
         self._voltage_subs = {}
+        self._output_dir = output_dir or Path('.')
+        self._name = name
 
     def initialize(self, federate: HelicsValueFederate):
         self._voltage_subs = {
@@ -175,7 +191,13 @@ class VoltageLogger(HelicsLogger):
             )
 
     def finalize(self):
-        pass
+        output_file = self._output_dir / f"{self._name}_voltage.csv"
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", *self.bus_voltage.keys()))
+            writer.writerows(
+                zip(self.time, *self.bus_voltage.values())
+            )
 
 
 class StorageLogger(HelicsLogger):
@@ -187,8 +209,10 @@ class StorageLogger(HelicsLogger):
     ----------
     device_names : Set[str]
         Names of the devices to monitor.
+    output_dir : PathLike, optional
+        Path to the directory where output files should be saved.
     """
-    def __init__(self, device_names):
+    def __init__(self, device_names, output_dir=None):
         self.device_names = device_names
         self._soc_subs = None
         self._power_subs = None
@@ -197,6 +221,7 @@ class StorageLogger(HelicsLogger):
         self.power_in = {device: [] for device in device_names}
         self.reactive_power = {device: [] for device in device_names}
         self.soc = {device: [] for device in device_names}
+        self._output_dir = output_dir or Path('.')
 
     def initialize(self, federate: HelicsValueFederate):
         self._soc_subs = {
@@ -235,7 +260,24 @@ class StorageLogger(HelicsLogger):
         self._log_power()
 
     def finalize(self):
-        pass
+        output_file = self._output_dir / "storage_power.csv"
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            columns = (
+                "time",
+                *(f"{device}_discharge_kw" for device in self.power_out),
+                *(f"{device}_charge_kw" for device in self.power_in),
+                *(f"{device}_kvar" for device in self.reactive_power),
+                *(f"{device}_soc" for device in self.soc)
+            )
+            writer.writerow(columns)
+            writer.writerows(
+                zip(self.time,
+                    *self.power_out.values(),
+                    *self.power_in.values(),
+                    *self.reactive_power.values(),
+                    *self.soc.values())
+            )
 
 
 def to_hours(seconds: List[float]) -> List[float]:
@@ -286,6 +328,7 @@ def run_federate(federate,
         _voltage_plot(voltage_logger)
         _storage_plots(storage_logger)
         plt.show()
+    logging_federate.finalize()
 
 
 def _device_names(grid_config):

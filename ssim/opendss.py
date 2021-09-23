@@ -1,15 +1,71 @@
 """Interface for devices that are part of an OpenDSS model."""
 from __future__ import annotations
+from collections import namedtuple
+import csv
 import enum
+from functools import lru_cache, cached_property
 import logging
+import math
 from os import PathLike
+from pathlib import Path
+import re
 from typing import Any, List, Dict, Optional
 
 import opendssdirect as dssdirect
 
+from ssim import grid
 from ssim.grid import GridSpecification, StorageSpecification
 from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
+
+
+ControlEvent = namedtuple("ControlEvent", ("time", "element", "action"))
+
+
+def _parse_control_event(event_record: str) -> ControlEvent:
+    """Parse a string containing an opendss event record."""
+    m = re.match(r"Hour=(?P<hour>\d+), "
+                 r"Sec=(?P<sec>\d+(\.\d*)?), "
+                 r"ControlIter=\d+, "
+                 r"Element=(?P<element>[a-zA-Z0-9.]+), "
+                 r"([a-zA-Z0-9.]+, )?Action=(?P<action>.*)",
+                 event_record)
+    hours = float(m.group("hour"))
+    seconds = float(m.group("sec"))
+    time = hours * 3600 + seconds
+    element = m.group("element")
+    action = m.group("action")
+    return ControlEvent(time, element, action)
+
+
+class ControlLog:
+    """Record of control actions that have been executed by OpenDSS."""
+    def __init__(self):
+        self._log_index = 0
+        self.events = []
+
+    def update(self):
+        """Add any new control actions to the control log."""
+        event_log = dssdirect.Solution.EventLog()
+        while self._log_index < len(event_log):
+            self.events.append(
+                _parse_control_event(event_log[self._log_index])
+            )
+            self._log_index += 1
+
+    def to_csv(self, output_file):
+        """Save the control log to a CSV file.
+
+        Parameters
+        ----------
+        output_file : str or PathLike
+            Path to the output file. If the file exists it will be truncated
+            before writing.
+        """
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(ControlEvent._fields)
+            writer.writerows(self.events)
 
 
 class Storage(StorageDevice):
@@ -30,7 +86,6 @@ class Storage(StorageDevice):
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
     """
-
     def __init__(self, name, bus, device_parameters, phases,
                  state=StorageState.IDLE):
         self.name = name
@@ -101,6 +156,10 @@ class Storage(StorageDevice):
     def kwh_rated(self) -> float:
         return float(self._get("kwhrated"))
 
+    @property
+    def status(self) -> grid.StorageStatus:
+        return grid.StorageStatus(self.name, self.soc, self.kw, self.kvar)
+
 
 class PVSystem:
     """Representation of a PV system in OpenDSS.
@@ -120,7 +179,6 @@ class PVSystem:
     system_parameters : dict
         Additional parameters
     """
-
     def __init__(self, name: str, bus: str, phases: int, pmpp: float,
                  inverter_kva: float, system_parameters: dict):
         self.name = name
@@ -132,6 +190,86 @@ class PVSystem:
                             {"bus1": bus, "phases": phases,
                              "Pmpp": pmpp, "kVA": inverter_kva,
                              **system_parameters})
+
+
+class Generator:
+    """Interface for OpenDSS Generator objects.
+
+    Parameters
+    ----------
+    name : str
+        Name of the generator.
+    """
+    def __init__(self, name):
+        if name not in dssdirect.Generators.AllNames():
+            raise ValueError(f"Generator {name} does not exist.")
+        self.name = name
+        self._activate()
+        self.type = int(
+            dssutil.get_property(f"generator.{self.name}.class")
+        )
+        self.is_operational = True
+
+    def _activate(self):
+        dssdirect.Generators.Name(self.name)
+
+    @property
+    def kw(self):
+        self._activate()
+        return dssdirect.Generators.kW()
+
+    @kw.setter
+    def kw(self, kw):
+        self._activate()
+        dssdirect.Generators.kW(kw)
+
+    @property
+    def kvar(self) -> float:
+        self._activate()
+        return dssdirect.Generators.kvar()
+
+    @kvar.setter
+    def kvar(self, kvar: float):
+        self._activate()
+        dssdirect.Generators.kvar(kvar)
+
+    @property
+    def online(self) -> bool:
+        self._activate()
+        return dssdirect.CktElement.Enabled()
+
+    def turn_on(self):
+        if self.is_operational:
+            self._activate()
+            dssdirect.CktElement.Enabled(True)
+
+    def turn_off(self):
+        if self.is_operational:
+            self._activate()
+            dssdirect.CktElement.Enabled(False)
+
+    def _read_meter(self) -> dict:
+        self._activate()
+        return dict(
+            zip(dssdirect.Generators.RegisterNames(),
+                dssdirect.Generators.RegisterValues())
+        )
+
+    @property
+    def hours_operating(self) -> float:
+        """Return the total hours the generator has been in operation."""
+        meter = self._read_meter()
+        return meter["Hours"]
+
+    @property
+    def status(self):
+        return grid.GeneratorStatus(
+            self.name,
+            self.kw,
+            self.kvar,
+            self.hours_operating,
+            self.online
+        )
 
 
 @enum.unique
@@ -216,9 +354,214 @@ def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
     return {**params, **storage_spec.params}
 
 
+class BusRecorder:
+    """Recorder for data from a subset of busses.
+
+    Records the following information from all specified busses:
+
+    - minimum voltage [pu]
+    - maximum voltage [pu]
+    - name of bus with maximum voltage
+    - name of bus with minimum voltage
+    - total load [kW]
+    - total PV generation [kW]
+
+    Parameters
+    ----------
+    name : str
+        Name of the recorder.
+    busses : Iterable of str, optional
+        Set of busses to record. If None, then all busses are used.
+    """
+    def __init__(self, name, busses=None):
+        if busses is None:
+            self.busses = set(dssdirect.Circuit.AllBusNames())
+        else:
+            self.busses = set(busses)
+        self._times = []
+        self._min_voltage = []
+        self._max_voltage = []
+        self._min_node = []
+        self._max_node = []
+        self._load_kw = []
+        self._load_kvar = []
+        self._pv_kw = []
+        self._pv_kvar = []
+        self.name = name
+
+    @cached_property
+    def pvsystems(self):
+        pvsystems = []
+        for bus in self.busses:
+            dssdirect.Circuit.SetActiveBus(bus)
+            for pce in dssdirect.Bus.AllPCEatBus():
+                if pce.startswith("PVSystem."):
+                    pvsystems.append(pce.split(".")[1])
+        return pvsystems
+
+    @cached_property
+    def loads(self):
+        loads = []
+        for bus in self.busses:
+            dssdirect.Circuit.SetActiveBus(bus)
+            for pce in dssdirect.Bus.AllPCEatBus():
+                if pce.startswith("Load."):
+                    loads.append(pce.split(".")[1])
+        return loads
+
+    @cached_property
+    def nodes(self):
+        nodes = []
+        for bus in self.busses:
+            dssdirect.Circuit.SetActiveBus(bus)
+            bus_nodes = dssdirect.Bus.Nodes()
+            nodes.extend(f"{bus}.{node}" for node in bus_nodes)
+        return nodes
+
+    def sample(self, time):
+        """Record data at the given time.
+
+        Parameters
+        ----------
+        time : float
+            The current time in seconds.
+        """
+        self._times.append(time)
+        total_kw = 0.0
+        total_kvar = 0.0
+        for load in self.loads:
+            dssdirect.Loads.Name(load)
+            kw, kvar = dssdirect.CktElement.TotalPowers()
+            total_kw += kw
+            total_kvar += kvar
+        self._load_kw.append(total_kw)
+        self._load_kvar.append(total_kvar)
+        pv_kw = 0.0
+        pv_kvar = 0.0
+        for pvsystem in self.pvsystems:
+            dssdirect.PVsystems.Name(pvsystem)
+            pv_kw += dssdirect.PVsystems.kW()
+            pv_kvar += dssdirect.PVsystems.kvar()
+        self._pv_kw.append(pv_kw)
+        self._pv_kvar.append(pv_kvar)
+        node_voltages = all_node_voltages(time)
+        select_voltage = {node: node_voltages[node] for node in self.nodes}
+        minimum_voltage = 10.0
+        maximum_voltage = 0.0
+        minimum_node = None
+        maximum_node = None
+        for node, voltage in select_voltage.items():
+            if voltage < 0.1:
+                # ignore any busses that are not energized
+                continue
+            if voltage < minimum_voltage:
+                minimum_voltage = voltage
+                minimum_node = node
+            if voltage > maximum_voltage:
+                maximum_voltage = voltage
+                maximum_node = node
+        self._min_node.append(minimum_node)
+        self._min_voltage.append(minimum_voltage)
+        self._max_node.append(maximum_node)
+        self._max_voltage.append(maximum_voltage)
+
+    def to_csv(self, output_file):
+        with open(output_file, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", "vmin", "vmax", "vmin_node", "vmax_node",
+                             "load_kw", "load_kvar",
+                             "pv_kw", "pv_kvar"))
+            writer.writerows(
+                zip(self._times, self._min_voltage, self._max_voltage,
+                    self._min_node, self._max_node,
+                    self._load_kw, self._load_kvar,
+                    self._pv_kw, self._pv_kvar)
+            )
+
+
+class PDERecorder:
+    """Record loading across power delivery elements.
+
+    Parameters
+    ----------
+    names : Iterable of str, optional
+        Names of the power delivery elements to monitor.
+    """
+    def __init__(self, names=None):
+        if names is None:
+            names = dssdirect.PDElements.AllNames()
+        self._names = tuple(names)
+        self._loading = []
+
+    def to_csv(self, output_file):
+        """Save the data to a CSV file.
+
+        Parameters
+        ----------
+        output_file : str or pathlike
+            Path to the output file.
+        """
+        with open(output_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", *self._names))
+            writer.writerows(self._loading)
+
+    def _pde_loading(self):
+        loading = dict(zip(dssdirect.PDElements.AllNames(),
+                           dssdirect.PDElements.AllPctNorm()))
+        for name in self._names:
+            yield loading[name]
+
+    def sample(self, time):
+        self._loading.append(
+            (time, *self._pde_loading())
+        )
+
+
+class VoltageRecorder:
+    """Record voltages at a set of busses.
+
+    Unlike :py:class:`BusRecorder` this records the voltage at every bus
+    without any aggregation.
+
+    Parameters
+    ----------
+    busses : Iterable of str
+        Set of busses to record.
+    """
+    def __init__(self, busses):
+        self.times = []
+        self.voltage = {bus: [] for bus in busses}
+
+    def _voltage(self, bus):
+        """Return the average voltage over all nodes at `bus`."""
+        return _mean_node_voltage(bus)
+
+    def sample(self, time):
+        self.times.append(time)
+        for bus, voltages in self.voltage.items():
+            voltages.append(self._voltage(bus))
+
+    def to_csv(self, output_path):
+        with open(output_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", *self.voltage.keys()))
+            writer.writerows(zip(self.times, *self.voltage.values()))
+
+
+@lru_cache(maxsize=1)
+def all_node_voltages(time):
+    """Return a dict of per-unit voltage at all nodes in the active circuit."""
+    # NOTE the parameter `time` is unused. it is provided only to facilitate
+    #      caching the results.
+    return dict(
+        zip(dssdirect.Circuit.AllNodeNames(),
+            dssdirect.Circuit.AllBusMagPu())
+    )
+
+
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
-
     def __init__(self,
                  dss_file: PathLike,
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
@@ -231,8 +574,14 @@ class DSSModel:
         self._storage = {}
         self._pvsystems = {}
         self._invcontrols = {}
+        self.generators = {
+            name: Generator(name) for name in dssdirect.Generators.AllNames()
+        }
         self._failed_elements = set()
+        self._recorder = BusRecorder("all-busses")
+        self._loading_recorder = None
         self._max_step = 15 * 60  # 15 minutes
+        self._control_log = ControlLog()
 
     @classmethod
     def from_grid_spec(cls, gridspec: GridSpecification) -> DSSModel:
@@ -252,13 +601,13 @@ class DSSModel:
         this way override the value provided in
         :py:attr:`PVSpecification.params`. The irradiance profile for the PV
         may be specified through a csv file in the
-        :py:attr: `grid.PVSpecification.irradiance_profile' field or as a
+        :py:attr: `grid.PVSpecification.irradiance_profile` field or as a
         parameter in :py:attr:`grid.PVSpecification.params`. Either way a new
         LoadShape will be created in the OpenDSS model named
         "irrad_pv_<pvsystem-name>".
 
         Similarly, for the storage device, the efficiency curve may be
-        specified as a parameter in :py:attr:`grid.StorageSpecification.params'
+        specified as a parameter in :py:attr:`grid.StorageSpecification.params`
         or in the :py:attr:`StorageSpecification.inverter_efficiency'. If
         either of these fields are specified then a new XYCurve will be
         created in the OpenDSS model named "eff_storage_<storagedevice-name>".
@@ -271,7 +620,7 @@ class DSSModel:
         this field is specified then a new XYCurve will be created in the
         OpenDSS model names "func_<invcontrol-name>". Curve specified this
         way will override the value provided in
-        :py:attr:`InvControlSpecification.params'
+        :py:attr:`InvControlSpecification.params`
 
         Parameters
         ----------
@@ -284,26 +633,29 @@ class DSSModel:
             An opendss grid model that matches the specification in `gridspec`.
         """
         model = DSSModel(gridspec.file)
+        model.add_voltage_recorder(gridspec.busses_to_log)
+        model.add_loading_recorder()
         for storage_device in gridspec.storage_devices:
-            system_params = _opendss_storage_params(storage_device)
+            storage_params = _opendss_storage_params(storage_device)
             if storage_device.inverter_efficiency is not None:
                 model.add_xycurve(f"eff_storage_{storage_device.name}",
                                   *zip(*storage_device.inverter_efficiency))
-                system_params["EffCurve"] = \
+                storage_params["EffCurve"] = \
                     f"eff_storage_{storage_device.name}"
             model.add_storage(
                 storage_device.name,
                 storage_device.bus,
                 storage_device.phases,
-                system_params
+                storage_params
             )
         for pv_system in gridspec.pv_systems:
             system_params = pv_system.params.copy()
             if pv_system.irradiance_profile is not None:
+                npts = _count_lines(pv_system.irradiance_profile)
                 model.add_loadshape(f"irrad_pv_{pv_system.name}",
-                                    pv_system.irradiance_profile, 1, 24)
-                model.loadshapeclass = LoadShapeClass.DAILY
-                system_params["Daily"] = f"irrad_pv_{pv_system.name}"
+                                    pv_system.irradiance_profile, 0, npts)
+                loadshape_class = str(model.loadshapeclass)
+                system_params[loadshape_class] = f"irrad_pv_{pv_system.name}"
             if pv_system.inverter_efficiency is not None:
                 model.add_xycurve(f"eff_pv_{pv_system.name}",
                                   *zip(*pv_system.inverter_efficiency))
@@ -312,7 +664,6 @@ class DSSModel:
                 model.add_xycurve(f"pt_{pv_system.name}",
                                   *zip(*pv_system.pt_curve))
                 system_params["P-TCurve"] = f"pt_{pv_system.name}"
-                system_params["kV"] = 4.16
             model.add_pvsystem(
                 pv_system.name,
                 pv_system.bus,
@@ -322,21 +673,31 @@ class DSSModel:
                 system_params
             )
         for inv_control in gridspec.inv_control:
-            system_params = inv_control.params.copy()
+            control_params = inv_control.params.copy()
             if inv_control.function_curve is not None:
                 model.add_xycurve(f"func_{inv_control.name}",
                                   *zip(*inv_control.function_curve))
-                system_params["vvc_curve1"] = f"func_{inv_control.name}"
-                system_params["deltaQ_factor"] = -1.0
-                system_params["RateofChangeMode"] = "LPF"
-                system_params["LPFTau"] = 10
-                system_params["voltage_curvex_ref"] = "ravg"
-                system_params["avgwindowlen"] = "15s"
+                control_params["vvc_curve1"] = f"func_{inv_control.name}"
+                control_params["deltaQ_factor"] = control_params.get(
+                    "deltaQ_factor", -1.0
+                )
+                control_params["RateofChangeMode"] = control_params.get(
+                    "RateofChangeMode", "LPF"
+                )
+                control_params["LPFTau"] = control_params.get(
+                    "LPFTau", 10
+                )
+                control_params["voltage_curvex_ref"] = control_params.get(
+                    "voltage_curvex_ref", "ravg"
+                )
+                control_params["avgwindowlen"] = control_params.get(
+                    "avgwindowlen", "15s"
+                )
             model.add_inverter_controller(
                 inv_control.name,
                 inv_control.der_list,
                 inv_control.inv_control_mode,
-                system_params
+                control_params
             )
         return model
 
@@ -372,7 +733,10 @@ class DSSModel:
         if self._last_solution_time is None:
             # The model has never been solved, its next step should be at 0 s.
             return 0
-        return self._last_solution_time + self._max_step
+        return min(
+            self._last_solution_time + self._max_step,
+            self.next_action()
+        )
 
     def last_update(self) -> Optional[float]:
         """Return the time of the most recent power flow calculation."""
@@ -387,9 +751,49 @@ class DSSModel:
             Time at which to solve. [seconds]
         """
         self._set_time(time)
-        dssdirect.Solution.Solve()
-        #dssdirect.Meters.SampleAll()  # sample all meters, but don't save.
+        try:
+            dssdirect.Solution.Solve()
+        except dssdirect.DSSException as e:
+            max_iter = dssdirect.Solution.MaxControlIterations()
+            if dssdirect.Solution.ControlIterations() < max_iter:
+                raise e
+            else:
+                logging.info("Max control iterations exceeded.")
         self._last_solution_time = time
+
+    def add_voltage_recorder(self, busses):
+        """Monitor voltage at each bus in `busses`."""
+        self._voltage_recorder = VoltageRecorder(busses)
+
+    def record_state(self):
+        """Record the values of interest at the last solution."""
+        self._recorder.sample(self._last_solution_time)
+        self._control_log.update()
+        if self._voltage_recorder is not None:
+            self._voltage_recorder.sample(self._last_solution_time)
+        if self._loading_recorder is not None:
+            self._loading_recorder.sample(self._last_solution_time)
+
+    def save_record(self, output_dir: Optional[PathLike] = None):
+        """Save the recorded simulation values to a file.
+
+        Saves the recorded values from the simulation to a CSV file
+        named "grid_state.csv" in `output_dir`.
+
+        Parameters
+        ----------
+        output_dir : PathLike, optional
+            Directory to save the record in. If not specified then the
+            current directory is used.
+        """
+        if output_dir is None:
+            output_dir = Path(".")
+        self._recorder.to_csv(output_dir / "grid_state.csv")
+        self._control_log.to_csv(output_dir / "control_log.csv")
+        if self._voltage_recorder is not None:
+            self._voltage_recorder.to_csv(output_dir / "bus_voltage.csv")
+        if self._loading_recorder is not None:
+            self._loading_recorder.to_csv(output_dir / "pde_loading.csv")
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
@@ -446,7 +850,7 @@ class DSSModel:
         """Add an Inverter Controller to OpenDSS.
 
         Parameters
-        __________
+        ----------
         name: str
             Name of the inverter controller.
         der_list : list
@@ -571,6 +975,22 @@ class DSSModel:
         return list(voltage / base_voltage for voltage in voltages[::2])
 
     @staticmethod
+    def mean_node_voltage(bus):
+        """Return the mean per-unit node voltage for all nodes at `bus`.
+
+        Parameters
+        ----------
+        bus : str
+            Name of the bus. Must not include any node names.
+
+        Returns
+        -------
+        float
+            Per-unit voltage.
+        """
+        return _mean_node_voltage(bus)
+
+    @staticmethod
     def positive_sequence_voltage(bus):
         """Return positive sequence voltage at `bus` [pu]."""
         dssdirect.Circuit.SetActiveBus(bus.split('.')[0])  # remove node names
@@ -598,6 +1018,30 @@ class DSSModel:
             Reactive power [kVAR]
         """
         return dssdirect.Circuit.TotalPower()
+
+    def next_action(self):
+        """Return the time of the next control action.
+
+        If no pending action, :py:attr:`math.inf` is returned.
+        """
+        if dssdirect.CtrlQueue.QueueSize() > 0:
+            # OpenDSS rounds the scheduled action times when they are
+            # returned by the CtrlQueue API. To ensure the simulation moves
+            # forward we detect when the next action time is in the past
+            # (i.e. it is less than or equal to the last solution time).
+            # In this case the only way to ensure we evaluate a solution at
+            # the scheduled control time is to step the simulation forward by
+            # 1 second intervals. This results in a few extra solutions, but
+            # the number is bounded by the longest control delay so it is not
+            # too bad.
+            next_action = min(
+                _action_time(action)
+                for action in dssdirect.CtrlQueue.Queue()[1:]
+            )
+            if self._last_solution_time >= next_action:
+                return self._last_solution_time + 1.0
+            return next_action
+        return math.inf
 
     @staticmethod
     def _switch_terminal(full_name: str, terminal: int, how: str):
@@ -694,3 +1138,79 @@ class DSSModel:
             'open', 'closed', or 'current'.
         """
         self._restore_element(f"line.{name}", terminal, how)
+
+    def fail_generator(self, name: str):
+        """Fail a generator.
+
+        Disables the generator so it cannot produce power and marks it as
+        failed to prevent its activation until it ahs been repaired.
+
+        Parameters
+        ----------
+        name : str
+            Name of the generator
+        """
+        self._fail_element(f"generator.{name}", 1, 'open')
+        # Disable the generator so it does not accumulate run-time while it
+        # is out of service.
+        self.generators[name].turn_off()
+        self.generators[name].is_operational = False
+
+    def restore_generator(self, name: str, enable=False):
+        """Repair a generator.
+
+        The repaired generator is reconnected to the grid, but it remains
+        disabled. The generator will remain disabled until it is explicitly
+        turned on (i.e. by the EMS).
+
+        Parameters
+        ----------
+        name : str
+            Name of the generator
+        enable : bool, default False
+            If True, the generator is re-enabled. If False the generator
+            remains disabled, leaving it to some other system to turn it back
+            on now that it is back in operation.
+        """
+        self._restore_element(f"generator.{name}", 1, 'closed')
+        self.generators[name].is_operational = True
+        if enable:
+            self.generators[name].turn_on()
+
+    def add_loading_recorder(self):
+        self._loading_recorder = PDERecorder()
+
+
+def _count_lines(file_path):
+    """Return the number of lines in the file."""
+    with open(file_path, "r") as f:
+        return len(f.readlines())
+
+
+def _mean_node_voltage(bus):
+    """Return the mean voltage at every node in `bus`. [pu]"""
+    dssdirect.Circuit.SetActiveBus(bus)
+    v_complex_pu = dssdirect.Bus.PuVoltage()
+    num_nodes = len(v_complex_pu) // 2
+    return sum(
+        dssdirect.CmathLib.cabs(real, imag)
+        for real, imag in zip(
+            v_complex_pu[::2], v_complex_pu[1::2])
+    ) / num_nodes
+
+
+def _action_time(action):
+    """Get the scheduled time from an OpenDSS control queue entry
+
+    Parameters
+    ----------
+    action : str
+        OpenDSS control queue entry. Comma separated string.
+
+    Returns
+    -------
+    float
+        Scheduled time [seconds].
+    """
+    _, hour, second, _, _, _ = action.split(",")
+    return float(hour) * 3600 + float(second)

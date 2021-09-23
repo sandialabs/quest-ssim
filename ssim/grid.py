@@ -3,6 +3,7 @@
 Contains a grid specification that can be used to construct
 data structures and models used by the various simulation federates.
 """
+import dataclasses
 import json
 import pathlib
 from dataclasses import dataclass, field
@@ -204,6 +205,7 @@ class PVSpecification:
             params=params
         )
 
+
 class GridSpecification:
     """Specification of the grid.
 
@@ -218,6 +220,7 @@ class GridSpecification:
         self.storage_devices: List[StorageSpecification] = []
         self.pv_systems: List[PVSpecification] = []
         self.inv_control: List[InvControlSpecification] = []
+        self.busses_to_log: List[str] = []
 
     def add_storage(self, specs: StorageSpecification):
         """Add a storage device to the grid specification.
@@ -277,6 +280,7 @@ class GridSpecification:
         with open(file) as f:
             spec = json.load(f)
         grid = cls(pathlib.Path(spec["dss_file"]))
+        grid.busses_to_log = set(spec.get("busses_to_log", []))
         for device in spec["storage"]:
             grid.add_storage(
                 StorageSpecification.from_dict(device)
@@ -290,3 +294,59 @@ class GridSpecification:
                 InvControlSpecification.from_dict(device)
             )
         return grid
+
+
+@dataclass
+class StorageStatus:
+    """Status of a storage system."""
+    name: str
+    soc: float
+    kw: float
+    kvar: float
+
+    def to_json(self):
+        return json.dumps(dataclasses.asdict(self))
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))
+
+
+@dataclass
+class PVStatus:
+    """Status of a PV System."""
+    name: str
+    kw: float
+    kvar: float
+
+    def to_json(self):
+        return json.dumps(dataclasses.asdict(self))
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))
+
+
+@dataclass
+class GeneratorStatus:
+    """Status of a Fossil Generator."""
+    name: str
+
+    #: Real power output from the generator
+    kw: float
+
+    #: Reactive power output from the generator.
+    kvar: float
+
+    #: Cumulative time the generator has been in operation. [hours]
+    operating_time: float
+
+    #: True if the generator is online and can respond to dispatch commands.
+    online: bool = True
+
+    def to_json(self):
+        return json.dumps(dataclasses.asdict(self))
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))

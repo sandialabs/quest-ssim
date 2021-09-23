@@ -1,0 +1,72 @@
+{
+    "dss_file": "../ieee13demo/ieee13nodeckt.dss",
+    "busses_to_log": ["670", "632", "680", "646", "611"],
+    "storage": [
+        {
+            "name": "S1",
+            "bus": "632",
+            "phases": 3,
+            "kwrated": 500,
+            "kwhrated": 5000,
+            "%stored": 50,
+            "kV": 4.16,
+            "controller": "droop",
+            "controller_params": {
+                "p_droop": 500,
+                "q_droop": -250
+            }
+        }
+    ],
+    "pvsystem": [
+        {
+            "name": "PV1",
+            "bus": "671",
+            "phases": 3,
+            "pmpp": 3000,
+            "kva_rated": 3600,
+            "kV": 4.16,
+            "irradiance_profile": "../ieee13demo/5MinuteIrradiance.csv",
+            "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                                    "y":  [0.90, 0.94, 0.98, 0.99]},
+            "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
+        }
+    ],
+    "invcontrol": [
+        {
+            "name": "InvCtrl1",
+            "der_list": ["PVsystem.PV1"],
+            "inv_control_mode": "voltvar",
+            "function_curve": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
+                               "y":  [1.0, 1.0, 0.0, -1.0, -1.0]}
+        }
+    ],
+    "reliability": {
+        "seed": 1234567,
+        "line": {
+            "mtbf": 1000000,
+            "min_repair": 1,
+            "max_repair": 10
+        },
+        "switch": {
+            "mtbf": 100,
+            "min_repair": 5,
+            "max_repair": 8,
+            "p_open": 1.0,
+            "p_closed": 0.0,
+            "p_current": 0.0
+        },
+        "generator":
+        {
+            "aging": {
+                "mtbf": 5000,
+                "min_repair": 1.0,
+                "max_repair": 1.0
+            },
+            "operating_wear_out": {
+                "mtbf": 1000,
+                "min_repair": 2.0,
+                "max_repair": 2.0
+            }
+        }
+    }
+}
