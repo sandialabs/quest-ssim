@@ -360,10 +360,14 @@ class CompositeHeuristicEMS:
 
         Returns
         -------
-        EMS
+        HeuristicEMS
+            A new HeuristicEMS instance to manage the storage devices
+            connected to `component`.
         """
-        storage_devices = self._grid_model.connected_storage(component)
-        return HeuristicEMS(storage_devices)
+        return HeuristicEMS(
+            self._grid_model.storage_spec(device)
+            for device in self._grid_model.connected_storage(component)
+        )
 
     def apply_reliability_events(self, events):
         """Notify the EMS of a set of reliability events.
@@ -406,6 +410,15 @@ class CompositeHeuristicEMS:
 
 
 class HeuristicEMS:
+    """Rule-based energy management system for storage devices.
+
+    Parameters
+    ----------
+    storage_devices : Iterable of grid.StorageSpecification
+        Storage devices that will managed by this ems.
+    minimum_soc : float, default 0.2
+        Minimum state of charge allowed for any storage device.
+    """
     def __init__(self, storage_devices, minimum_soc=0.2):
         self._minimum_soc = minimum_soc
         self._actual_demand = 0.0
