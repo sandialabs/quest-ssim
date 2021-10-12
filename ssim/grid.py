@@ -271,8 +271,9 @@ class GridSpecification:
         KeyError
             If the device is not found.
         """
+        name = name.lower()
         for device in self.storage_devices:
-            if device.name == name:
+            if device.name.lower() == name:
                 return device
         raise KeyError(f"no storage device named '{name}'")
 
