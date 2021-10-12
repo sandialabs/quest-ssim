@@ -349,6 +349,7 @@ class CompositeHeuristicEMS:
             tuple(component): self._new_ems(component)
             for component in self._grid_model.components()
         }
+        self._time = 0.0
 
     def _new_ems(self, component):
         """Create a new EMS to manage a subset of the grid.
@@ -398,15 +399,15 @@ class CompositeHeuristicEMS:
 
     def next_update(self):
         """TODO Return the next time the EMS needs to update."""
-        pass
+        return self._time + 300  # 5 minutes
 
     def control_actions(self):
         """TODO Return the set of control actions to be applied in the grid."""
-        pass
+        return []
 
     def step(self, time):
         """TODO Generate a new set of control actions at `time`."""
-        pass
+        self._time = time
 
 
 class HeuristicEMS:

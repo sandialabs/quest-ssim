@@ -115,6 +115,7 @@ def run():
         f"created federate with endpoints: {federate.endpoints}",
         logging.DEBUG
     )
-    ems_federate = EMSFederate(federate, args.grid_config)
+    ems_federate = EMSFederate(federate,
+                               GridSpecification.from_json(args.grid_config))
     federate.enter_executing_mode()
     ems_federate.run(args.hours)
