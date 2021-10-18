@@ -8,7 +8,7 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.grid import GridSpecification
+from ssim.grid import GridSpecification, PVStatus, StorageStatus
 from ssim.ems import CompositeHeuristicEMS
 
 
@@ -30,10 +30,41 @@ class EMSFederate:
             "reliability"
         )
 
+    @staticmethod
+    def _parse_control_message(message):
+        """Parse a message received on the control endpoint.
+        
+        Possible messages:
+        - StorageStatus
+        - PVStatus
+        - GenertatorStatus
+        - ? 
+
+        Each of these should be comming from a distinct endpoint. For PV status
+        messages the endpoint is 'grid/pvsystem.{name}.control'. For Storage
+        status messages the endpoint is in the storage controller: 
+        '{name}/control' - this makes identifying storage messages a bit more
+        difficult. 
+
+        Parameters
+        ----------
+        message : HelicsMessage
+
+        Returns
+        -------
+        PVStatus or StorageStatus
+        """
+        if message.source.startswith("storage"):
+            return StorageStatus.from_json(message.data)
+        elif message.source.startswith("pvsystem"):
+            return PVStatus.from_json(message.data)
+
     def pending_control_messages(self):
         """Iterator over messages received on the control endpoint."""
         while self.control_endpoint.has_message():
-            yield json.loads(self.control_endpoint.get_message().data)
+            yield self._parse_control_message(
+                self.control_endpoint.get_message()
+            )
 
     def pending_reliability_messages(self):
         """Iterator over messages received on the reliability endpoint."""
@@ -51,16 +82,15 @@ class EMSFederate:
         )
 
     def _send_control_messages(self):
-        # TODO revisit this. what is `device`? Does this work for
-        # control messages to the grid? Generator dispatch? Switch
-        # actions?
+        # TODO extend this to work for control messages to the grid federate
+        #      as well as storage control federates (as currently implemented)
         for device, action in self._ems.control_actions():
             self.federate.log_message(
                 f"sending control message: {action}", logging.DEBUG
             )
             self.control_endpoint.send_data(
                 action.to_json(),
-                destination=f"{device}/control"
+                destination=f"storage.{device}.control"
             )
 
     def _step(self, time):
@@ -119,3 +149,7 @@ def run():
                                GridSpecification.from_json(args.grid_config))
     federate.enter_executing_mode()
     ems_federate.run(args.hours)
+
+
+if __name__ == '__main__':
+    run()

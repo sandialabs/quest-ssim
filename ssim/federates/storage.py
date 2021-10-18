@@ -10,6 +10,7 @@ from helics import (
 )
 
 from ssim import ems
+from ssim import grid
 from ssim.grid import GridSpecification
 
 
@@ -88,7 +89,6 @@ def pending_messages(endpoint):
     endpoint : HelicsEndpoint
         The endpoint to receive from.
     """
-
     while endpoint.has_message():
         message = endpoint.get_message()
         yield message.data
@@ -107,12 +107,14 @@ def _send_soc_to_ems(soc, time, federate):
         Federate handle to send the message from. Must have a registered
         endpoint named "control".
     """
-    endpoint = federate.get_endpoint_by_name("control")
+    endpoint_name = f"storage.{federate.name}.control"
+    endpoint = federate.get_endpoint_by_name(endpoint_name)
     message = endpoint.create_message()
     message.destination = "ems/control"
-    message.original_source = f"{federate.name}/control"
-    message.source = f"{federate.name}/control"
-    message.data = json.dumps({"name": federate.name, "soc": soc})
+    message.original_source = endpoint_name
+    message.source = endpoint_name
+    # TODO fill in power fields with the actual values.
+    message.data = grid.StorageStatus(federate.name, soc).to_json()
     message.time = time
     endpoint.send_data(message)
 
@@ -130,6 +132,9 @@ def _controller(federate, controller, hours):
         How long to run the controller.
     """
     federate.log_message(f"storage starting ({hours})", HelicsLogLevel.TRACE)
+    control_endpoint = federate.get_endpoint_by_name(
+        f"storage.{federate.name}.control"
+    )
     time = 0.0
     while time < (hours * 3600):
         federate.log_message(f"granted time: {time}", HelicsLogLevel.TRACE)
@@ -142,7 +147,7 @@ def _controller(federate, controller, hours):
         federate.log_message(f"voltage: {voltage}", HelicsLogLevel.TRACE)
         federate.log_message(f"soc: {soc}", HelicsLogLevel.TRACE)
         controller.apply_control(
-            pending_messages(federate.get_endpoint_by_name("control"))
+            pending_messages(control_endpoint)
         )
         power = controller.step(time, voltage, soc)
         if power is not None:
@@ -263,7 +268,7 @@ def _get_controller(device):
 
 def _start_controller(federate_config, grid_config, hours):
     federate = helicsCreateCombinationFederateFromConfig(federate_config)
-    federate.register_endpoint("control")
+    federate.register_global_endpoint(f"storage.{federate.name}.control")
     spec = GridSpecification.from_json(grid_config)
     device = spec.get_storage_by_name(federate.name)
     federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)

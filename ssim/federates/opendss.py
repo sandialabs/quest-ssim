@@ -123,7 +123,7 @@ class PVInterface:
     def __init__(self, federate, pvsystem):
         self._federate = federate
         self._system = pvsystem
-        self._control_endpoint = federate.register_endpoint(
+        self._control_endpoint = federate.register_global_endpoint(
             f"pvsystem.{pvsystem.name}.control"
         )
 

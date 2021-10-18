@@ -303,8 +303,6 @@ class StorageStatus:
     """Status of a storage system."""
     name: str
     soc: float
-    kw: float
-    kvar: float
 
     def to_json(self):
         return json.dumps(dataclasses.asdict(self))
