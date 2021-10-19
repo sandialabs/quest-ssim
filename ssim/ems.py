@@ -72,7 +72,7 @@ class GridModel:
         spec = GridSpecification.from_json(config)
         return cls(spec)
 
-    def _initialize_devices(self):
+    def _initialize_devices_and_loads(self):
         for element in dssdirect.Circuit.AllElementNames():
             dssdirect.Circuit.SetActiveElement(element)
             node = dssdirect.CktElement.BusNames()[0]
@@ -107,7 +107,8 @@ class GridModel:
             node["generator"] = set()
             node["pvsystem"] = set()
             node["failed_devices"] = set()
-        self._initialize_devices()
+            node["load"] = set()
+        self._initialize_devices_and_loads()
 
     def node(self, element):
         """Return the name of the node that `element` is associated with.
@@ -225,6 +226,21 @@ class GridModel:
             Names of PVSystems connected to busses in `component`
         """
         return self._connected_elements(component, "pvsystem")
+
+    def connected_loads(self, component):
+        """Iterator over all loads connected to busses in `component`.
+        
+        Parameters
+        ----------
+        component: Iterable of str
+            Set of busses that form a connected component in the grid.
+
+        Returns
+        -------
+        Generator
+            Names of loads connected to busses in `component`.
+        """
+        return self._connected_elements(component, "load")
 
     def connect(self, bus1, bus2):
         """Connect `bus1` to `bus2`."""
@@ -395,7 +411,8 @@ class CompositeHeuristicEMS:
         ----------
         messages : Iterable of dict
         """
-        pass
+        for message in messages:
+            print(message)
 
     def next_update(self):
         """TODO Return the next time the EMS needs to update."""

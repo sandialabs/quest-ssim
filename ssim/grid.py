@@ -350,3 +350,18 @@ class GeneratorStatus:
     @classmethod
     def from_json(cls, jsonstr):
         return cls(**json.loads(jsonstr))
+
+
+@dataclass
+class LoadStatus:
+    """Status of a single load"""
+    name: str
+    kw: float
+    kvar: float
+
+    def to_json(self):
+        return json.dumps(dataclasses.asdict(self))
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))

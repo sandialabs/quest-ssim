@@ -114,3 +114,9 @@ def test_apply_reliability_events(grid_model):
         [repair_line2, repair_line3]
     )
     assert grid_model.num_components == 1
+
+
+def test_connected_loads(grid_model):
+    """Loads are added to the grid model."""
+    component = next(grid_model.components())
+    assert {'load1', 'load2'} == set(grid_model.connected_loads(component))

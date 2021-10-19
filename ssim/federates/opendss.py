@@ -187,6 +187,40 @@ class EventLog:
             writer.writerows(self._events)
 
 
+class LoadInterface:
+    """Manager for output to other federates related to loads.
+
+    Parameters
+    ----------
+    federate : HelicsFederate
+        HELICS federate handle.
+    """
+    def __init__(self, federate, model):
+        self._federate = federate
+        self._control_endpoint = federate.register_global_endpoint(
+            f"load.control"
+        )
+        self._model = model
+
+    def update(self):
+        """Update the loads in response to input.
+
+        Loads do not currently respond to input, so this method does
+        nothing.
+        """
+        pass
+
+    def _send_to_ems(self, status):
+        self._control_endpoint.send_data(
+            status.to_json(), "ems/control"
+        )
+
+    def publish(self):
+        """Send status updates to the EMS federate control endpoint"""
+        for load in self._model.loads():
+            self._send_to_ems(load.status)
+
+
 class GridFederate:
     """Manage HELICS interfaces for reliability and storage devices.
 
@@ -220,6 +254,7 @@ class GridFederate:
             for device in self._grid_model.pvsystems.values()
         ]
         self._reliability = ReliabilityInterface(federate)
+        self._load_interface = LoadInterface(federate, self._grid_model)
 
     def _update_storage(self):
         for storage in self._storage_interface:
@@ -236,6 +271,7 @@ class GridFederate:
         )
         for pvsystem in self._pv_interface:
             pvsystem.publish()
+        self._load_interface.publish()
         real, reactive = self._grid_model.total_power()
         self._federate.publications['grid/total_power'].publish(
             complex(real, reactive)

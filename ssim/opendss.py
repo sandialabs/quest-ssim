@@ -288,6 +288,52 @@ class Generator:
         )
 
 
+class Load:
+    """Interface to an OpenDSS load object.
+
+    Parameters
+    ----------
+    name : str
+        Name of the load.
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def _activate(self):
+        dssdirect.Loads.Name(self.name)
+
+    @property
+    def kw_rated(self) -> float:
+        """Nominal maximum kW of the laod."""
+        self._activate()
+        return dssdirect.Loads.kW()
+
+    @property
+    def kvar_rated(self) -> float:
+        """Nominal maximum kVAR of the load"""
+        self._activate()
+        return dssdirect.Loads.kvar()
+
+    @property
+    def kw(self) -> float:
+        """Actual real power demand from the load.
+
+        Accounts for load shapes etc.
+        """
+        self._activate()
+        return sum(dssdirect.CktElement.Powers()[0::2])
+
+    @property
+    def kvar(self) -> float:
+        """Actual reactive power fom the load."""
+        self._activate()
+        return sum(dssdirect.CktElement.Powers()[1::2])
+
+    @property
+    def status(self) -> grid.LoadStatus:
+        return grid.LoadStatus(self.name, self.kw, self.kvar)
+
+
 @enum.unique
 class SolutionMode(enum.Enum):
     """OpenDSS solution modes."""
@@ -981,6 +1027,16 @@ class DSSModel:
         :py:meth:`DSSModel.add_invcontrol`.
         """
         return self._invcontrols
+
+    def loads(self):
+        """Return an iterator over all loads in the model.
+
+        Returns
+        -------
+        Iterable of Load
+        """
+        for load in dssdirect.Loads.AllNames():
+            yield Load(load)
 
     @staticmethod
     def node_voltage(bus):

@@ -8,7 +8,7 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.grid import GridSpecification, PVStatus, StorageStatus
+from ssim.grid import GridSpecification, PVStatus, StorageStatus, LoadStatus
 from ssim.ems import CompositeHeuristicEMS
 
 
@@ -33,18 +33,18 @@ class EMSFederate:
     @staticmethod
     def _parse_control_message(message):
         """Parse a message received on the control endpoint.
-        
+
         Possible messages:
         - StorageStatus
         - PVStatus
         - GenertatorStatus
-        - ? 
+        - ?
 
         Each of these should be comming from a distinct endpoint. For PV status
         messages the endpoint is 'grid/pvsystem.{name}.control'. For Storage
         status messages the endpoint is in the storage controller: 
         '{name}/control' - this makes identifying storage messages a bit more
-        difficult. 
+        difficult.
 
         Parameters
         ----------
@@ -58,6 +58,8 @@ class EMSFederate:
             return StorageStatus.from_json(message.data)
         elif message.source.startswith("pvsystem"):
             return PVStatus.from_json(message.data)
+        elif message.source.startswith("load"):
+            return LoadStatus.from_json(message.data)
 
     def pending_control_messages(self):
         """Iterator over messages received on the control endpoint."""
