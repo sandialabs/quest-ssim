@@ -18,12 +18,13 @@ manager classes to handle the data streams.
 
 """
 import json
+import logging
 
 import opendssdirect as dssdirect
 
 import networkx as nx
 
-from ssim.grid import GridSpecification
+from ssim.grid import GridSpecification, PVStatus, LoadStatus, StorageStatus
 from ssim.opendss import DSSModel
 from ssim import dssutil, reliability
 
@@ -411,19 +412,54 @@ class CompositeHeuristicEMS:
         ----------
         messages : Iterable of dict
         """
+        # For each component sum the generation and demand, then pass
+        # it to the HeuristicEMS instance responsible for that component.
+        components = self._component_ems.keys()
+        load = {component: 0.0 for component in components}
+        pv_generation = {component: 0.0 for component in components}
+        ess_status = {component: [] for component in components}
+        # make inverted indexes for each message type
+        loads = {load: component
+                 for component in components
+                 for load in self._grid_model.connected_loads(component)}
+        pvsystems = {
+            pvsystem: component
+            for component in components
+            for pvsystem in self._grid_model.connected_pvsystems(component)
+        }
+        storage = {
+            ess: component
+            for component in components
+            for ess in self._grid_model.connected_storage(component)
+        }
         for message in messages:
-            print(message)
+            if isinstance(message, PVStatus):
+                pv_generation[pvsystems[message.name.lower()]] += message.kw
+            elif isinstance(message, StorageStatus):
+                ess_status[storage[message.name.lower()]].append(message)
+            elif isinstance(message, LoadStatus):
+                load[loads[message.name.lower()]] += message.kw
+            else:
+                logging.warning(f"unnexpected status message: {message}")
+        for component, ems in self._component_ems.items():
+            ems.update_actual_demand(load[component])
+            ems.update_actual_generation(pv_generation[component])
+            for ess in ess_status[component]:
+                ems.update_storage(ess.name.lower(), ess.soc)
 
     def next_update(self):
         """TODO Return the next time the EMS needs to update."""
         return self._time + 300  # 5 minutes
 
     def control_actions(self):
-        """TODO Return the set of control actions to be applied in the grid."""
-        return []
+        """Return the set of control actions to be applied in the grid."""
+        for ems in self._component_ems.values():
+            for device, dispatch in ems.dispatch_storage().items():
+                print(f"dispatch: {device} - {dispatch}")
+                yield device, dispatch
 
     def step(self, time):
-        """TODO Generate a new set of control actions at `time`."""
+        """Generate a new set of control actions at `time`."""
         self._time = time
 
 
@@ -441,15 +477,11 @@ class HeuristicEMS:
         self._minimum_soc = minimum_soc
         self._actual_demand = 0.0
         self._actual_generation = 0.0
-        self._storage_soc = {
-            device.name: device.soc for device in storage_devices
-        }
-        self._storage_kw = {
-            device.name: device.kw for device in storage_devices
-        }
-        self._storage_kw_rated = {
-            device.name: device.kwrated for device in storage_devices
-        }
+        self._storage_soc = {}
+        self._storage_kw_rated = {}
+        for device in storage_devices:
+            self._storage_soc[device.name.lower()] = device.soc
+            self._storage_kw_rated[device.name.lower()] = device.kw_rated
 
     @classmethod
     def from_existing(cls, storage_devices, ems_instances):
@@ -477,14 +509,14 @@ class HeuristicEMS:
         for device in storage_devices:
             for ems in ems_instances:
                 if device in ems._storage_soc:
-                    new_ems._storage_soc = ems._storage_soc[device]
-                    new_ems._storage_kw = ems._storage_soc[device]
+                    device_name = device.name.lower()
+                    new_ems._storage_soc[device_name] = ems._storage_soc[device_name]
 
     def update_actual_generation(self, generation):
-        self._actual_generation = sum(generation.values())
+        self._actual_generation = generation
 
     def update_actual_demand(self, demand):
-        self._actual_demand = sum(demand.values())
+        self._actual_demand = demand
 
     def update_generation_forecast(self, generation_forecast):
         # not using forecasts yet
@@ -494,9 +526,8 @@ class HeuristicEMS:
         # not using forecasts yet
         pass
 
-    def update_storage(self, name, storage_kw, storage_soc):
+    def update_storage(self, name, storage_soc):
         self._storage_soc[name] = storage_soc
-        self._storage_kw[name] = storage_kw
 
     def _charge_device(self, device):
         if self._storage_soc[device] < 1.0:
@@ -560,6 +591,11 @@ class StorageControlMessage:
         self.action = action
         self.real_power = real_power
         self.reactive_power = reactive_power
+
+    def __repr__(self):
+        return f"StorageControlMessage({self.action}, " \
+               f"kw={self.real_power}, " \
+               f"kvar={self.reactive_power})"
 
     @classmethod
     def from_json(cls, data):
