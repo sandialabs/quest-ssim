@@ -107,7 +107,7 @@ def _send_soc_to_ems(soc, time, federate):
         Federate handle to send the message from. Must have a registered
         endpoint named "control".
     """
-    endpoint_name = f"storage.{federate.name}.control"
+    endpoint_name = f"storage.{federate.name.lower()}.control"
     endpoint = federate.get_endpoint_by_name(endpoint_name)
     message = endpoint.create_message()
     message.destination = "ems/control"
@@ -133,7 +133,7 @@ def _controller(federate, controller, hours):
     """
     federate.log_message(f"storage starting ({hours})", HelicsLogLevel.TRACE)
     control_endpoint = federate.get_endpoint_by_name(
-        f"storage.{federate.name}.control"
+        f"storage.{federate.name.lower()}.control"
     )
     time = 0.0
     while time < (hours * 3600):
@@ -268,7 +268,7 @@ def _get_controller(device):
 
 def _start_controller(federate_config, grid_config, hours):
     federate = helicsCreateCombinationFederateFromConfig(federate_config)
-    federate.register_global_endpoint(f"storage.{federate.name}.control")
+    federate.register_global_endpoint(f"storage.{federate.name.lower()}.control")
     spec = GridSpecification.from_json(grid_config)
     device = spec.get_storage_by_name(federate.name)
     federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)
