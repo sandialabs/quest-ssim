@@ -110,6 +110,7 @@ class StorageSpecification:
             params=params
         )
 
+
 @dataclass
 class InvControlSpecification:
 

@@ -268,7 +268,9 @@ def _get_controller(device):
 
 def _start_controller(federate_config, grid_config, hours):
     federate = helicsCreateCombinationFederateFromConfig(federate_config)
-    federate.register_global_endpoint(f"storage.{federate.name.lower()}.control")
+    federate.register_global_endpoint(
+        f"storage.{federate.name.lower()}.control"
+    )
     spec = GridSpecification.from_json(grid_config)
     device = spec.get_storage_by_name(federate.name)
     federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)
