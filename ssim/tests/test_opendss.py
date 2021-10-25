@@ -291,11 +291,17 @@ def test_DSSModel_storage_efficiency_curves(grid_spec):
 
 def test_DSSModel_solution_time(test_circuit):
     assert test_circuit.next_update() == 0
+    dssdirect.run_command("set controlmode=OFF")  # disable controls
     test_circuit.solve(0)
     delta = test_circuit.next_update()
     test_circuit.solve(delta)
     test_circuit.solve(delta + delta)
-    assert test_circuit.next_update() == delta * 3
+    next_time = test_circuit.next_update()
+    assert next_time == delta * 3
+    dssdirect.run_command("set controlmode=TIME")
+    test_circuit.solve(next_time)
+    # next update should be at a shorter interval with controls enabled.
+    assert test_circuit.next_update() < delta * 4
 
 
 def test_DSSModel_fail_line_restore_line(test_circuit):
