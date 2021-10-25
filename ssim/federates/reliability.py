@@ -60,8 +60,6 @@ class ReliabilityFederate:
         for event in self._reliability_model.events():
             self._federate.log_message(
                 f"publishing event {event} @ {time}", logging.DEBUG)
-            message = self._event_message(event)
-            logging.debug("sending message: %s", message)
             self._send_event_message(event)
 
     def run(self, hours: float):

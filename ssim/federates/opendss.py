@@ -1,7 +1,6 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
 import csv
-import logging
 from pathlib import Path
 
 from helics import (
@@ -33,30 +32,44 @@ class ReliabilityInterface:
         )
         self._federate = federate
 
-    def update_generators(self, generators):
-        """Send updated GeneratorStatus messages to the reliability federate.
-
-        These messages include the cumulative number of hours the generator
-        has been running which can be used to update the reliability model for
-        each individual generator.
-
-        Messages are sent from the "grid/reliability" endpoint to the
-        "reliability/reliability" endpoint.
-        """
-        for generator in generators:
-            self._federate.log_message(f"updating generator {generator.name}:"
-                                       f" {generator.status}",
-                                       logging.DEBUG)
-            self.endpoint.send_data(
-                generator.status.to_json(), "reliability/reliability"
-            )
-
     @property
     def events(self):
         """An iterator over all pending reliability events."""
         while self.endpoint.has_message():
             message = self.endpoint.get_message()
             yield reliability.Event.from_json(message.data)
+
+
+class GeneratorInterface:
+    """HELICS interface for generators connected to the grid.
+
+    Parameters
+    ----------
+    federate : HelicsCombinationFederate
+    """
+
+    def __init__(self, federate, generator):
+        self._federate = federate
+        self.generator = generator
+        self.control_endpoint = federate.register_global_endpoint(
+            f"generator.{generator.name.lower()}.control"
+        )
+        self.reliability_endpoint = federate.get_endpoint_by_name(
+            "reliability")
+
+    def update(self):
+        """Update inputs for the generator."""
+        # TODO respond to control messages from the EMS
+        pass
+
+    def publish(self):
+        status_json = self.generator.status.to_json()
+        self.control_endpoint.send_data(
+            status_json, destination="ems/control"
+        )
+        self.reliability_endpoint.send_data(
+            status_json, destination="reliability/reliability"
+        )
 
 
 class StorageInterface:
@@ -198,7 +211,7 @@ class LoadInterface:
     def __init__(self, federate, model):
         self._federate = federate
         self._control_endpoint = federate.register_global_endpoint(
-            f"load.control"
+            "load.control"
         )
         self._model = model
 
@@ -255,6 +268,10 @@ class GridFederate:
         ]
         self._reliability = ReliabilityInterface(federate)
         self._load_interface = LoadInterface(federate, self._grid_model)
+        self._generator_interface = [
+            GeneratorInterface(federate, generator)
+            for generator in self._grid_model.generators.values()
+        ]
 
     def _update_storage(self):
         for storage in self._storage_interface:
@@ -266,9 +283,11 @@ class GridFederate:
                 storage.device.bus
             )
             storage.publish(voltage)
-        self._reliability.update_generators(
-            self._grid_model.generators.values()
-        )
+        for generator in self._generator_interface:
+            generator.publish()
+        # self._reliability.update_generators(
+        #     self._grid_model.generators.values()
+        # )
         for pvsystem in self._pv_interface:
             pvsystem.publish()
         self._load_interface.publish()

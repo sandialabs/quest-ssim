@@ -24,7 +24,10 @@ import opendssdirect as dssdirect
 
 import networkx as nx
 
-from ssim.grid import GridSpecification, PVStatus, LoadStatus, StorageStatus
+from ssim.grid import (
+    GridSpecification,
+    PVStatus, LoadStatus, StorageStatus, GeneratorStatus
+)
 from ssim.opendss import DSSModel
 from ssim import dssutil, reliability
 
@@ -47,6 +50,7 @@ class GridModel:
     gridspec : GridSpecification
         Specification of the grid and connected devices.
     """
+
     def __init__(self, gridspec):
         self._model = DSSModel.from_grid_spec(gridspec)
         self._gridspec = gridspec
@@ -230,7 +234,7 @@ class GridModel:
 
     def connected_loads(self, component):
         """Iterator over all loads connected to busses in `component`.
-        
+
         Parameters
         ----------
         component: Iterable of str
@@ -439,6 +443,8 @@ class CompositeHeuristicEMS:
                 ess_status[storage[message.name.lower()]].append(message)
             elif isinstance(message, LoadStatus):
                 load[loads[message.name.lower()]] += message.kw
+            elif isinstance(message, GeneratorStatus):
+                print(f"got generator status message: {message}")
             else:
                 logging.warning(f"unnexpected status message: {message}")
         for component, ems in self._component_ems.items():
@@ -509,8 +515,8 @@ class HeuristicEMS:
         for device in storage_devices:
             for ems in ems_instances:
                 if device in ems._storage_soc:
-                    device_name = device.name.lower()
-                    new_ems._storage_soc[device_name] = ems._storage_soc[device_name]
+                    name = device.name.lower()
+                    new_ems._storage_soc[name] = ems._storage_soc[name]
 
     def update_actual_generation(self, generation):
         self._actual_generation = generation

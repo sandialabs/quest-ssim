@@ -1,6 +1,5 @@
 """Energy Management System Federate."""
 import argparse
-import json
 import logging
 
 from helics import (
@@ -8,7 +7,10 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.grid import GridSpecification, PVStatus, StorageStatus, LoadStatus
+from ssim.grid import (
+    GridSpecification,
+    PVStatus, StorageStatus, LoadStatus, GeneratorStatus
+)
 from ssim.ems import CompositeHeuristicEMS
 
 
@@ -40,9 +42,11 @@ class EMSFederate:
         - GenertatorStatus
         - ?
 
+        TODO rewrite to reflect the new endpoint names (global endpoints)
+
         Each of these should be comming from a distinct endpoint. For PV status
         messages the endpoint is 'grid/pvsystem.{name}.control'. For Storage
-        status messages the endpoint is in the storage controller: 
+        status messages the endpoint is in the storage controller:
         '{name}/control' - this makes identifying storage messages a bit more
         difficult.
 
@@ -60,6 +64,8 @@ class EMSFederate:
             return PVStatus.from_json(message.data)
         elif message.source.startswith("load"):
             return LoadStatus.from_json(message.data)
+        elif message.source.startswith("generator"):
+            return GeneratorStatus.from_json(message.data)
 
     def pending_control_messages(self):
         """Iterator over messages received on the control endpoint."""
