@@ -29,7 +29,7 @@
       "exec": "logger-federate --hours 1025 grid-demo632.json ../federate-config/logger.json",
       "host": "localhost",
       "name": "logger"
-    },
+    }
   ],
   "name": "ssim_demo"
 }
