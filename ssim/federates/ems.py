@@ -7,10 +7,7 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.grid import (
-    GridSpecification,
-    PVStatus, StorageStatus, LoadStatus, GeneratorStatus
-)
+from ssim.grid import GridSpecification, StatusMessage
 from ssim.ems import CompositeHeuristicEMS
 
 
@@ -36,36 +33,34 @@ class EMSFederate:
     def _parse_control_message(message):
         """Parse a message received on the control endpoint.
 
-        Possible messages:
+        Accepts the following messages:
         - StorageStatus
         - PVStatus
         - GenertatorStatus
-        - ?
+        - LoadStatus
 
-        TODO rewrite to reflect the new endpoint names (global endpoints)
-
-        Each of these should be comming from a distinct endpoint. For PV status
-        messages the endpoint is 'grid/pvsystem.{name}.control'. For Storage
-        status messages the endpoint is in the storage controller:
-        '{name}/control' - this makes identifying storage messages a bit more
-        difficult.
+        The message type is determined by the name of the source
+        endpoint. Each message type comes from a global enpoint named
+        with the type followed by identifying information. For
+        generators, pvsystems, and storage devices there is one
+        endpoint per device (for example, "generator.gen1.control", or
+        "pvsystem.pv1.control" where "gen1" and "pv1" are names of
+        specific PV systems). For loads, there is only one endpoint
+        which sends a single status message containing information
+        about all the loads connected to the grid.
 
         Parameters
         ----------
         message : HelicsMessage
+            A message received on the "ems/control" endpoint.
 
         Returns
         -------
-        PVStatus or StorageStatus
+        StatusMessage
+            The parsed status message.
+
         """
-        if message.source.startswith("storage"):
-            return StorageStatus.from_json(message.data)
-        elif message.source.startswith("pvsystem"):
-            return PVStatus.from_json(message.data)
-        elif message.source.startswith("load"):
-            return LoadStatus.from_json(message.data)
-        elif message.source.startswith("generator"):
-            return GeneratorStatus.from_json(message.data)
+        return StatusMessage.from_json(message.data)
 
     def pending_control_messages(self):
         """Iterator over messages received on the control endpoint."""

@@ -299,38 +299,61 @@ class GridSpecification:
         return grid
 
 
+class StatusMessage:
+    """Base class for status messages.
+
+    Provides methods for serializing status messages to JSON strings
+    and for de-serializing JSON strings to status messages.
+    """
+
+    __slots__ = []
+
+    def to_json(self):
+        message_type = type(self).__name__
+        message_data = dataclasses.asdict(self)
+        return json.dumps({"message_type": message_type, **message_data})
+
+    @classmethod
+    def from_json(self, jsonstr):
+        message = json.loads(jsonstr)
+        message_type = message.pop("message_type")
+        if message_type == "StorageStatus":
+            return StorageStatus(**message)
+        if message_type == "PVStatus":
+            return PVStatus(**message)
+        if message_type == "GeneratorStatus":
+            return GeneratorStatus(**message)
+        if message_type == "LoadStatus":
+            return LoadStatus(**message)
+
+
 @dataclass
-class StorageStatus:
+class StorageStatus(StatusMessage):
     """Status of a storage system."""
+
+    __slots__ = ['name', 'soc']
+
     name: str
     soc: float
 
-    def to_json(self):
-        return json.dumps(dataclasses.asdict(self))
-
-    @classmethod
-    def from_json(cls, jsonstr):
-        return cls(**json.loads(jsonstr))
-
 
 @dataclass
-class PVStatus:
+class PVStatus(StatusMessage):
     """Status of a PV System."""
+
+    __slots__ = ['name', 'kw', 'kvar']
+
     name: str
     kw: float
     kvar: float
 
-    def to_json(self):
-        return json.dumps(dataclasses.asdict(self))
-
-    @classmethod
-    def from_json(cls, jsonstr):
-        return cls(**json.loads(jsonstr))
-
 
 @dataclass
-class GeneratorStatus:
+class GeneratorStatus(StatusMessage):
     """Status of a Fossil Generator."""
+
+    __slots__ = ['name', 'kw', 'kvar', 'operating_time', 'online']
+
     name: str
 
     #: Real power output from the generator
@@ -343,26 +366,15 @@ class GeneratorStatus:
     operating_time: float
 
     #: True if the generator is online and can respond to dispatch commands.
-    online: bool = True
-
-    def to_json(self):
-        return json.dumps(dataclasses.asdict(self))
-
-    @classmethod
-    def from_json(cls, jsonstr):
-        return cls(**json.loads(jsonstr))
+    online: bool
 
 
 @dataclass
-class LoadStatus:
+class LoadStatus(StatusMessage):
     """Status of a single load"""
+
+    __slots__ = ['name', 'kw', 'kvar']
+
     name: str
     kw: float
     kvar: float
-
-    def to_json(self):
-        return json.dumps(dataclasses.asdict(self))
-
-    @classmethod
-    def from_json(cls, jsonstr):
-        return cls(**json.loads(jsonstr))
