@@ -309,12 +309,30 @@ class StatusMessage:
     __slots__ = []
 
     def to_json(self):
+        """Get a JSON representation of the status message.
+
+        Returns
+        -------
+        str
+            JSON encoding of the status message.
+        """
         message_type = type(self).__name__
         message_data = dataclasses.asdict(self)
         return json.dumps({"message_type": message_type, **message_data})
 
     @classmethod
     def from_json(self, jsonstr):
+        """Parse a JSON string and return the status message it represents.
+
+        Parameters
+        ----------
+        jsonstr : str
+            String containing the JSON representation of a status message.
+
+        Returns
+        -------
+        StatusMessage
+        """
         message = json.loads(jsonstr)
         message_type = message.pop("message_type")
         if message_type == "StorageStatus":

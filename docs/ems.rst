@@ -6,75 +6,56 @@ The energy management system is implemented as a helics message federate
 that communicates with storage controllers, the reliability federate, and
 the grid federate.
 
-It receives information about the state of charge of the storage devices, and
-sends messages to each storage controller instructing it to charge, discharge,
-or idle at a particular rate.
+It receives information about the state of charge of the storage
+devices, the status of generators, and the status of loads connected
+to the grid and sends messages to each storage controller and to the
+gird federate containing set-points for storaged devices and
+dispatchable generators.
 
-The EMS is also tracks reliability events in order to account for isolated
-sections of the grid (e.g. PV systems, storage devices, and loads
-that are disconnected from the grid and therefore should be excluded from the
-dispatch decisions).
-
-EMS API
-=======
-
-The EMS needs information about dispatchable generators and loads (storage)
-as well as forecasts for the load and for DER generation.
-
-Load Forecasts
---------------
-
-We need forecasts at different time-scales. We should plan to support
-forecasts ranging from five minutes to a month ahead. As a starting point,
-however, 48-hours ahead should be sufficient. (Prescient uses this time scale
-to calculate hourly unit-commitment over a 24 hour period, producing a new
-unit commitment plan evey 24 hours with an overlapping 48-hour forecast.)
-
-DER Forecasts
--------------
-
-It seems like a reasonable approach to include DER forecasts separately from
-load forecasts. Ideally we should have one forecast for each DER connected
-to the grid. Need same time-scales as the load forecasts, but might need some
-smaller time-scales as well to support minute-by-minute dispatch decisions.
-
-For solar we can use ``pvlib.forecast``. This module provides APIs for
-accessing forecast data from various models.
-
-Storage Specs
--------------
-
-Need to know the storage capacity, charge/discharge limits, current state of
-charge, minimum/maximum state of charge (could these change?), idling losses.
+The EMS als receives reliability events in order to track isolated
+sections of the grid (e.g. PV systems, storage devices, and loads that
+are disconnected from the grid and therefore should be excluded from
+the dispatch decisions) or other failures that should be accounted for
+in dispatch decisions.
 
 HELICS Interface
 ================
 
-The interface between the EMS and the other simulation federates received
-information about the current state of charge of the storage devices, the
-current state of the grid (whether any components are not functioning or
-are isolated), and any active threats (either before the thread occurs, or
-during the threat itself). The federate sends dispatch messages to the storage
-controllers.
+The EMS federate provides two endpoints to which other federated can
+send messages. Reliability messages are received on the
+"ems/reliability" endpoint and status messages for components such as
+generators or storage devices are received on the "ems/control"
+endpoint. The "ems/control" endpoint is also the source of messages
+sent from the EMS federate to dispatch storage and generators, or to
+perform other control actions in the grid.
 
-.. We may want to do more than this in the future, but for now this is a
-   good starting point. Only control storage devices, and leave the rest
-   for future work. In addition to only implementing control over storage
-   devices, the handling of "threat" events described above is for planning
-   more than immediate implementation (since the "threat federate" does not
-   exist yet).
+Status messages, sent to the EMS federate, are JSON representations of
+dataclasses that inherit from :py:class:`ssim.grid.StatusMessage`. See
+:ref:`status_messages` for more information.
 
-The interface described above will necessitate an endpoint for sending
-control messages to storage controllers (along with an endpoint for receiving
-control messages at each controller. Additionally it will need an endpoint
-for receiving reliability messages.
+Grid Federate Endpoints
+-----------------------
 
-There are a couple options for the interface that receives the state of charge
-of the storage devices. The easiest approach is to just subscribe to the value
-published by the grid federate ("grid/storage.<name>.soc"), but that implies
-the the EMS is directly sensing the state of charge from the storage devices.
-A more realistic approach is to send the state of charge in a message from
-the controller federate for each device.
+The following global endpoints are used by the grid federate for
+communication with the EMS federate.
+
+- ``"load.control"`` Single endpoint used to send load status messages to
+  the EMS. A separate message is send for each load.
+- ``"pvsystem.{name}.control"`` Sends status of a PV system to the EMS
+  (one endpoint per PV system).
+- ``"generator.{name}.control"`` Sends status of generators to the ems
+  (one endpoint per generator).
+
+Storage Controller Endpoints
+----------------------------
+
+- ``"storage.{name}.control"`` Sends status of a storage device to the
+  EMS and receives control messaged from the EMS.
+
+EMS Interface Overview
+----------------------
+
+The diagram below shows an overview of the endpoints described above.
 
 .. digraph:: ems_helics
 
@@ -82,83 +63,48 @@ the controller federate for each device.
    node [style=rounded];
 
    ems [label="EMS"; shape=record; style=rounded];
-   s1 [label="<f0> s1 controller| <control> control endpoint| <soc> soc";
+   s1 [label="<f0> s1 controller| <control> storage.s1.control | <soc> soc";
        shape=record; style=rounded];
-   grid [label="grid federate | <load> total power | <s1_soc> storage.s1.soc | <other> ...";
+   grid [label="grid federate | <total_load> total power | <pv1> pvsystem.pv1.control | ... | <gen1> generator.gen1.control | ... | <load> load.control | <s1_soc> storage.s1.soc | <other> ...";
          shape=record];
    reliability [label="reliability federate"; shape=record];
    clone [label="cloning filter"; shape=ellipse];
 
-   ems -> s1:control [label="(dis)charging power"];
+   ems -> s1:control [label="power setpoint"];
    grid:s1_soc -> s1:soc;
-   grid:load -> ems;
+   grid:load -> ems [label="load status*"];
+   grid:pv1 -> ems [label="pv1 status"];
+   grid:gen1 -> ems [label="gen1 status"];
+   grid:total_load -> ems;
    s1:control -> ems [label="soc"];
    reliability -> clone [label="failure/restoration events"];
    clone -> {ems grid:other};
 
-Time
-====
+.. _status_messages:
 
-There are a few options for how the federate manages time. I believe it is not
-very realistic for it to operate at every time granted to the grid federate.
-There will be some fixed interval at which devices are dispatched which will
-vary depending on the dispatch model/tool that is being used (for example,
-Prescient uses 5-minutes for economic dispatch and 24-hours for unit
-commitment).
+Status Messages
+===============
 
-Architecture
-============
+The following dataclasses are used to represent status messages sent
+from other federates to the EMS.
 
-Following the pattern for the existing federates, we will have a
-:py:mod:`ssim.ems` module which implements the EMS itself, and a
-:py:mod:`ssim.federates.ems` module which implements the HELICS federate
-interface for the EMS. This forces us to maintain a clear separation between
-the communication and the model, making it easier to modify or replace the
-model in the future.
+.. autoclass:: ssim.grid.StorageStatus
+   :members:
+   :undoc-members:
 
-To get the basic functionality in place we need to add the HELICS interfaces
-shown in the diagram above, in particular the "control" endpoint in the storage
-controller.
+.. autoclass:: ssim.grid.PVStatus
+   :members:
+   :undoc-members:
 
-EMS Interface
--------------
+.. autoclass:: ssim.grid.GeneratorStatus
+   :members:
+   :undoc-members:
 
-While we may want to include multiple EMS managing different sets of storage
-devices, to start with the easiest approach is to use a global endpoint for
-all communication coming to the EMS federate. The global endpoint will just be
-called "ems".
+.. autoclass:: ssim.grid.LoadStatus
+   :members:
+   :undoc-members:
 
-Storage Control Interface
--------------------------
+Each status message class inherits from
 
-We should not require that every storage device be controlled by the EMS. This
-means we should add a flag, or some other indicator the the grid configuration
-to indicate that the device is dispatchable. The fastest path to something that
-works here would be to just add another controller (i.e. "ems") which
-implements this type of external control.
-
-.. note:: This may not be quite right. Even devices which are not dispatchable
-          may provide information about their current state of charge and their
-          current power output to the EMS. In general, it is probably a
-          reasonable approach to include the interface to the EMS for every
-          storage controller, and let the controller determine what it should
-          share.
-
-The "ems" controller implies a substantial departure from the existing pattern
-used in :py:mod:`ssim.federates.storage`. This module, and the controllers it
-contains are built around the interface between the storage controller and the
-grid federate.
-
-To simplify the configuration of the storage controller federates, when each
-federate is initialized it should create a "control" endpoint. At each time
-grant the control endpoint should send a message from the "control" endpoint
-to "ems"
-
-.. note:: Does publishing the soc to the EMS imply the need for some kind of
-          Fixed minimum update interval? For now I'm going to leave this alone,
-          but I think it is worth revisiting as it could have a substantial
-          impact on the performance of an EMS that accounts for state of charge
-          in its dispatch and unit commitment decisions.
-
-.. We should also plan for potentially multiple EMS controlling different sets
-   of devices on the grid, for example multiple microgrids on the same feeder.
+.. autoclass:: ssim.grid.StatusMessage
+   :members:
