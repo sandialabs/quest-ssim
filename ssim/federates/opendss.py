@@ -285,9 +285,6 @@ class GridFederate:
             storage.publish(voltage)
         for generator in self._generator_interface:
             generator.publish()
-        # self._reliability.update_generators(
-        #     self._grid_model.generators.values()
-        # )
         for pvsystem in self._pv_interface:
             pvsystem.publish()
         self._load_interface.publish()

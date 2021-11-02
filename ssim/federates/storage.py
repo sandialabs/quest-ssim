@@ -113,7 +113,6 @@ def _send_soc_to_ems(soc, time, federate):
     message.destination = "ems/control"
     message.original_source = endpoint_name
     message.source = endpoint_name
-    # TODO fill in power fields with the actual values.
     message.data = grid.StorageStatus(federate.name, soc).to_json()
     message.time = time
     endpoint.send_data(message)
