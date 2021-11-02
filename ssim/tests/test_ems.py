@@ -43,7 +43,8 @@ def test_component_sets(grid_model):
         grid_model.disable_edge(cut)
         for component in grid_model.components():
             if 'regbus' in component:
-                assert {'gen1'} == set(grid_model.connected_generators(component))
+                generators = grid_model.connected_generators(component)
+                assert {'gen1'} == set(generators)
             else:
                 assert set() == set(grid_model.connected_generators(component))
         grid_model.enable_edge(cut)

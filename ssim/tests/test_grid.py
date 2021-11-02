@@ -33,7 +33,10 @@ def test_storage_spec_efficiency_curves(storage_spec_dict):
 
 def test_PVStatus_from_json():
     status = grid.StatusMessage.from_json(
-        '{"message_type": "PVStatus", "name": "foo", "kw": 100.1, "kvar": -100.1}'
+        '{"message_type": "PVStatus",'
+        '"name": "foo",'
+        '"kw": 100.1,'
+        '"kvar": -100.1}'
     )
     assert isinstance(status, grid.PVStatus)
     assert status.name == 'foo'
