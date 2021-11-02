@@ -121,3 +121,28 @@ def test_connected_loads(grid_model):
     """Loads are added to the grid model."""
     component = next(grid_model.components())
     assert {'load1', 'load2'} == set(grid_model.connected_loads(component))
+
+
+@pytest.mark.parametrize("element", ["load.load1", "generator.gen1",
+                                     "pvsystem.pv1", "storage.ess1"])
+def test_component_from_element(gridspec, element):
+    gridspec.add_pvsystem(
+        grid.PVSpecification(
+            "pv1",
+            "loadbus2",
+            160.0,
+            150.0
+        )
+    )
+    gridspec.add_storage(
+        grid.StorageSpecification(
+            "ESS1",
+            "loadbus2",
+            250.0,
+            150.0,
+            "external"
+        )
+    )
+    grid_model = ems.GridModel(gridspec)
+    component = next(grid_model.components())
+    assert grid_model.component_from_element(element) == component
