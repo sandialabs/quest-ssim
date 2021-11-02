@@ -1,9 +1,9 @@
 """Energy Management System Federate."""
 import argparse
-import logging
 
 from helics import (
-    helicsCreateMessageFederateFromConfig, helics_time_maxtime
+    helicsCreateMessageFederateFromConfig, helics_time_maxtime,
+    HelicsLogLevel
 )
 
 from ssim import reliability
@@ -89,7 +89,8 @@ class EMSFederate:
         #      as well as storage control federates (as currently implemented)
         for device, action in self._ems.control_actions():
             self.federate.log_message(
-                f"sending control message: {action}", logging.DEBUG
+                f"sending control message: {action}",
+                HelicsLogLevel.TRACE
             )
             self.control_endpoint.send_data(
                 action.to_json(),
@@ -146,7 +147,7 @@ def run():
     federate = helicsCreateMessageFederateFromConfig(args.federate_config)
     federate.log_message(
         f"created federate with endpoints: {federate.endpoints}",
-        logging.DEBUG
+        HelicsLogLevel.TRACE
     )
     ems_federate = EMSFederate(federate,
                                GridSpecification.from_json(args.grid_config))
