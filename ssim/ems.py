@@ -367,7 +367,7 @@ class CompositeHeuristicEMS:
     def __init__(self, grid_spec):
         self._grid_model = GridModel(grid_spec)
         self._component_ems = {
-            tuple(component): self._new_ems(component)
+            frozenset(component): self._new_ems(component)
             for component in self._grid_model.components()
         }
         self._time = 0.0
@@ -402,7 +402,7 @@ class CompositeHeuristicEMS:
         self._grid_model.apply_reliability_events(events)
         old_ems_instances = self._component_ems
         self._component_ems = {}
-        for component in map(tuple, self._grid_model.components()):
+        for component in map(frozenset, self._grid_model.components()):
             if component in self._component_ems:
                 # the component still exists in the grid, unchanged
                 self._component_ems[component] = old_ems_instances[component]
@@ -422,29 +422,31 @@ class CompositeHeuristicEMS:
         load = {component: 0.0 for component in components}
         pv_generation = {component: 0.0 for component in components}
         ess_status = {component: [] for component in components}
-        # make inverted indexes for each message type
-        loads = {load: component
-                 for component in components
-                 for load in self._grid_model.connected_loads(component)}
-        pvsystems = {
-            pvsystem: component
-            for component in components
-            for pvsystem in self._grid_model.connected_pvsystems(component)
-        }
-        storage = {
-            ess: component
-            for component in components
-            for ess in self._grid_model.connected_storage(component)
-        }
         for message in messages:
             if isinstance(message, PVStatus):
-                pv_generation[pvsystems[message.name.lower()]] += message.kw
+                component = frozenset(
+                    self._grid_model.component_from_element(
+                        f"pvsystem.{message.name}"
+                    )
+                )
+                pv_generation[component] += message.kw
             elif isinstance(message, StorageStatus):
-                ess_status[storage[message.name.lower()]].append(message)
+                component = frozenset(
+                    self._grid_model.component_from_element(
+                        f"storage.{message.name}"
+                    )
+                )
+                ess_status[component].append(message)
             elif isinstance(message, LoadStatus):
-                load[loads[message.name.lower()]] += message.kw
+                component = frozenset(
+                    self._grid_model.component_from_element(
+                        f"load.{message.name}"
+                    )
+                )
+                load[component] += message.kw
             elif isinstance(message, GeneratorStatus):
                 print(f"got generator status message: {message}")
+                # TODO update generator statuses
             else:
                 logging.warning(f"unnexpected status message: {message}")
         for component, ems in self._component_ems.items():
