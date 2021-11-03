@@ -6,9 +6,7 @@
   "time_delta": 1,
   "endpoints": [
     {
-      "name": "reliability/reliability",
-      "destination": "grid/reliability",
-      "global": true
+      "name": "reliability"
     }
   ]
 }

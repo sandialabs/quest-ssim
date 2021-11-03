@@ -1,7 +1,6 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
 import csv
-import logging
 from pathlib import Path
 
 from helics import (
@@ -11,7 +10,7 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.grid import GridSpecification
+from ssim.grid import GridSpecification, PVStatus
 from ssim.opendss import DSSModel
 
 
@@ -33,30 +32,44 @@ class ReliabilityInterface:
         )
         self._federate = federate
 
-    def update_generators(self, generators):
-        """Send updated GeneratorStatus messages to the reliability federate.
-
-        These messages include the cumulative number of hours the generator
-        has been running which can be used to update the reliability model for
-        each individual generator.
-
-        Messages are sent from the "grid/reliability" endpoint to the
-        "reliability/reliability" endpoint.
-        """
-        for generator in generators:
-            self._federate.log_message(f"updating generator {generator.name}:"
-                                       f" {generator.status}",
-                                       logging.DEBUG)
-            self.endpoint.send_data(
-                generator.status.to_json(), "reliability/reliability"
-            )
-
     @property
     def events(self):
         """An iterator over all pending reliability events."""
         while self.endpoint.has_message():
             message = self.endpoint.get_message()
             yield reliability.Event.from_json(message.data)
+
+
+class GeneratorInterface:
+    """HELICS interface for generators connected to the grid.
+
+    Parameters
+    ----------
+    federate : HelicsCombinationFederate
+    """
+
+    def __init__(self, federate, generator):
+        self._federate = federate
+        self.generator = generator
+        self.control_endpoint = federate.register_global_endpoint(
+            f"generator.{generator.name.lower()}.control"
+        )
+        self.reliability_endpoint = federate.get_endpoint_by_name(
+            "reliability")
+
+    def update(self):
+        """Update inputs for the generator."""
+        # TODO respond to control messages from the EMS
+        pass
+
+    def publish(self):
+        status_json = self.generator.status.to_json()
+        self.control_endpoint.send_data(
+            status_json, destination="ems/control"
+        )
+        self.reliability_endpoint.send_data(
+            status_json, destination="reliability/reliability"
+        )
 
 
 class StorageInterface:
@@ -110,6 +123,47 @@ class StorageInterface:
         )
 
 
+class PVInterface:
+    """Manager for the output to other federates related to PV Systems
+
+    Parameters
+    ----------
+    federate : HelicsFederate
+        HELICS federate handle.
+    pvsystem : PVSystem
+        PVSystem instance providing access to the opendss model.
+    """
+    def __init__(self, federate, pvsystem):
+        self._federate = federate
+        self._system = pvsystem
+        self._control_endpoint = federate.register_global_endpoint(
+            f"pvsystem.{pvsystem.name}.control"
+        )
+
+    def update(self):
+        """Update PVSystem model in response to federate input.
+
+        Since PVSystems are not dispatchable this does nothing; however,
+        in the future it could be used to support curtailment or other
+        operations managed by the EMS.
+        """
+        pass
+
+    def publish(self):
+        """Send message to the EMS with the current status of the PV system.
+
+        Current real and reactive power are reported to the EMS.
+        """
+        status = PVStatus(
+            self._system.name,
+            self._system.kw,
+            self._system.kvar
+        )
+        self._control_endpoint.send_data(
+            status.to_json(), "ems/control"
+        )
+
+
 class EventLog:
     """A record of all events that have occured."""
     def __init__(self):
@@ -146,6 +200,40 @@ class EventLog:
             writer.writerows(self._events)
 
 
+class LoadInterface:
+    """Manager for output to other federates related to loads.
+
+    Parameters
+    ----------
+    federate : HelicsFederate
+        HELICS federate handle.
+    """
+    def __init__(self, federate, model):
+        self._federate = federate
+        self._control_endpoint = federate.register_global_endpoint(
+            "load.control"
+        )
+        self._model = model
+
+    def update(self):
+        """Update the loads in response to input.
+
+        Loads do not currently respond to input, so this method does
+        nothing.
+        """
+        pass
+
+    def _send_to_ems(self, status):
+        self._control_endpoint.send_data(
+            status.to_json(), "ems/control"
+        )
+
+    def publish(self):
+        """Send status updates to the EMS federate control endpoint"""
+        for load in self._model.loads():
+            self._send_to_ems(load.status)
+
+
 class GridFederate:
     """Manage HELICS interfaces for reliability and storage devices.
 
@@ -174,7 +262,16 @@ class GridFederate:
             for device in self._grid_model.storage_devices.values()
         ]
         self._event_log = EventLog()
+        self._pv_interface = [
+            PVInterface(federate, device)
+            for device in self._grid_model.pvsystems.values()
+        ]
         self._reliability = ReliabilityInterface(federate)
+        self._load_interface = LoadInterface(federate, self._grid_model)
+        self._generator_interface = [
+            GeneratorInterface(federate, generator)
+            for generator in self._grid_model.generators.values()
+        ]
 
     def _update_storage(self):
         for storage in self._storage_interface:
@@ -186,9 +283,11 @@ class GridFederate:
                 storage.device.bus
             )
             storage.publish(voltage)
-        self._reliability.update_generators(
-            self._grid_model.generators.values()
-        )
+        for generator in self._generator_interface:
+            generator.publish()
+        for pvsystem in self._pv_interface:
+            pvsystem.publish()
+        self._load_interface.publish()
         real, reactive = self._grid_model.total_power()
         self._federate.publications['grid/total_power'].publish(
             complex(real, reactive)

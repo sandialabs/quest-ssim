@@ -191,6 +191,22 @@ class PVSystem:
                              "Pmpp": pmpp, "kVA": inverter_kva,
                              **system_parameters})
 
+    def _activate(self):
+        """Make this the active PV system in OpenDSS."""
+        dssdirect.PVsystems.Name(self.name)
+
+    @property
+    def kw(self) -> float:
+        """Current real power output. [kW]"""
+        self._activate()
+        return dssdirect.PVsystems.kW()
+
+    @property
+    def kvar(self) -> float:
+        """Current reactive power output/consumption system. [kVAR]"""
+        self._activate()
+        return dssdirect.PVsystems.kvar()
+
 
 class Generator:
     """Interface for OpenDSS Generator objects.
@@ -270,6 +286,52 @@ class Generator:
             self.hours_operating,
             self.online
         )
+
+
+class Load:
+    """Interface to an OpenDSS load object.
+
+    Parameters
+    ----------
+    name : str
+        Name of the load.
+    """
+    def __init__(self, name):
+        self.name = name
+
+    def _activate(self):
+        dssdirect.Loads.Name(self.name)
+
+    @property
+    def kw_rated(self) -> float:
+        """Nominal maximum kW of the laod."""
+        self._activate()
+        return dssdirect.Loads.kW()
+
+    @property
+    def kvar_rated(self) -> float:
+        """Nominal maximum kVAR of the load"""
+        self._activate()
+        return dssdirect.Loads.kvar()
+
+    @property
+    def kw(self) -> float:
+        """Actual real power demand from the load.
+
+        Accounts for load shapes etc.
+        """
+        self._activate()
+        return sum(dssdirect.CktElement.Powers()[0::2])
+
+    @property
+    def kvar(self) -> float:
+        """Actual reactive power fom the load."""
+        self._activate()
+        return sum(dssdirect.CktElement.Powers()[1::2])
+
+    @property
+    def status(self) -> grid.LoadStatus:
+        return grid.LoadStatus(self.name, self.kw, self.kvar)
 
 
 @enum.unique
@@ -965,6 +1027,16 @@ class DSSModel:
         :py:meth:`DSSModel.add_invcontrol`.
         """
         return self._invcontrols
+
+    def loads(self):
+        """Return an iterator over all loads in the model.
+
+        Returns
+        -------
+        Iterable of Load
+        """
+        for load in dssdirect.Loads.AllNames():
+            yield Load(load)
 
     @staticmethod
     def node_voltage(bus):

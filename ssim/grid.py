@@ -110,6 +110,7 @@ class StorageSpecification:
             params=params
         )
 
+
 @dataclass
 class InvControlSpecification:
 
@@ -147,6 +148,7 @@ class InvControlSpecification:
             function_curve=_get_curve("function_curve", params),
             params=params
         )
+
 
 @dataclass
 class PVSpecification:
@@ -270,8 +272,9 @@ class GridSpecification:
         KeyError
             If the device is not found.
         """
+        name = name.lower()
         for device in self.storage_devices:
-            if device.name == name:
+            if device.name.lower() == name:
                 return device
         raise KeyError(f"no storage device named '{name}'")
 
@@ -296,40 +299,79 @@ class GridSpecification:
         return grid
 
 
+class StatusMessage:
+    """Base class for status messages.
+
+    Provides methods for serializing status messages to JSON strings
+    and for de-serializing JSON strings to status messages.
+    """
+
+    __slots__ = []
+
+    def to_json(self):
+        """Get a JSON representation of the status message.
+
+        Returns
+        -------
+        str
+            JSON encoding of the status message.
+        """
+        message_type = type(self).__name__
+        message_data = dataclasses.asdict(self)
+        return json.dumps({"message_type": message_type, **message_data})
+
+    @classmethod
+    def from_json(self, jsonstr):
+        """Parse a JSON string and return the status message it represents.
+
+        Parameters
+        ----------
+        jsonstr : str
+            String containing the JSON representation of a status message.
+
+        Returns
+        -------
+        StatusMessage
+        """
+        message = json.loads(jsonstr)
+        message_type = message.pop("message_type")
+        if message_type == "StorageStatus":
+            return StorageStatus(**message)
+        if message_type == "PVStatus":
+            return PVStatus(**message)
+        if message_type == "GeneratorStatus":
+            return GeneratorStatus(**message)
+        if message_type == "LoadStatus":
+            return LoadStatus(**message)
+
+
 @dataclass
-class StorageStatus:
+class StorageStatus(StatusMessage):
     """Status of a storage system."""
+
+    __slots__ = ['name', 'soc']
+
     name: str
     soc: float
-    kw: float
-    kvar: float
-
-    def to_json(self):
-        return json.dumps(dataclasses.asdict(self))
-
-    @classmethod
-    def from_json(cls, jsonstr):
-        return cls(**json.loads(jsonstr))
 
 
 @dataclass
-class PVStatus:
+class PVStatus(StatusMessage):
     """Status of a PV System."""
+
+    __slots__ = ['name', 'kw', 'kvar']
+
     name: str
     kw: float
     kvar: float
 
-    def to_json(self):
-        return json.dumps(dataclasses.asdict(self))
-
-    @classmethod
-    def from_json(cls, jsonstr):
-        return cls(**json.loads(jsonstr))
-
 
 @dataclass
-class GeneratorStatus:
+class GeneratorStatus(StatusMessage):
     """Status of a Fossil Generator."""
+
+    __slots__ = ['name', 'kw', 'kvar', 'operating_time', 'online']
+
     name: str
 
     #: Real power output from the generator
@@ -342,11 +384,15 @@ class GeneratorStatus:
     operating_time: float
 
     #: True if the generator is online and can respond to dispatch commands.
-    online: bool = True
+    online: bool
 
-    def to_json(self):
-        return json.dumps(dataclasses.asdict(self))
 
-    @classmethod
-    def from_json(cls, jsonstr):
-        return cls(**json.loads(jsonstr))
+@dataclass
+class LoadStatus(StatusMessage):
+    """Status of a single load"""
+
+    __slots__ = ['name', 'kw', 'kvar']
+
+    name: str
+    kw: float
+    kvar: float
