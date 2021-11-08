@@ -120,7 +120,7 @@ class InvControlSpecification:
     #: List of PVSystem and/or Storage elements to be controlled.
     der_list: List[str]
 
-    #: Control mode to be enabled
+    #: Control mode to be enabled (should be based on OpenDSS)
     inv_control_mode: str
 
     #: Curve that defines behavior of the specified mode
