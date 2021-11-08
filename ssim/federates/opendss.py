@@ -12,6 +12,7 @@ from helics import (
 from ssim import reliability
 from ssim.grid import GridSpecification, PVStatus
 from ssim.opendss import DSSModel
+from ssim.ems import GeneratorControlMessage
 
 
 class ReliabilityInterface:
@@ -46,6 +47,7 @@ class GeneratorInterface:
     Parameters
     ----------
     federate : HelicsCombinationFederate
+    generator : opendss.Generator
     """
 
     def __init__(self, federate, generator):
@@ -59,8 +61,16 @@ class GeneratorInterface:
 
     def update(self):
         """Update inputs for the generator."""
-        # TODO respond to control messages from the EMS
-        pass
+        while self.control_endpoint.has_message():
+            message = self.control_endpoint.get_message()
+            gen_control = GeneratorControlMessage.from_json(message.data)
+            if gen_control.action == "on":
+                self.generator.turn_on()
+            elif gen_control.action == "off":
+                self.generator.turn_off()
+            else:
+                self.generator.change_setpoint(
+                    gen_control.kw, gen_control.kvar)
 
     def publish(self):
         status_json = self.generator.status.to_json()

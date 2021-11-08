@@ -146,3 +146,45 @@ def test_component_from_element(gridspec, element):
     grid_model = ems.GridModel(gridspec)
     component = next(grid_model.components())
     assert grid_model.component_from_element(element) == component
+
+
+def test_generator_control_message():
+    message = ems.GeneratorControlMessage("on")
+    message = ems.GeneratorControlMessage("off")
+    message = ems.GeneratorControlMessage("setpoint", kw=100.0)
+    assert message.kw == 100.0
+    assert message.kvar == 0.0
+    message = ems.GeneratorControlMessage("setpoint", kvar=100.0)
+    assert message.kw == 0.0
+    assert message.kvar == 100.0
+    message = ems.GeneratorControlMessage("setpoint", kw=10.0, kvar=-1.5)
+    assert message.kw == 10.0
+    assert message.kvar == -1.5
+
+
+@pytest.mark.parametrize("action", ["on", "off"])
+@pytest.mark.parametrize("kw,kvar", [(x, y)
+                                     for x in [100.0, None]
+                                     for y in [100.0, None]
+                                     if x is not None or y is not None])
+def test_generator_control_message_invalid(action, kw, kvar):
+    with pytest.raises(ValueError):
+        ems.GeneratorControlMessage(action, kw, kvar)
+
+
+@pytest.mark.parametrize("action", ["on", "off", "setpoint"])
+def test_generator_control_to_from_json(action):
+    message = ems.GeneratorControlMessage(action)
+    message2 = ems.GeneratorControlMessage.from_json(message.to_json())
+    assert message.action == message2.action
+    if action == "setpoint":
+        assert message2.kw == 0.0
+        assert message2.kvar == 0.0
+        message = ems.GeneratorControlMessage(action, kw=100.0, kvar=-120.0)
+        message2 = ems.GeneratorControlMessage.from_json(message.to_json())
+        assert message2.action == action
+        assert message2.kw == 100.0
+        assert message2.kvar == -120.0
+    else:
+        assert message2.kw == None
+        assert message2.kvar == None

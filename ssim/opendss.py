@@ -264,6 +264,24 @@ class Generator:
             self._activate()
             dssdirect.CktElement.Enabled(False)
 
+    def change_setpoint(self, kw, kvar):
+        """Update the generator setpoint.
+
+        The setpoint is only changed if `self.is_operational` is True,
+        otherwise the method does nothing.
+
+        Parameters
+        ----------
+        kw : float
+            Real power set point [kW].
+        kvar : float
+            Reactive power set point [kVAR].
+
+        """
+        if self.is_operational:
+            self.kw = kw
+            self.kvar = kvar
+
     def _read_meter(self) -> dict:
         self._activate()
         return dict(
@@ -1215,7 +1233,7 @@ class DSSModel:
         """Fail a generator.
 
         Disables the generator so it cannot produce power and marks it as
-        failed to prevent its activation until it ahs been repaired.
+        failed to prevent its activation until it has been repaired.
 
         Parameters
         ----------

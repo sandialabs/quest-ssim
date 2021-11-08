@@ -627,3 +627,47 @@ class StorageControlMessage:
         return json.dumps({'action': self.action,
                            'kW': self.real_power,
                            'kVAR': self.reactive_power})
+
+
+class GeneratorControlMessage:
+    """Representation of a generator control command.
+
+    Parameters
+    ----------
+    action : str
+        The action being commanded. One of "on", "off", "setpoint"
+    kw : float, optional
+        The commanded real power setpoint. Only valid when `aciton` is
+        "setpoint". [kW]
+    kvar : float, optional
+        The commanded reactive power setpoint. Only valid when `action` is
+        "setpoint". [kVAR]
+    """
+    def __init__(self, action, kw=None, kvar=None):
+        if action not in {"on", "off", "setpoint"}:
+            raise ValueError(
+                "action must be one of 'on', 'off', or 'setpoint' "
+                f"(got '{action}')"
+            )
+        if (kw is not None or kvar is not None) and action != "setpoint":
+            raise ValueError(
+                "kw and kvar can only be specified for action='setpoint' "
+                f"(got action='{action}')"
+            )
+        self.action = action
+        self.kw = None
+        self.kvar = None
+        if action == "setpoint":
+            self.kw = kw or 0.0
+            self.kvar = kvar or 0.0
+
+    def to_json(self):
+        if self.action == "setpoint":
+            return json.dumps({'action': self.action,
+                               'kw': self.kw,
+                               'kvar': self.kvar})
+        return json.dumps({'action': self.action})
+
+    @classmethod
+    def from_json(cls, jsonstr):
+        return cls(**json.loads(jsonstr))
