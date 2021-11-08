@@ -47,14 +47,9 @@
         {
             "name": "InvCtrl1",
             "der_list": ["PVsystem.PV1", "PVsystem.PV2"],
-            "inv_control_mode": "voltvar",
+            "inv_control_mode": "wattvar",
             "function_curve": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
-                               "y":  [1.0, 1.0, 0.0, -1.0, -1.0]},
-            "deltaQ_factor" : -1.0,
-            "RateofChangeMode" : "LPF",
-            "LPFTau" : 10,
-            "voltage_curvex_ref" : "ravg",
-            "avgwindowlen" : "15s"
+                               "y":  [1.0, 1.0, 0.0, -1.0, -1.0]}
         }
     ],
     "reliability": {

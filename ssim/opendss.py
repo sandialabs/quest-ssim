@@ -739,8 +739,27 @@ class DSSModel:
             if inv_control.function_curve is not None:
                 model.add_xycurve(f"func_{inv_control.name}",
                                   *zip(*inv_control.function_curve))
+                # volt-var function
                 if inv_control.inv_control_mode.lower() == "voltvar":
-                    control_params["vvc_curve1"] = f"func_{inv_control.name}"
+                    control_params["vvc_curve1"] = \
+                        f"func_{inv_control.name}"
+                # volt-watt function
+                elif inv_control.inv_control_mode.lower() == "voltwatt":
+                    control_params["voltwatt_curve"] = \
+                        f"func_{inv_control.name}"
+                # watt-pf function
+                elif inv_control.inv_control_mode.lower() == "wattpf":
+                    control_params["wattpf_curve"] = \
+                        f"func_{inv_control.name}"
+                # watt-var function
+                elif inv_control.inv_control_mode.lower() == "wattvar":
+                    control_params["wattvar_curve"] = \
+                        f"func_{inv_control.name}"
+                # dynamic reactive current function does not require a
+                # function curve definition, the operating characteristics
+                # are defined through OpenDSS parameters defined in the JSON
+                # config file
+
             model.add_inverter_controller(
                 inv_control.name,
                 inv_control.der_list,
