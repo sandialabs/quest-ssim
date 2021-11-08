@@ -123,7 +123,11 @@ class InvControlSpecification:
     #: Control mode to be enabled (should be based on OpenDSS)
     inv_control_mode: str
 
-    #: Curve that defines behavior of the specified mode
+    #: Combination control mode to be enabled (should be based on OpenDSS)
+    #inv_control_combined_mode: Optional[str]
+
+    #: Curve that defines behavior of the specified mode (define this when
+    # implementing a single inverter function)
     function_curve: Optional[Curve] = None
 
     #: Additional parameters

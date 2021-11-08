@@ -36,7 +36,7 @@
             "name": "InvCtrl1",
             "der_list": ["PVsystem.PV1"],
             "inv_control_mode": "voltvar",
-            "function_curve": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
+            "function_curve_1": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
                                "y":  [1.0, 1.0, 0.0, -1.0, -1.0]}
         }
     ],
