@@ -54,7 +54,7 @@
             "RateofChangeMode": "LPF",
             "LPFTau": 10,
             "voltage_curvex_ref": "ravg",
-            "avgwindowlen": "15s"
+            "avgwindowlen": "10s"
         }
     ],
     "reliability": {

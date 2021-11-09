@@ -50,15 +50,25 @@ _________________________________________
 The common parameters that need to be defined for inveter functions are:
 
 - ``der_list``:
+
 - ``inverter_control_mode``:
-- ``voltage_curvex_ref``:
-- ``avgwindowlen``:
-- ``voltageChangeTolerance``:
-- ``RateofChangeMode``:
-- ``RiseFallLimit``:
-- ``LPFTau``:
-- ``monBus``:
-- ``monBusesVbase``:
+
+- ``voltage_curvex_ref``: Base voltage used to normalize (compute per-unit values) of the monitored voltage. The options are listed below:
+    - ``rated``: Uses the rated voltage of the controlled DER unit as the base voltage. In other words, 1.0 in the volt-var curve equals rated voltage.
+    - ``avg``: Uses an average value calculated using the monitored votlage of previous time steps that are stored in a moving window. The window has length in units of time defined using the parameter ``avgwindowlen``.
+    - ``ravg``: Uses the rated voltage of the controlled DER unit as the base voltage. Same as avg, with the exception that the avgerage terminal voltage is divided by the rated voltage.
+
+- ``avgwindowlen``: Sets the length of the averaging window over which the average DER terminal voltage is calculated. Units are indicated by appending s, m, or h to the integer value. Defaults to 0 seconds.
+
+- ``voltageChangeTolerance``: Tolerance in per-unit of the control loop convergence associated to the monitored voltage in per-unit. Defaults to 0.0001 pu.
+- ``RateofChangeMode``: Limits the changes of the reactive power and the active power between time steps. Defaults to ``INACTIVE``. The options are as follows:
+    - ``INACTIVE``: Indicates no limit on rate of change for either active or reactive power output.
+    - ``LPF``: A low-pass filter will be applied to the reactive or active power output as a function of a time constant defined by the parameter ``LPFTau``.
+    - ``RISEFALL``: A rise and fall limit in the change of active and/or reactive power expressed in terms of pu power per second, defined in the parameter ``RiseFallLimit``, is applied to the desired reactive power and/or the active power limit.
+- ``LPFTau``: Filter time constant of the LPF option of the RateofChangeMode property. The time constant will cause the low-pass filter to achieve 95% of the target value in 3 time constants. Defaults to 0 seconds.
+- ``RiseFallLimit``: Limit in power in pu per second used by the ``RISEFALL`` option of the ``RateofChangeMode`` paramter.The base value for this ramp is defined in the ``RefReactivePower`` parameter and/or in ``VoltwattYAxis`` parameter.
+- ``monBus``: Name of monitored bus used by the voltage-dependent control modes. Default is bus of the controlled DER unit.
+- ``monBusesVbase``: Array list of rated voltages of the buses and their nodes presented in the ``monBus`` parameter. This list may have different line-to-line and/or line-to-ground voltages.
 - ``monVoltageCalc``:
 
 
@@ -70,7 +80,7 @@ watt-var.
 
 - ``RefReactivePower``:
 - ``VarChangeTolerance``:
-- ``deltaQ_factor``:
+- ``deltaQ_factor``: Sets the maximum change (in per unit) from the prior var output level to the desired var output level during each control iteration. Defaults to -1.0 meaning OpenDSS engine take care of selection of this factor internally.
 
 Parameters that Limit Active Power
 __________________________________
