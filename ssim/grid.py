@@ -123,12 +123,14 @@ class InvControlSpecification:
     #: Control mode to be enabled (should be based on OpenDSS)
     inv_control_mode: str
 
-    #: Combination control mode to be enabled (should be based on OpenDSS)
-    #inv_control_combined_mode: Optional[str]
-
     #: Curve that defines behavior of the specified mode (define this when
     # implementing a single inverter function)
-    function_curve: Optional[Curve] = None
+    function_curve_1: Optional[Curve] = None
+
+    #: Curve that defines behavior of the specified mode (define this in
+    # addition to function_curve_1 when implementing combined inverter
+    # functions)
+    function_curve_2: Optional[Curve] = None
 
     #: Additional parameters
     params: dict = field(default_factory=dict)
@@ -149,7 +151,8 @@ class InvControlSpecification:
             params.pop("name"),
             params.pop("der_list"),
             params.pop("inv_control_mode"),
-            function_curve=_get_curve("function_curve", params),
+            function_curve_1=_get_curve("function_curve_1", params),
+            function_curve_2=_get_curve("function_curve_2", params),
             params=params
         )
 

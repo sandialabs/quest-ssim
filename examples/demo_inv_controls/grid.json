@@ -46,10 +46,12 @@
     "invcontrol": [
         {
             "name": "InvCtrl1",
-            "der_list": ["PVsystem.PV1", "PVsystem.PV2"],
-            "inv_control_mode": "voltvar",
-            "function_curve": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
+            "der_list": ["PVsystem.PV1"],
+            "inv_control_mode": "vv_vw",
+            "function_curve_1": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
                                "y":  [1.0, 1.0, 0.0, -1.0, -1.0]},
+            "function_curve_2": {"x":  [0.5, 1.06, 1.10, 1.5],
+                               "y":  [1.0, 1.0, 0.0, 0.0]},
             "deltaQ_factor" : -1.0,
             "RateofChangeMode": "LPF",
             "LPFTau": 10,

@@ -391,9 +391,14 @@ class InvControl:
         self.name = name
         self.der_list = der_list
         self.inv_control_mode = inv_control_mode
-        dssutil.run_command(f"new invcontrol.{name}",
-                            {"derlist": der_list, "mode": inv_control_mode,
-                             **system_parameters})
+        if inv_control_mode.lower() == "vv_vw":
+            dssutil.run_command(f"new invcontrol.{name}",
+                                {"derlist": der_list, "combimode": inv_control_mode,
+                                 **system_parameters})
+        else:
+            dssutil.run_command(f"new invcontrol.{name}",
+                                {"derlist": der_list, "mode": inv_control_mode,
+                                 **system_parameters})
 
 
 def _opendss_storage_params(storage_spec: StorageSpecification) -> dict:
@@ -736,10 +741,25 @@ class DSSModel:
             )
         for inv_control in gridspec.inv_control:
             control_params = inv_control.params.copy()
-            if inv_control.function_curve is not None:
+            if inv_control.function_curve_1 is not None and \
+                    inv_control.function_curve_2 is not None:
+                # combined inverter control function
+                # add function_curve_1 and function_curve_2 to the model
+                model.add_xycurve(f"func_{inv_control.name}_1",
+                                  *zip(*inv_control.function_curve_1))
+                model.add_xycurve(f"func_{inv_control.name}_2",
+                                  *zip(*inv_control.function_curve_2))
+                # volt-var + volt-watt function
+                if inv_control.inv_control_mode.lower() == "vv_vw":
+                    control_params["vvc_curve1"] = \
+                        f"func_{inv_control.name}_1"
+                    control_params["voltwatt_curve"] = \
+                        f"func_{inv_control.name}_2"
+            elif inv_control.function_curve_1 is not None:
+                # single inverter control functions
+                # add function_curve_1 to the model
                 model.add_xycurve(f"func_{inv_control.name}",
-                                  *zip(*inv_control.function_curve))
-                # check for single inverter control functions
+                                  *zip(*inv_control.function_curve_1))
                 # volt-var function
                 if inv_control.inv_control_mode.lower() == "voltvar":
                     control_params["vvc_curve1"] = \
@@ -757,10 +777,6 @@ class DSSModel:
                     control_params["wattvar_curve"] = \
                         f"func_{inv_control.name}"
 
-                # dynamic reactive current function does not require a
-                # function curve definition, the operating characteristics
-                # are defined through OpenDSS parameters defined in the JSON
-                # config file
 
             model.add_inverter_controller(
                 inv_control.name,
