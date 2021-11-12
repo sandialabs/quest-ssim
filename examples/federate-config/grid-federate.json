@@ -1,7 +1,7 @@
 {
   "name": "grid",
   "core_name": "grid_core",
-  "log_level": 7,
+  "log_level": "trace",
   "core_type": "zmq",
   "time_delta": 1.0,
   "subscriptions": [
