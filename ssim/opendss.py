@@ -18,7 +18,6 @@ from ssim.grid import GridSpecification, StorageSpecification
 from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
 
-
 ControlEvent = namedtuple("ControlEvent", ("time", "element", "action"))
 
 
@@ -40,6 +39,7 @@ def _parse_control_event(event_record: str) -> ControlEvent:
 
 class ControlLog:
     """Record of control actions that have been executed by OpenDSS."""
+
     def __init__(self):
         self._log_index = 0
         self.events = []
@@ -86,6 +86,7 @@ class Storage(StorageDevice):
     state : StorageState, default StorageState.IDLING
         Initial state of storage device.
     """
+
     def __init__(self, name, bus, device_parameters, phases,
                  state=StorageState.IDLE):
         self.name = name
@@ -179,6 +180,7 @@ class PVSystem:
     system_parameters : dict
         Additional parameters
     """
+
     def __init__(self, name: str, bus: str, phases: int, pmpp: float,
                  inverter_kva: float, system_parameters: dict):
         self.name = name
@@ -216,6 +218,7 @@ class Generator:
     name : str
         Name of the generator.
     """
+
     def __init__(self, name):
         if name not in dssdirect.Generators.AllNames():
             raise ValueError(f"Generator {name} does not exist.")
@@ -296,6 +299,7 @@ class Load:
     name : str
         Name of the load.
     """
+
     def __init__(self, name):
         self.name = name
 
@@ -393,7 +397,8 @@ class InvControl:
         self.inv_control_mode = inv_control_mode
         if inv_control_mode.lower() == "vv_vw":
             dssutil.run_command(f"new invcontrol.{name}",
-                                {"derlist": der_list, "combimode": inv_control_mode,
+                                {"derlist": der_list,
+                                 "combimode": inv_control_mode,
                                  **system_parameters})
         else:
             dssutil.run_command(f"new invcontrol.{name}",
@@ -440,6 +445,7 @@ class BusRecorder:
     busses : Iterable of str, optional
         Set of busses to record. If None, then all busses are used.
     """
+
     def __init__(self, name, busses=None):
         if busses is None:
             self.busses = set(dssdirect.Circuit.AllBusNames())
@@ -554,6 +560,7 @@ class PDERecorder:
     names : Iterable of str, optional
         Names of the power delivery elements to monitor.
     """
+
     def __init__(self, names=None):
         if names is None:
             names = dssdirect.PDElements.AllNames()
@@ -596,6 +603,7 @@ class VoltageRecorder:
     busses : Iterable of str
         Set of busses to record.
     """
+
     def __init__(self, busses):
         self.times = []
         self.voltage = {bus: [] for bus in busses}
@@ -629,6 +637,7 @@ def all_node_voltages(time):
 
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
+
     def __init__(self,
                  dss_file: PathLike,
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
@@ -741,24 +750,10 @@ class DSSModel:
             )
         for inv_control in gridspec.inv_control:
             control_params = inv_control.params.copy()
-            if inv_control.function_curve_1 is not None and \
-                    inv_control.function_curve_2 is not None:
-                # combined inverter control function
-                # add function_curve_1 and function_curve_2 to the model
-                model.add_xycurve(f"func_{inv_control.name}_1",
-                                  *zip(*inv_control.function_curve_1))
-                model.add_xycurve(f"func_{inv_control.name}_2",
-                                  *zip(*inv_control.function_curve_2))
-                # volt-var + volt-watt function
-                if inv_control.inv_control_mode.lower() == "vv_vw":
-                    control_params["vvc_curve1"] = \
-                        f"func_{inv_control.name}_1"
-                    control_params["voltwatt_curve"] = \
-                        f"func_{inv_control.name}_2"
-            elif inv_control.function_curve_1 is not None:
+            if inv_control.function_curve_1 is not None:
                 # single inverter control functions
                 # add function_curve_1 to the model
-                model.add_xycurve(f"func_{inv_control.name}",
+                model.add_xycurve(f"func_{inv_control.name}_1",
                                   *zip(*inv_control.function_curve_1))
                 # volt-var function
                 if inv_control.inv_control_mode.lower() == "voltvar":
@@ -776,7 +771,17 @@ class DSSModel:
                 elif inv_control.inv_control_mode.lower() == "wattvar":
                     control_params["wattvar_curve"] = \
                         f"func_{inv_control.name}"
-
+                elif inv_control.inv_control_mode.lower() == "vv_vw":
+                    if inv_control.function_curve_2 is None:
+                        raise ValueError("vv_vw control mode requires two "
+                                         "function curves. Add a value for "
+                                         "'function_curve_2'.")
+                model.add_xycurve(f"func_{inv_control.name}_2",
+                                  *zip(*inv_control.function_curve_2))
+                control_params["vvc_curve1"] = \
+                    f"func_{inv_control.name}_1"
+                control_params["voltwatt_curve"] = \
+                    f"func_{inv_control.name}_2"
 
             model.add_inverter_controller(
                 inv_control.name,
