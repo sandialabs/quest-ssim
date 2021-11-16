@@ -128,8 +128,8 @@ class InvControlSpecification:
     function_curve_1: Optional[Curve] = None
 
     #: Curve that defines behavior of the specified mode (define this in
-    # addition to function_curve_1 when implementing combined inverter
-    # functions)
+    #: addition to function_curve_1 when implementing combined inverter
+    #: functions)
     function_curve_2: Optional[Curve] = None
 
     #: Additional parameters
