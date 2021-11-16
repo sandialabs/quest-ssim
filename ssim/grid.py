@@ -124,7 +124,7 @@ class InvControlSpecification:
     inv_control_mode: str
 
     #: Curve that defines behavior of the specified mode (define this when
-    # implementing a single inverter function)
+    #: implementing a single inverter function)
     function_curve_1: Optional[Curve] = None
 
     #: Curve that defines behavior of the specified mode (define this in
