@@ -776,8 +776,8 @@ class DSSModel:
                         raise ValueError("vv_vw control mode requires two "
                                          "function curves. Add a value for "
                                          "'function_curve_2'.")
-                model.add_xycurve(f"func_{inv_control.name}_2",
-                                  *zip(*inv_control.function_curve_2))
+                    model.add_xycurve(f"func_{inv_control.name}_2",
+                                      *zip(*inv_control.function_curve_2))
                 control_params["vvc_curve1"] = \
                     f"func_{inv_control.name}_1"
                 control_params["voltwatt_curve"] = \
