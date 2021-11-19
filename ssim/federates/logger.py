@@ -69,7 +69,7 @@ class LoggingFederate:
         """Finalize all loggers."""
         for logger in self._loggers.values():
             logger.finalize()
-        self._federate.finalize()
+        self._federate.disconnect()
 
     def add_logger(self, name: str, logger: HelicsLogger):
         """Add a logger to the federate.
