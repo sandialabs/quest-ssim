@@ -6,8 +6,7 @@ from pathlib import Path
 from helics import (
     HelicsCombinationFederate, helics_time_maxtime,
     helicsFederateLogDebugMessage, HelicsLogLevel,
-    helicsCreateCombinationFederateFromConfig,
-    helicsMessageGetString
+    helicsCreateCombinationFederateFromConfig
 )
 
 from ssim import reliability
@@ -38,10 +37,6 @@ class ReliabilityInterface:
         """An iterator over all pending reliability events."""
         while self.endpoint.has_message():
             message = self.endpoint.get_message()
-            self._federate.log_message(
-                f"received reliability message: '{message.data}'",
-                level=HelicsLogLevel.DEBUG
-            )
             yield reliability.Event.from_json(message.data)
 
 
