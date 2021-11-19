@@ -15,6 +15,8 @@ from helics import (
 
 import matplotlib.pyplot as plt
 
+from ssim.federates import timing
+
 
 class HelicsLogger(ABC):
     """Base class for loggers that record values from HELICS federates."""
@@ -95,14 +97,9 @@ class LoggingFederate:
             )
         self._loggers[name] = logger
 
-    def _step(self):
-        """Request the maximum time from HELICS and invoke loggers whenever
-        a time is granted."""
-        time = self._federate.request_time(helics_time_maxtime - 1)
-        logging.debug(f"granted time: {time}")
+    def _update_loggers(self, time):
         for logger in self._loggers.values():
             logger.log(time)
-        return time
 
     def run(self, hours: float):
         """Run for `hours` and invoke loggers whenever HELICS grants a time.
@@ -112,8 +109,9 @@ class LoggingFederate:
         hours : float
             Total time to log. [hours]
         """
-        while self._step() < hours * 3600:
-            pass
+        schedule = timing.schedule(self._federate, lambda: helics_time_maxtime)
+        for time in schedule:
+            self._update_loggers(time)
 
 
 class PowerLogger(HelicsLogger):

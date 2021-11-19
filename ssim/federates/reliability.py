@@ -9,6 +9,7 @@ from helics import (
 
 from ssim import grid
 from ssim.reliability import GridReliabilityModel
+from ssim.federates import timing
 
 
 class ReliabilityFederate:
@@ -66,15 +67,14 @@ class ReliabilityFederate:
         logging.info("Running reliability federate.")
         logging.info("endpoints: %s", self._federate.endpoints)
         current_time = 0.0
-        while current_time < hours * 3600:
+        self.step(0.0)
+        schedule = timing.schedule(
+            self._federate,
+            self._reliability_model.peek,
+            hours * 3600
+        )
+        for current_time in schedule:
             self.step(current_time)
-            self._federate.log_message(
-                f"next update: {self._reliability_model.peek()}",
-                logging.DEBUG
-            )
-            current_time = self._federate.request_time(
-                self._reliability_model.peek()
-            )
 
 
 def _make_reliability_model(grid_config: str) -> GridReliabilityModel:

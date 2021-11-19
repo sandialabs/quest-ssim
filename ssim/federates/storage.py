@@ -12,6 +12,7 @@ from helics import (
 from ssim import ems
 from ssim import grid
 from ssim.grid import GridSpecification
+from ssim.federates import timing
 
 
 class StorageController(ABC):
@@ -134,8 +135,8 @@ def _controller(federate, controller, hours):
     control_endpoint = federate.get_endpoint_by_name(
         f"storage.{federate.name.lower()}.control"
     )
-    time = 0.0
-    while time < (hours * 3600):
+    schedule = timing.schedule(federate, controller.next_update, hours * 3600)
+    for time in schedule:
         federate.log_message(f"granted time: {time}", HelicsLogLevel.TRACE)
         voltage = federate.subscriptions[
             f"grid/storage.{federate.name}.voltage"
@@ -156,7 +157,6 @@ def _controller(federate, controller, hours):
             )
             federate.publications[f"{federate.name}/power"].publish(power)
         _send_soc_to_ems(soc, time, federate)
-        time = federate.request_time(controller.next_update())
 
 
 class CycleController(StorageController):
