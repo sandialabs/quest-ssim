@@ -115,3 +115,4 @@ def run():
     fed = ReliabilityFederate(federate, reliability_model)
     federate.enter_executing_mode()
     fed.run(args.hours)
+    federate.disconnect()

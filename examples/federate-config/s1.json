@@ -1,7 +1,7 @@
 {
   "name": "S1",
   "core_name": "s1_core",
-  "log_level": 7,
+  "log_level": "trace",
   "core_type": "zmq",
   "time_delta": 0.1,
   "subscriptions": [

@@ -276,7 +276,7 @@ def _start_controller(federate_config, grid_config, hours):
     controller = _get_controller(device)
     federate.enter_executing_mode()
     _controller(federate, controller, hours)
-    federate.finalize()
+    federate.disconnect()
 
 
 def run():

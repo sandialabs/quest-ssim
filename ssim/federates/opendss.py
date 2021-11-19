@@ -403,4 +403,4 @@ def run():
     federate.enter_executing_mode()
     grid_federate.run(args.hours)
     grid_federate.finalize()
-    federate.finalize()
+    federate.disconnect()

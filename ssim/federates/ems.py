@@ -153,6 +153,7 @@ def run():
                                GridSpecification.from_json(args.grid_config))
     federate.enter_executing_mode()
     ems_federate.run(args.hours)
+    federate.disconnect()
 
 
 if __name__ == '__main__':
