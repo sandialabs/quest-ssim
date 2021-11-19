@@ -137,7 +137,6 @@ def _controller(federate, controller, hours):
     )
     schedule = timing.schedule(federate, controller.next_update, hours * 3600)
     for time in schedule:
-        federate.log_message(f"granted time: {time}", HelicsLogLevel.TRACE)
         voltage = federate.subscriptions[
             f"grid/storage.{federate.name}.voltage"
         ].double

@@ -121,7 +121,7 @@ class EMSFederate:
         """
         schedule = timing.schedule(
             self.federate,
-            self._ems.nex_update,
+            self._ems.next_update,
             hours * 3600
         )
         for time in schedule:

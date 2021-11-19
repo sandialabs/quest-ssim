@@ -109,8 +109,12 @@ class LoggingFederate:
         hours : float
             Total time to log. [hours]
         """
-        schedule = timing.schedule(self._federate, lambda: helics_time_maxtime)
+        schedule = timing.schedule(self._federate)
         for time in schedule:
+            if time == helics_time_maxtime:
+                # Don't log since this is the signal that all other
+                # federates have finished
+                return
             self._update_loggers(time)
 
 
