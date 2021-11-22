@@ -2,6 +2,7 @@
 from helics import (
     HelicsValueFederate,
     HelicsMessageFederate,
+    HelicsCombinationFederate,
     HelicsLogLevel,
     helics_time_maxtime
 )
@@ -28,6 +29,8 @@ def schedule(federate, next_update=None, max_time=None):
     while granted_time < max_time:
         if next_update is not None:
             request_time = next_update()
+        federate.log_message(f"requesting time: {request_time}",
+                             HelicsLogLevel.TRACE)
         granted_time = federate.request_time(request_time)
         if request_time > granted_time:
             log_preemption(federate, request_time, granted_time)
@@ -49,7 +52,7 @@ def log_preemption(federate, requested, granted):
         Time that was granted
     """
     federate.log_message(
-        f"preempted @ {granted} (requested: {requested}) - "
+        f"preempted by updates on: "
         + ", ".join(updated_inputs(federate)),
         HelicsLogLevel.TRACE)
 
@@ -79,8 +82,10 @@ def _updated_endpoints(federate):
 
 
 def updated_inputs(federate):
+    updated_subscriptions = []
+    updated_endpoints = []
     if isinstance(federate, HelicsValueFederate):
-        return _updated_inputs(federate)
+        updated_subscriptions = _updated_inputs(federate)
     if isinstance(federate, HelicsMessageFederate):
-        return _updated_endpoints(federate)
-    return _updated_inputs(federate) + _updated_endpoints(federate)
+        updated_endpoints = _updated_endpoints(federate)
+    return updated_subscriptions + updated_endpoints
