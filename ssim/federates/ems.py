@@ -9,6 +9,7 @@ from helics import (
 from ssim import reliability
 from ssim.grid import GridSpecification, StatusMessage
 from ssim.ems import CompositeHeuristicEMS
+from ssim.federates import timing
 
 
 class EMSFederate:
@@ -118,10 +119,13 @@ class EMSFederate:
         hours : float
             How long to run the EMS federate. [hours]
         """
-        time = 0.0
-        while time < hours * 3600:
+        schedule = timing.schedule(
+            self.federate,
+            self._ems.next_update,
+            hours * 3600
+        )
+        for time in schedule:
             self._step(time)
-            time = self.federate.request_time(self._ems.next_update())
 
 
 def run():

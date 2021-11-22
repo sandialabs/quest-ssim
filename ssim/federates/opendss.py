@@ -13,6 +13,7 @@ from ssim import reliability
 from ssim.grid import GridSpecification, PVStatus
 from ssim.opendss import DSSModel
 from ssim.ems import GeneratorControlMessage
+from ssim.federates import timing
 
 
 class ReliabilityInterface:
@@ -358,11 +359,12 @@ class GridFederate:
 
     def run(self, hours: float):
         """Run the simulation for `hours`."""
-        current_time = self._grid_model.last_update() or 0
-        while current_time < hours * 3600:
-            current_time = self._federate.request_time(
-                self._grid_model.next_update()
-            )
+        schedule = timing.schedule(
+            self._federate,
+            self._grid_model.next_update,
+            hours * 3600
+        )
+        for current_time in schedule:
             self.step(current_time)
 
     def finalize(self):
