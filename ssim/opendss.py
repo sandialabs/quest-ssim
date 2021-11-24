@@ -18,6 +18,7 @@ from ssim.grid import GridSpecification, StorageSpecification
 from ssim.storage import StorageDevice, StorageState
 from ssim import dssutil
 
+
 ControlEvent = namedtuple("ControlEvent", ("time", "element", "action"))
 
 
@@ -758,30 +759,30 @@ class DSSModel:
                 # volt-var function
                 if inv_control.inv_control_mode.lower() == "voltvar":
                     control_params["vvc_curve1"] = \
-                        f"func_{inv_control.name}"
+                        f"func_{inv_control.name}_1"
                 # volt-watt function
                 elif inv_control.inv_control_mode.lower() == "voltwatt":
                     control_params["voltwatt_curve"] = \
-                        f"func_{inv_control.name}"
+                        f"func_{inv_control.name}_1"
                 # watt-pf function
                 elif inv_control.inv_control_mode.lower() == "wattpf":
                     control_params["wattpf_curve"] = \
-                        f"func_{inv_control.name}"
+                        f"func_{inv_control.name}_1"
                 # watt-var function
                 elif inv_control.inv_control_mode.lower() == "wattvar":
                     control_params["wattvar_curve"] = \
-                        f"func_{inv_control.name}"
+                        f"func_{inv_control.name}_1"
                 elif inv_control.inv_control_mode.lower() == "vv_vw":
                     if inv_control.function_curve_2 is None:
                         raise ValueError("vv_vw control mode requires two "
                                          "function curves. Add a value for "
                                          "'function_curve_2'.")
-                model.add_xycurve(f"func_{inv_control.name}_2",
-                                  *zip(*inv_control.function_curve_2))
-                control_params["vvc_curve1"] = \
-                    f"func_{inv_control.name}_1"
-                control_params["voltwatt_curve"] = \
-                    f"func_{inv_control.name}_2"
+                    model.add_xycurve(f"func_{inv_control.name}_2",
+                                      *zip(*inv_control.function_curve_2))
+                    control_params["vvc_curve1"] = \
+                        f"func_{inv_control.name}_1"
+                    control_params["voltwatt_curve"] = \
+                        f"func_{inv_control.name}_2"
 
             model.add_inverter_controller(
                 inv_control.name,

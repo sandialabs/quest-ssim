@@ -9,8 +9,10 @@
             "kwrated": 500,
             "kwhrated": 5000,
             "%stored": 50,
+            "kW": 400,
+            "pf": 0.8,
             "kV": 4.16,
-            "controller": "droop",
+            "controller": "external",
             "controller_params": {
                 "p_droop": 0,
                 "q_droop": 0
@@ -22,7 +24,7 @@
             "name": "PV1",
             "bus": "671",
             "phases": 3,
-            "pmpp": 3000,
+            "pmpp": 4000,
             "kva_rated": 3600,
             "kV": 4.16,
             "irradiance_profile": "../ieee13demo/5MinuteIrradiance.csv",
@@ -34,7 +36,7 @@
             "name": "PV2",
             "bus": "680",
             "phases": 3,
-            "pmpp": 3000,
+            "pmpp": 4000,
             "kva_rated": 3600,
             "kV": 4.16,
             "irradiance_profile": "../ieee13demo/5MinuteIrradiance.csv",
@@ -43,22 +45,7 @@
             "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
         }
     ],
-    "invcontrol": [
-        {
-            "name": "InvCtrl1",
-            "der_list": ["PVsystem.PV1"],
-            "inv_control_mode": "vv_vw",
-            "function_curve_1": {"x":  [0.5, 0.95, 1.0, 1.05, 1.5],
-                               "y":  [1.0, 1.0, 0.0, -1.0, -1.0]},
-            "function_curve_2": {"x":  [0.5, 1.06, 1.10, 1.5],
-                               "y":  [1.0, 1.0, 0.0, 0.0]},
-            "deltaQ_factor" : -1.0,
-            "RateofChangeMode": "LPF",
-            "LPFTau": 10,
-            "voltage_curvex_ref": "ravg",
-            "avgwindowlen": "10s"
-        }
-    ],
+    "invcontrol": [],
     "reliability": {
         "seed": 1234567,
         "line": {
