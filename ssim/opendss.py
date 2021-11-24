@@ -6,7 +6,7 @@ import enum
 from functools import lru_cache, cached_property
 import logging
 import math
-from os import PathLike
+from os import PathLike, path
 from pathlib import Path
 import re
 from typing import Any, List, Dict, Optional
@@ -640,6 +640,54 @@ def all_node_voltages(time):
     )
 
 
+class Monitor:
+    """Extended API for OpenDSS Monitor objects.
+
+    Parameters
+    ----------
+    name : str
+        Name of the monitor object.
+    """
+
+    def __init__(self, name):
+        self.name = name
+
+    def to_csv(self, directory=None, filename=None):
+        """Save the monitor data to a csv file.
+
+        Parameters
+        ----------
+        directory: PathLike, optional
+            Path to the directory where the ouput file should be
+            written. If not specified the data is written to the file
+            name specified in OpenDSS.
+        filename: str, optional
+            Name of the output CSV file. If not specified the file
+            name is extracted from the monitor's FileName property in
+            OpenDSS. This argument is only valid if `directory` is
+            specified.
+        """
+        dssdirect.Monitors.Name(self.name)
+        dssdirect.Monitors.Save()
+        if directory is None:
+            output_file = Path(dssdirect.Monitors.FileName())
+        elif filename is None:
+            filename = path.basename(dssdirect.Monitors.FileName())
+            output_file = directory / filename
+        else:
+            output_file = directory / filename
+        print(f"saving monitor {self.name} data in {output_file}")
+        with open(output_file, 'w', newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", *dssdirect.Monitors.Header()))
+            writer.writerows(
+                zip(map(lambda hour: hour * 3600.0,
+                        dssdirect.Monitors.dblHour()),
+                    *(dssdirect.Monitors.Channel(x)
+                      for x in range(1, dssdirect.Monitors.NumChannels() + 1)))
+            )
+
+
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
     def __init__(self,
@@ -874,6 +922,13 @@ class DSSModel:
             self._voltage_recorder.to_csv(output_dir / "bus_voltage.csv")
         if self._loading_recorder is not None:
             self._loading_recorder.to_csv(output_dir / "pde_loading.csv")
+        # Save the data recorded by any internal OpenDSS monitors
+        for monitor in self.monitors():
+            monitor.to_csv(directory=output_dir)
+
+    def monitors(self):
+        for monitor_name in dssdirect.Monitors.AllNames():
+            yield Monitor(monitor_name)
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
