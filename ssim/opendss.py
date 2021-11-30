@@ -897,7 +897,7 @@ class DSSModel:
             return 0
         return min(
             self._last_solution_time + self._max_step,
-            self.next_action()
+            self.next_event()
         )
 
     def last_update(self) -> Optional[float]:
@@ -1197,6 +1197,23 @@ class DSSModel:
             Reactive power [kVAR]
         """
         return dssdirect.Circuit.TotalPower()
+
+    def next_event(self):
+        """Return the time of the next event that will change the grid state.
+
+        Events include control actions, depletion of a storage device,
+        or a storage device reaching its full state of charge.
+
+        Returns
+        -------
+        float
+            Time when the next event will occur. [seconds]
+        """
+        storage_change = min(
+            storage.state_change() for storage in self.storage_devices.values()
+        )
+        control_time = self.next_action()
+        return min(self._last_solution_time + storage_change, control_time)
 
     def next_action(self):
         """Return the time of the next control action.
