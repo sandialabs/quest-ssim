@@ -91,19 +91,19 @@ class Storage(StorageDevice):
         self.name = name
         self.bus = bus
         self._device_parameters = device_parameters
-        self.state = state
         dssutil.run_command(
             f"New Storage.{name}",
             {"bus1": bus, "phases": phases, "state": state,
              "dispmode": "external", **device_parameters}
         )
 
-    def get_state(self) -> StorageState:
-        return self.state
+    @property
+    def state(self) -> StorageState:
+        return StorageState(self._get('state').lower())
 
-    def set_state(self, state: StorageState):
-        self._set('state', state)
-        self.state = state
+    @state.setter
+    def state(self, new_state):
+        self._set('state', new_state)
 
     def _set(self, property: str, value: Any):
         """Set `property` to `value` in OpenDSS.
@@ -127,6 +127,12 @@ class Storage(StorageDevice):
 
     def set_power(self, kw: float, kvar: float = None, pf: float = None):
         self._set('kW', kw)
+        if self.kw == 0.0:
+            self.state = StorageState.IDLE
+        elif self.kw > 0:
+            self.state = StorageState.DISCHARGING
+        elif self.kw < 0:
+            self.state = StorageState.CHARGING
         if pf is not None:
             self._set('pf', pf)
         if kvar is not None:
@@ -158,7 +164,35 @@ class Storage(StorageDevice):
 
     @property
     def status(self) -> grid.StorageStatus:
-        return grid.StorageStatus(self.name, self.soc, self.kw, self.kvar)
+        return grid.StorageStatus(self.name, self.soc)
+
+    def state_change(self) -> float:
+        """Return the time until the storage device will change state.
+
+        A state change is any change in the power output or input
+        caused by the state of charge reaching either its upper or
+        lower limit.
+
+        Returns
+        -------
+        float
+            Seconds until the device must change state.
+        """
+        if self.state is StorageState.IDLE:
+            return math.inf
+        if self.state is StorageState.DISCHARGING:
+            kwh_minimum = self.kwh_rated * float(self._get("%reserve")) / 100
+            kwh_remaining = float(self._get("kwhstored")) - kwh_minimum
+            kw = self.kw
+            kw_discharge = (
+                    kw + (1.0 - (float(self._get("%effdischarge")) / 100)
+                          - (float(self._get("%idlingkw")) / 100)) * kw)
+            return 3600.0 * (kwh_remaining / kw_discharge)
+        if self.state is StorageState.CHARGING:
+            kwh_remaining = self.kwh_rated - float(self._get("kwhstored"))
+            kw_charge = (float(self._get("%effcharge")) / 100
+                         - float(self._get("%idlingkw")) / 100) * abs(self.kw)
+            return 3600.0 * (kwh_remaining / kw_charge)
 
 
 class PVSystem:
@@ -863,7 +897,7 @@ class DSSModel:
             return 0
         return min(
             self._last_solution_time + self._max_step,
-            self.next_action()
+            self.next_event()
         )
 
     def last_update(self) -> Optional[float]:
@@ -1163,6 +1197,23 @@ class DSSModel:
             Reactive power [kVAR]
         """
         return dssdirect.Circuit.TotalPower()
+
+    def next_event(self):
+        """Return the time of the next event that will change the grid state.
+
+        Events include control actions, depletion of a storage device,
+        or a storage device reaching its full state of charge.
+
+        Returns
+        -------
+        float
+            Time when the next event will occur. [seconds]
+        """
+        storage_change = min(
+            storage.state_change() for storage in self.storage_devices.values()
+        )
+        control_time = self.next_action()
+        return min(self._last_solution_time + storage_change, control_time)
 
     def next_action(self):
         """Return the time of the next control action.
