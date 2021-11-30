@@ -1,4 +1,5 @@
 """Tests for ssim.opendss"""
+import math
 import os.path
 from pathlib import Path
 import pytest
@@ -337,3 +338,35 @@ def test_Generator_change_setpoint(test_circuit_fixed_gen):
     new_power, _ = test_circuit_fixed_gen.total_power()
     power_change = abs(new_power) - abs(old_power)
     assert power_change == pytest.approx(100.0, 1.0)
+
+
+@pytest.fixture
+def test_circuit_with_storage(test_circuit):
+    test_circuit.add_storage(
+        "TestStorage",
+        "loadbus1",
+        3,
+        {"kwhrated": 1000, "kwrated": 1000,
+         "kv": 12.47, "%stored": 100, "%reserve": 20,
+         "%idlingkw": 13},
+        state=opendss.StorageState.DISCHARGING
+    )
+    return test_circuit
+
+
+def test_Storage_next_state_change(test_circuit_with_storage):
+    storage = test_circuit_with_storage.storage_devices["TestStorage"]
+    test_circuit_with_storage.update_storage("TestStorage", -1000.0, 0)
+    test_circuit_with_storage.solve(0.0)
+    assert storage.state_change() == math.inf
+    test_circuit_with_storage.update_storage("TestStorage", 1000.0, 0)
+    test_circuit_with_storage.solve(0.0)
+    change = storage.state_change()
+    test_circuit_with_storage.solve(change)
+    time = change
+    assert storage.soc == pytest.approx(0.2)
+    test_circuit_with_storage.update_storage("TestStorage", -1000.0, 0)
+    test_circuit_with_storage.solve(time)
+    change = storage.state_change()
+    test_circuit_with_storage.solve(time + change)
+    assert storage.soc == pytest.approx(1.0)
