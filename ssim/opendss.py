@@ -1209,9 +1209,13 @@ class DSSModel:
         float
             Time when the next event will occur. [seconds]
         """
-        storage_change = min(
-            storage.state_change() for storage in self.storage_devices.values()
-        )
+        if len(self.storage_devices) == 0:
+            storage_change = math.inf
+        else:
+            storage_change = min(
+                storage.state_change()
+                for storage in self.storage_devices.values()
+            )
         control_time = self.next_action()
         return min(self._last_solution_time + storage_change, control_time)
 
