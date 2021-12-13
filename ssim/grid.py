@@ -208,6 +208,19 @@ class PVSpecification:
         )
 
 
+@dataclass
+class EMSSpecification:
+    #: type of the ems that should be used.
+    ems_type: str
+
+    #: EMS parameters
+    params: dict = field(default_factory=dict)
+
+    @classmethod
+    def from_dict(cls, params):
+        return cls(**params)
+
+
 class GridSpecification:
     """Specification of the grid.
 
@@ -223,6 +236,7 @@ class GridSpecification:
         self.pv_systems: List[PVSpecification] = []
         self.inv_control: List[InvControlSpecification] = []
         self.busses_to_log: List[str] = []
+        self.ems = None
 
     def add_storage(self, specs: StorageSpecification):
         """Add a storage device to the grid specification.
@@ -278,6 +292,9 @@ class GridSpecification:
                 return device
         raise KeyError(f"no storage device named '{name}'")
 
+    def add_ems(self, ems_spec):
+        self.ems = ems_spec
+
     @classmethod
     def from_json(cls, file: str):
         with open(file) as f:
@@ -295,6 +312,10 @@ class GridSpecification:
         for device in spec["invcontrol"]:
             grid.add_inv_control(
                 InvControlSpecification.from_dict(device)
+            )
+        if "ems" in spec:
+            grid.add_ems(
+                EMSSpecification.from_dict(spec["ems"])
             )
         return grid
 

@@ -68,5 +68,8 @@
                 "max_repair": 2.0
             }
         }
+    },
+    "ems": {
+        "ems_type": "composite-heuristic"
     }
 }

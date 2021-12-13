@@ -23,7 +23,7 @@ class EMSFederate:
     grid_spec : GridSpecification
     """
     def __init__(self, federate, grid_spec):
-        self._ems = CompositeHeuristicEMS(grid_spec)
+        self._ems = _create_ems(grid_spec)
         self.federate = federate
         self.control_endpoint = federate.get_endpoint_by_name("control")
         self.reliability_endpoint = federate.get_endpoint_by_name(
@@ -126,6 +126,15 @@ class EMSFederate:
         )
         for time in schedule:
             self._step(time)
+
+
+def _create_ems(grid_spec):
+    if grid_spec.ems is None:
+        return CompositeHeuristicEMS(grid_spec)
+    if grid_spec.ems.ems_type == 'composite-heuristic':
+        return CompositeHeuristicEMS(grid_spec)
+    raise ValueError(f"Unknown ems type: {grid_spec.ems.ems_type}."
+                     " Valid EMS types are: 'composite-heuristic'.")
 
 
 def run():
