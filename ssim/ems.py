@@ -19,16 +19,12 @@ manager classes to handle the data streams.
 """
 import abc
 import json
-import logging
 
 import opendssdirect as dssdirect
 
 import networkx as nx
 
-from ssim.grid import (
-    GridSpecification,
-    PVStatus, LoadStatus, StorageStatus, GeneratorStatus
-)
+from ssim.grid import GridSpecification
 from ssim.opendss import DSSModel
 from ssim import dssutil, reliability
 

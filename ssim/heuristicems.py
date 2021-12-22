@@ -95,16 +95,16 @@ class CompositeHeuristicEMS(ems.Dispatcher):
                 print(f"got generator status message: {message}")
                 # TODO update generator statuses
             else:
-                logging.warning(f"unnexpected status message: {message}")
-        for component, ems in self._component_ems.items():
-            ems.update_actual_demand(load[component])
-            ems.update_actual_generation(pv_generation[component])
+                logging.warning(f"unexpected status message: {message}")
+        for component, component_ems in self._component_ems.items():
+            component_ems.update_actual_demand(load[component])
+            component_ems.update_actual_generation(pv_generation[component])
             for ess in ess_status[component]:
-                ems.update_storage(ess.name.lower(), ess.soc)
+                component_ems.update_storage(ess.name.lower(), ess.soc)
 
     def output(self):
-        for ems in self._component_ems.values():
-            for device, dispatch in ems.dispatch_storage().items():
+        for component_ems in self._component_ems.values():
+            for device, dispatch in component_ems.dispatch_storage().items():
                 yield device, dispatch
 
     def next_update(self):
@@ -128,6 +128,7 @@ class HeuristicEMS:
         self._actual_generation = 0.0
         self._storage_soc = {}
         self._storage_kw_rated = {}
+        self._excess_generation = 0.0
         for device in storage_devices:
             self._storage_soc[device.name.lower()] = device.soc
             self._storage_kw_rated[device.name.lower()] = device.kw_rated
@@ -153,13 +154,16 @@ class HeuristicEMS:
         """
         new_ems = cls(
             storage_devices,
-            minimum_soc=min(ems._minimum_soc for ems in ems_instances)
+            minimum_soc=min(
+                component_ems._minimum_soc for component_ems in ems_instances
+            )
         )
         for device in storage_devices:
-            for ems in ems_instances:
-                if device in ems._storage_soc:
+            for component_ems in ems_instances:
+                if device in component_ems._storage_soc:
                     name = device.name.lower()
-                    new_ems._storage_soc[name] = ems._storage_soc[name]
+                    soc = component_ems._storage_soc[name]
+                    new_ems._storage_soc[name] = soc
 
     def update_actual_generation(self, generation):
         self._actual_generation = generation
