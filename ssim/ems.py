@@ -17,6 +17,7 @@ management components. To get to this point we should define some
 manager classes to handle the data streams.
 
 """
+import abc
 import json
 import logging
 
@@ -345,232 +346,115 @@ class GridModel:
             self._apply_event(event)
 
 
-def _node_to_bus(node_name):
-    """Return an OpenDSS bus name, stripped of all node names."""
-    return node_name.split(".", maxsplit=1)[0]
+class EMS:
+    """Basic EMS consisting of a planner and a dispatcher.
 
+    An EMS has three primary components:
 
-class CompositeHeuristicEMS:
-    """A collection of HeuristicEMS instances.
+    1. A grid model
+    2. A planner
+    3. A dispatch model
 
-    For each connected component in the grid there is a
-    :py:class:`HeuristicEMS` instance to manage the generators and storage
-    connected to that component. As the grid topology changes new EMS
-    instances are constructed (when a component splits), and old EMS
-    instances are combined (when components merge).
+    The planner sets long or medium term goals that are used by the
+    dispatcher to inform its dispatch decisions. The dispatcher is
+    responsible for sending control messages to grid elements
+    in response to real time conditions on the grid.
 
     Parameters
     ----------
-    grid_spec : GridSpecification
-        Grid specification
+    grid : GridModel
+        The grid model
+    dispatcher : Dispatcher
+        The dispatcher.
+    planner : Planner, optional
+        The planner.
     """
-    def __init__(self, grid_spec):
-        self._grid_model = GridModel(grid_spec)
-        self._component_ems = {
-            frozenset(component): self._new_ems(component)
-            for component in self._grid_model.components()
-        }
-        self._time = 0.0
 
-    def _new_ems(self, component):
-        """Create a new EMS to manage a subset of the grid.
-
-        Parameters
-        ----------
-        component : tuple of str
-            The set up busses the EMS will be responsible for.
-
-        Returns
-        -------
-        HeuristicEMS
-            A new HeuristicEMS instance to manage the storage devices
-            connected to `component`.
-        """
-        return HeuristicEMS(
-            self._grid_model.storage_spec(device)
-            for device in self._grid_model.connected_storage(component)
-        )
-
-    def apply_reliability_events(self, events):
-        """Notify the EMS of a set of reliability events.
-
-        Parameters
-        ----------
-        events : Iterable of ReliabilityEvent
-            Set of events to apply.
-        """
-        self._grid_model.apply_reliability_events(events)
-        old_ems_instances = self._component_ems
-        self._component_ems = {}
-        for component in map(frozenset, self._grid_model.components()):
-            if component in self._component_ems:
-                # the component still exists in the grid, unchanged
-                self._component_ems[component] = old_ems_instances[component]
-            else:
-                self._component_ems[component] = self._new_ems(component)
-
-    def update(self, messages):
-        """Update EMS state based on status updates and other control messages.
-
-        Parameters
-        ----------
-        messages : Iterable of dict
-        """
-        # For each component sum the generation and demand, then pass
-        # it to the HeuristicEMS instance responsible for that component.
-        components = self._component_ems.keys()
-        load = {component: 0.0 for component in components}
-        pv_generation = {component: 0.0 for component in components}
-        ess_status = {component: [] for component in components}
-        for message in messages:
-            if isinstance(message, PVStatus):
-                component = frozenset(
-                    self._grid_model.component_from_element(
-                        f"pvsystem.{message.name}"
-                    )
-                )
-                pv_generation[component] += message.kw
-            elif isinstance(message, StorageStatus):
-                component = frozenset(
-                    self._grid_model.component_from_element(
-                        f"storage.{message.name}"
-                    )
-                )
-                ess_status[component].append(message)
-            elif isinstance(message, LoadStatus):
-                component = frozenset(
-                    self._grid_model.component_from_element(
-                        f"load.{message.name}"
-                    )
-                )
-                load[component] += message.kw
-            elif isinstance(message, GeneratorStatus):
-                print(f"got generator status message: {message}")
-                # TODO update generator statuses
-            else:
-                logging.warning(f"unnexpected status message: {message}")
-        for component, ems in self._component_ems.items():
-            ems.update_actual_demand(load[component])
-            ems.update_actual_generation(pv_generation[component])
-            for ess in ess_status[component]:
-                ems.update_storage(ess.name.lower(), ess.soc)
+    def __init__(self, grid, dispatcher, planner=None):
+        self.grid = grid
+        self.dispatcher = dispatcher
+        self.planner = planner
 
     def next_update(self):
-        """TODO Return the next time the EMS needs to update."""
-        return self._time + 300  # 5 minutes
+        if self.planner is None:
+            return self.dispatcher.next_update()
+        return min(self.planner.next_update(),
+                   self.dispatcher.next_update())
 
-    def control_actions(self):
-        """Return the set of control actions to be applied in the grid."""
-        for ems in self._component_ems.values():
-            for device, dispatch in ems.dispatch_storage().items():
-                print(f"dispatch: {device} - {dispatch}")
-                yield device, dispatch
+    def update(self, time, inputs, forecast_manager):
+        inputs = list(inputs)
+        if self.planner is not None:
+            self.planner.update(time, inputs, forecast_manager, self.grid)
+            self.dispatcher.update(
+                time,
+                inputs,
+                self.planner.plan,
+                self.grid
+            )
+        else:
+            self.dispatcher.update(time, inputs, self.grid)
 
-    def step(self, time):
-        """Generate a new set of control actions at `time`."""
-        self._time = time
+    def output(self):
+        return self.dispatcher.output()
 
 
-class HeuristicEMS:
-    """Rule-based energy management system for storage devices.
+class Planner(abc.ABC):
+    """Abstract base class for EMS Planners."""
 
-    Parameters
-    ----------
-    storage_devices : Iterable of grid.StorageSpecification
-        Storage devices that will managed by this ems.
-    minimum_soc : float, default 0.2
-        Minimum state of charge allowed for any storage device.
-    """
-    def __init__(self, storage_devices, minimum_soc=0.2):
-        self._minimum_soc = minimum_soc
-        self._actual_demand = 0.0
-        self._actual_generation = 0.0
-        self._storage_soc = {}
-        self._storage_kw_rated = {}
-        for device in storage_devices:
-            self._storage_soc[device.name.lower()] = device.soc
-            self._storage_kw_rated[device.name.lower()] = device.kw_rated
+    @abc.abstractmethod
+    def next_update(self) -> float:
+        """Return the time of the next planning iteration."""
 
-    @classmethod
-    def from_existing(cls, storage_devices, ems_instances):
-        """Create a new HeuristicEMS instance based on existing instances.
-
-        The state of charge of each storage device is copied from one of the
-        instances in `ems_instances`.
+    @abc.abstractmethod
+    def update(self, time, inputs, forecast_manager, grid_model):
+        """Update the plan.
 
         Parameters
         ----------
-        storage_devices : Iterable of StorageSpecification
-            Storage devices that are to be managed by this EMS.
-        ems_instances : Iterable of HeuristicEMS
-            Existing EMS instances to get storage state from.
-
-        Returns
-        -------
-        HeuristicEMS
-            New EMS instance.
+        time : float
+            Current time
+        inputs : Iterable of StatusMessage
+        forecast_manager : ForecastManager
+        grid_model : GridModel
         """
-        new_ems = cls(
-            storage_devices,
-            minimum_soc=min(ems._minimum_soc for ems in ems_instances)
-        )
-        for device in storage_devices:
-            for ems in ems_instances:
-                if device in ems._storage_soc:
-                    name = device.name.lower()
-                    new_ems._storage_soc[name] = ems._storage_soc[name]
 
-    def update_actual_generation(self, generation):
-        self._actual_generation = generation
+    @property
+    @abc.abstractmethod
+    def plan(self) -> dict:
+        """The current dispatch plan.
 
-    def update_actual_demand(self, demand):
-        self._actual_demand = demand
-
-    def update_generation_forecast(self, generation_forecast):
-        # not using forecasts yet
-        pass
-
-    def update_demand_forecast(self, demand_forecast):
-        # not using forecasts yet
-        pass
-
-    def update_storage(self, name, storage_soc):
-        self._storage_soc[name] = storage_soc
-
-    def _charge_device(self, device):
-        if self._storage_soc[device] < 1.0:
-            target_power = min(
-                self._storage_kw_rated[device], self._excess_generation
-            )
-            self._excess_generation -= target_power
-            return StorageControlMessage.charge(target_power)
-        return StorageControlMessage.idle()
-
-    def _discharge_device(self, device):
-        if self._storage_soc[device] > self._minimum_soc:
-            target_power = min(
-                self._storage_kw_rated[device], abs(self._excess_generation)
-            )
-            self._excess_generation += target_power
-            return StorageControlMessage.discharge(target_power)
-        return StorageControlMessage.idle()
-
-    def _dispatch_device(self, storage_name):
-        if self._excess_generation > 0.0:
-            return self._charge_device(storage_name)
-        if self._excess_generation == 0.0:
-            return StorageControlMessage.idle()
-        if self._excess_generation < 0.0:
-            return self._discharge_device(storage_name)
-
-    def dispatch_storage(self):
-        """Dispatch storage devices in a fixed, arbitrary order based on excess
-        generation.
+        A dispatch plan is a dict where keys are dispatchable grid
+        elements (e.g. conventional generators, or energy storage
+        systems). The dict values are time series of target values for
+        each element, energy storage, for example might have a plan
+        that specifies the state of charge that should be achieved at
+        various times.
         """
-        self._excess_generation = self._actual_generation - self._actual_demand
-        return {
-            name: self._dispatch_device(name) for name in self._storage_soc
-        }
+
+
+class Dispatcher(abc.ABC):
+    """Abstract base class for EMS Dispatchers."""
+
+    @abc.abstractmethod
+    def next_update(self):
+        """Return the time that the dispatcher needs to do its next update."""
+
+    @abc.abstractmethod
+    def update(self, time, inputs, grid_model, plan=None):
+        """Make new dispatch decisions based on the current plan and inputs.
+
+        Parameters
+        ----------
+        time : float
+            Current time.
+        inputs : Iterable of StatusMessage
+        grid_model : GridModel
+        plan : DispatchPlan, optional
+            A dispatch plan returned from a Planner instance.
+        """
+
+    def output(self):
+        """Return the latest control output."""
 
 
 class StorageControlMessage:
@@ -671,3 +555,8 @@ class GeneratorControlMessage:
     @classmethod
     def from_json(cls, jsonstr):
         return cls(**json.loads(jsonstr))
+
+
+def _node_to_bus(node_name):
+    """Return an OpenDSS bus name, stripped of all node names."""
+    return node_name.split(".", maxsplit=1)[0]
