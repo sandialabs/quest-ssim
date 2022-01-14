@@ -6,7 +6,7 @@ from pathlib import Path
 from helics import (
     HelicsCombinationFederate, helics_time_maxtime,
     helicsFederateLogDebugMessage, HelicsLogLevel,
-    helicsCreateCombinationFederateFromConfig
+    helicsCreateCombinationFederateFromConfig, HelicsDataType
 )
 
 from ssim import reliability
@@ -96,18 +96,25 @@ class StorageInterface:
     def __init__(self, federate, device):
         self.device = device
         self._federate = federate
-        self._power_sub = federate.subscriptions[
-            f"{device.name}/power"
-        ]
-        self._voltage_pub = federate.publications[
-            f"grid/storage.{device.name}.voltage"
-        ]
-        self._soc_pub = federate.publications[
-            f"grid/storage.{device.name}.soc"
-        ]
-        self._power_pub = federate.publications[
-            f"grid/storage.{device.name}.power"
-        ]
+        self._power_sub = federate.register_subscription(
+            f"{device.name}/power", units="kW"
+        )
+        self._power_sub.set_default(complex(0.0, 0.0))
+        self._voltage_pub = federate.register_publication(
+            f"storage.{device.name}.voltage",
+            kind=HelicsDataType.DOUBLE,
+            units="pu"
+        )
+        self._soc_pub = federate.register_publication(
+            f"storage.{device.name}.soc",
+            kind=HelicsDataType.DOUBLE,
+            units=""
+        )
+        self._power_pub = federate.register_publication(
+            f"storage.{device.name}.power",
+            kind=HelicsDataType.COMPLEX,
+            units="kW"
+        )
 
     def update(self):
         """Update inputs for the storage device.
