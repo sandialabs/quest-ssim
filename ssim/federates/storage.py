@@ -264,7 +264,31 @@ def _get_controller(device):
         raise ValueError(f"Unknown controller: '{device.controller}'")
 
 
-def _start_controller(federate_config, grid_config, hours):
+def _add_subscriptions(name, config):
+    config["subscriptions"].extend(
+        [{"key": f"grid/storage.{name}.soc",
+          "unit": "",
+          "type": "double",
+          "default": 0.5},
+         {"key": f"grid/storage.{name}.voltage",
+          "unit": "pu",
+          "type": "double",
+          "default": 1.0}]
+    )
+
+
+def _complete_config(name, skeleton):
+    with open(skeleton) as f:
+        config = json.load(f)
+        config['name'] = name
+        config['core'] = f"{name}_core"
+        _add_subscriptions(name, config)
+        return json.dumps(config)
+
+
+def _start_controller(name, federate_config_skeleton, grid_config, hours):
+    federate_config = _complete_config(name, federate_config_skeleton)
+    print(f"federate config: {federate_config}")
     federate = helicsCreateCombinationFederateFromConfig(federate_config)
     federate.register_global_endpoint(
         f"storage.{federate.name.lower()}.control"
@@ -281,6 +305,11 @@ def _start_controller(federate_config, grid_config, hours):
 def run():
     parser = argparse.ArgumentParser(
         description="HELICS federate for a storage controller."
+    )
+    parser.add_argument(
+        "name",
+        type=str,
+        help="Name of the storage device controlled by this federate."
     )
     parser.add_argument(
         "grid_config",
@@ -301,5 +330,5 @@ def run():
     )
     args = parser.parse_args()
     _start_controller(
-        args.federate_config, args.grid_config, args.hours
+        args.name, args.federate_config, args.grid_config, args.hours
     )
