@@ -222,8 +222,8 @@ def test_DSSModel_from_gridspec_inverter_controller(grid_spec):
             name="invcontrol1",
             der_list=["PVSystem.pv1"],
             inv_control_mode="voltvar",
-            function_curve=((0.5, 1.0), (0.95, 1.0), (1.0, 0.0),
-                            (1.05, -1.0), (1.5, -1.0))
+            function_curve_1=((0.5, 1.0), (0.95, 1.0), (1.0, 0.0),
+                              (1.05, -1.0), (1.5, -1.0))
         )
     )
     model = opendss.DSSModel.from_grid_spec(grid_spec)
