@@ -1,4 +1,5 @@
 """Tests for ssim.opendss"""
+import math
 import os.path
 from pathlib import Path
 import pytest
@@ -200,6 +201,7 @@ def test_DSSModel_from_gridspec_pvsystem(grid_spec):
     dssdirect.Circuit.SetActiveBus("loadbus2")
     assert "PVSystem.pv2" in dssdirect.Bus.AllPCEatBus()
 
+
 def test_DSSModel_from_gridspec_inverter_controller(grid_spec):
     pv_params = {
         "kV": 12.47,
@@ -251,6 +253,7 @@ def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
     assert dssdirect.XYCurves.XArray() == [0.0, 2.0, 3.0]
     assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]
 
+
 def test_DSSModel_pvsystem_irradiance_profiles(grid_spec, data_dir):
     grid_spec.add_pvsystem(
         grid.PVSpecification(
@@ -258,13 +261,14 @@ def test_DSSModel_pvsystem_irradiance_profiles(grid_spec, data_dir):
             bus="loadbus2",
             pmpp=100,
             kva_rated=100,
-            irradiance_profile= data_dir / "test_irradiance.csv"
+            irradiance_profile=data_dir / "test_irradiance.csv"
         )
     )
     opendss.DSSModel.from_grid_spec(grid_spec)
     dssdirect.PVsystems.Name("pv1")
     irrad_profile_name = dssdirect.run_command("? pvsystem.pv1.daily")
     assert dssdirect.LoadShape.Name() == "irrad_pv_pv1"
+
 
 def test_DSSModel_storage_efficiency_curves(grid_spec):
     storage_params = {
@@ -312,3 +316,57 @@ def test_DSSModel_fail_line_restore_line(test_circuit):
     test_circuit.solve(7200)
     active_power_restored, _ = test_circuit.total_power()
     assert active_power < active_power_restored
+
+
+@pytest.fixture
+def test_circuit_fixed_gen(test_circuit):
+    # make the wind generator a fixed generator so it no longer
+    # follows a dispatch curve
+    dssdirect.run_command("edit generator.gen1 status=fixed")
+    return test_circuit
+
+
+def test_Generator_change_setpoint(test_circuit_fixed_gen):
+    gen = test_circuit_fixed_gen.generators["gen1"]
+    gen.kw = 100.0
+    assert gen.online
+    test_circuit_fixed_gen.solve(1.0)
+    old_power, _ = test_circuit_fixed_gen.total_power()
+    gen.change_setpoint(0.0, 0.0)
+    test_circuit_fixed_gen.solve(10.0)
+    assert gen.online
+    new_power, _ = test_circuit_fixed_gen.total_power()
+    power_change = abs(new_power) - abs(old_power)
+    assert power_change == pytest.approx(100.0, 1.0)
+
+
+@pytest.fixture
+def test_circuit_with_storage(test_circuit):
+    test_circuit.add_storage(
+        "TestStorage",
+        "loadbus1",
+        3,
+        {"kwhrated": 1000, "kwrated": 1000,
+         "kv": 12.47, "%stored": 100, "%reserve": 20,
+         "%idlingkw": 13},
+        state=opendss.StorageState.DISCHARGING
+    )
+    return test_circuit
+
+
+def test_Storage_next_state_change(test_circuit_with_storage):
+    storage = test_circuit_with_storage.storage_devices["TestStorage"]
+    test_circuit_with_storage.update_storage("TestStorage", -1000.0, 0)
+    test_circuit_with_storage.solve(0.0)
+    assert storage.state_change() == math.inf
+    test_circuit_with_storage.update_storage("TestStorage", 1000.0, 0)
+    test_circuit_with_storage.solve(0.0)
+    change = storage.state_change()
+    test_circuit_with_storage.solve(change)
+    time = change
+    assert storage.soc == pytest.approx(0.2)
+    test_circuit_with_storage.update_storage("TestStorage", -1000.0, 0)
+    test_circuit_with_storage.solve(time)
+    change = storage.state_change()
+    test_circuit_with_storage.solve(time + change)
+    assert storage.soc == pytest.approx(1.0)

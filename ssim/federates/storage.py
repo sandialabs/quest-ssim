@@ -12,6 +12,7 @@ from helics import (
 from ssim import ems
 from ssim import grid
 from ssim.grid import GridSpecification
+from ssim.federates import timing
 
 
 class StorageController(ABC):
@@ -134,9 +135,8 @@ def _controller(federate, controller, hours):
     control_endpoint = federate.get_endpoint_by_name(
         f"storage.{federate.name.lower()}.control"
     )
-    time = 0.0
-    while time < (hours * 3600):
-        federate.log_message(f"granted time: {time}", HelicsLogLevel.TRACE)
+    schedule = timing.schedule(federate, controller.next_update, hours * 3600)
+    for time in schedule:
         voltage = federate.subscriptions[
             f"grid/storage.{federate.name}.voltage"
         ].double
@@ -156,7 +156,6 @@ def _controller(federate, controller, hours):
             )
             federate.publications[f"{federate.name}/power"].publish(power)
         _send_soc_to_ems(soc, time, federate)
-        time = federate.request_time(controller.next_update())
 
 
 class CycleController(StorageController):
@@ -265,7 +264,31 @@ def _get_controller(device):
         raise ValueError(f"Unknown controller: '{device.controller}'")
 
 
-def _start_controller(federate_config, grid_config, hours):
+def _add_subscriptions(name, config):
+    config["subscriptions"].extend(
+        [{"key": f"grid/storage.{name}.soc",
+          "unit": "",
+          "type": "double",
+          "default": 0.5},
+         {"key": f"grid/storage.{name}.voltage",
+          "unit": "pu",
+          "type": "double",
+          "default": 1.0}]
+    )
+
+
+def _complete_config(name, skeleton):
+    with open(skeleton) as f:
+        config = json.load(f)
+        config['name'] = name
+        config['core'] = f"{name}_core"
+        _add_subscriptions(name, config)
+        return json.dumps(config)
+
+
+def _start_controller(name, federate_config_skeleton, grid_config, hours):
+    federate_config = _complete_config(name, federate_config_skeleton)
+    print(f"federate config: {federate_config}")
     federate = helicsCreateCombinationFederateFromConfig(federate_config)
     federate.register_global_endpoint(
         f"storage.{federate.name.lower()}.control"
@@ -276,12 +299,17 @@ def _start_controller(federate_config, grid_config, hours):
     controller = _get_controller(device)
     federate.enter_executing_mode()
     _controller(federate, controller, hours)
-    federate.finalize()
+    federate.disconnect()
 
 
 def run():
     parser = argparse.ArgumentParser(
         description="HELICS federate for a storage controller."
+    )
+    parser.add_argument(
+        "name",
+        type=str,
+        help="Name of the storage device controlled by this federate."
     )
     parser.add_argument(
         "grid_config",
@@ -302,5 +330,5 @@ def run():
     )
     args = parser.parse_args()
     _start_controller(
-        args.federate_config, args.grid_config, args.hours
+        args.name, args.federate_config, args.grid_config, args.hours
     )

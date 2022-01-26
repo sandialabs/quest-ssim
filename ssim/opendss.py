@@ -6,7 +6,7 @@ import enum
 from functools import lru_cache, cached_property
 import logging
 import math
-from os import PathLike
+from os import PathLike, path
 from pathlib import Path
 import re
 from typing import Any, List, Dict, Optional
@@ -93,19 +93,19 @@ class Storage(StorageDevice):
         self.name = name
         self.bus = bus
         self._device_parameters = device_parameters
-        self.state = state
         dssutil.run_command(
             f"New Storage.{name}",
             {"bus1": bus, "phases": phases, "state": state,
              "dispmode": "external", **device_parameters}
         )
 
-    def get_state(self) -> StorageState:
-        return self.state
+    @property
+    def state(self) -> StorageState:
+        return StorageState(self._get('state').lower())
 
-    def set_state(self, state: StorageState):
-        self._set('state', state)
-        self.state = state
+    @state.setter
+    def state(self, new_state):
+        self._set('state', new_state)
 
     def _set(self, property: str, value: Any):
         """Set `property` to `value` in OpenDSS.
@@ -129,6 +129,12 @@ class Storage(StorageDevice):
 
     def set_power(self, kw: float, kvar: float = None, pf: float = None):
         self._set('kW', kw)
+        if self.kw == 0.0:
+            self.state = StorageState.IDLE
+        elif self.kw > 0:
+            self.state = StorageState.DISCHARGING
+        elif self.kw < 0:
+            self.state = StorageState.CHARGING
         if pf is not None:
             self._set('pf', pf)
         if kvar is not None:
@@ -160,7 +166,35 @@ class Storage(StorageDevice):
 
     @property
     def status(self) -> grid.StorageStatus:
-        return grid.StorageStatus(self.name, self.soc, self.kw, self.kvar)
+        return grid.StorageStatus(self.name, self.soc)
+
+    def state_change(self) -> float:
+        """Return the time until the storage device will change state.
+
+        A state change is any change in the power output or input
+        caused by the state of charge reaching either its upper or
+        lower limit.
+
+        Returns
+        -------
+        float
+            Seconds until the device must change state.
+        """
+        if self.state is StorageState.IDLE:
+            return math.inf
+        if self.state is StorageState.DISCHARGING:
+            kwh_minimum = self.kwh_rated * float(self._get("%reserve")) / 100
+            kwh_remaining = float(self._get("kwhstored")) - kwh_minimum
+            kw = self.kw
+            kw_discharge = (
+                    kw + (1.0 - (float(self._get("%effdischarge")) / 100)
+                          - (float(self._get("%idlingkw")) / 100)) * kw)
+            return 3600.0 * (kwh_remaining / kw_discharge)
+        if self.state is StorageState.CHARGING:
+            kwh_remaining = self.kwh_rated - float(self._get("kwhstored"))
+            kw_charge = (float(self._get("%effcharge")) / 100
+                         - float(self._get("%idlingkw")) / 100) * abs(self.kw)
+            return 3600.0 * (kwh_remaining / kw_charge)
 
 
 class PVSystem:
@@ -267,6 +301,24 @@ class Generator:
         if self.is_operational:
             self._activate()
             dssdirect.CktElement.Enabled(False)
+
+    def change_setpoint(self, kw, kvar):
+        """Update the generator setpoint.
+
+        The setpoint is only changed if `self.is_operational` is True,
+        otherwise the method does nothing.
+
+        Parameters
+        ----------
+        kw : float
+            Real power set point [kW].
+        kvar : float
+            Reactive power set point [kVAR].
+
+        """
+        if self.is_operational:
+            self.kw = kw
+            self.kvar = kvar
 
     def _read_meter(self) -> dict:
         self._activate()
@@ -636,6 +688,54 @@ def all_node_voltages(time):
     )
 
 
+class Monitor:
+    """Extended API for OpenDSS Monitor objects.
+
+    Parameters
+    ----------
+    name : str
+        Name of the monitor object.
+    """
+
+    def __init__(self, name):
+        self.name = name
+
+    def to_csv(self, directory=None, filename=None):
+        """Save the monitor data to a csv file.
+
+        Parameters
+        ----------
+        directory: PathLike, optional
+            Path to the directory where the ouput file should be
+            written. If not specified the data is written to the file
+            name specified in OpenDSS.
+        filename: str, optional
+            Name of the output CSV file. If not specified the file
+            name is extracted from the monitor's FileName property in
+            OpenDSS. This argument is only valid if `directory` is
+            specified.
+        """
+        dssdirect.Monitors.Name(self.name)
+        dssdirect.Monitors.Save()
+        if directory is None:
+            output_file = Path(dssdirect.Monitors.FileName())
+        elif filename is None:
+            filename = path.basename(dssdirect.Monitors.FileName())
+            output_file = directory / filename
+        else:
+            output_file = directory / filename
+        print(f"saving monitor {self.name} data in {output_file}")
+        with open(output_file, 'w', newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(("time", *dssdirect.Monitors.Header()))
+            writer.writerows(
+                zip(map(lambda hour: hour * 3600.0,
+                        dssdirect.Monitors.dblHour()),
+                    *(dssdirect.Monitors.Channel(x)
+                      for x in range(1, dssdirect.Monitors.NumChannels() + 1)))
+            )
+
+
 class DSSModel:
     """Wrapper around OpenDSSDirect."""
 
@@ -826,7 +926,7 @@ class DSSModel:
             return 0
         return min(
             self._last_solution_time + self._max_step,
-            self.next_action()
+            self.next_event()
         )
 
     def last_update(self) -> Optional[float]:
@@ -885,6 +985,13 @@ class DSSModel:
             self._voltage_recorder.to_csv(output_dir / "bus_voltage.csv")
         if self._loading_recorder is not None:
             self._loading_recorder.to_csv(output_dir / "pde_loading.csv")
+        # Save the data recorded by any internal OpenDSS monitors
+        for monitor in self.monitors():
+            monitor.to_csv(directory=output_dir)
+
+    def monitors(self):
+        for monitor_name in dssdirect.Monitors.AllNames():
+            yield Monitor(monitor_name)
 
     def add_storage(self, name: str, bus: str, phases: int,
                     device_parameters: Dict[str, Any],
@@ -1120,6 +1227,27 @@ class DSSModel:
         """
         return dssdirect.Circuit.TotalPower()
 
+    def next_event(self):
+        """Return the time of the next event that will change the grid state.
+
+        Events include control actions, depletion of a storage device,
+        or a storage device reaching its full state of charge.
+
+        Returns
+        -------
+        float
+            Time when the next event will occur. [seconds]
+        """
+        if len(self.storage_devices) == 0:
+            storage_change = math.inf
+        else:
+            storage_change = min(
+                storage.state_change()
+                for storage in self.storage_devices.values()
+            )
+        control_time = self.next_action()
+        return min(self._last_solution_time + storage_change, control_time)
+
     def next_action(self):
         """Return the time of the next control action.
 
@@ -1244,7 +1372,7 @@ class DSSModel:
         """Fail a generator.
 
         Disables the generator so it cannot produce power and marks it as
-        failed to prevent its activation until it ahs been repaired.
+        failed to prevent its activation until it has been repaired.
 
         Parameters
         ----------

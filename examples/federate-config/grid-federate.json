@@ -1,62 +1,15 @@
 {
   "name": "grid",
   "core_name": "grid_core",
-  "log_level": 7,
+  "log_level": "trace",
   "core_type": "zmq",
   "time_delta": 1.0,
-  "subscriptions": [
-    {
-      "key": "S1/power",
-      "unit": "kW",
-      "type": "complex",
-      "default": 1.0
-    },
-    {
-      "key": "S2/power",
-      "unit": "kW",
-      "type": "complex",
-      "default": 1.0
-    }
-  ],
+  "subscriptions": [],
   "publications": [
     {
       "key": "total_power",
-      "unit": "kW",
-      "type": "complex"
-    },
-    {
-      "key": "storage.S1.soc",
-      "unit": "",
-      "type": "double",
-      "default": 1.0
-    },
-    {
-      "key": "storage.S1.voltage",
-      "unit": "pu",
-      "type": "double",
-      "default": 0.0
-    },
-    {
-      "key": "storage.S1.power",
-      "unit": "kW",
-      "type": "complex"
-    },
-    {
-      "key": "storage.S2.soc",
-      "unit": "",
-      "type": "double",
-      "default": 1.0
-    },
-    {
-      "key": "storage.S2.voltage",
-      "unit": "pu",
-      "type": "double",
-      "default": 0.0
-    },
-    {
-      "key": "storage.S2.power",
-      "unit": "kW",
-      "type": "complex"
+      "type":  "complex",
+      "units": "kW"
     }
   ],
   "endpoints": [

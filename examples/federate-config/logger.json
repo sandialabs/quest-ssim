@@ -3,5 +3,5 @@
   "core_type": "zmq",
   "core_name": "logger_core",
   "observer": true,
-  "log_level": 7
+  "log_level": "trace"
 }

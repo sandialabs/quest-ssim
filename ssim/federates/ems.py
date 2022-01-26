@@ -8,7 +8,9 @@ from helics import (
 
 from ssim import reliability
 from ssim.grid import GridSpecification, StatusMessage
-from ssim.ems import CompositeHeuristicEMS
+from ssim.ems import GridModel, EMS
+from ssim.heuristicems import CompositeHeuristicEMS
+from ssim.federates import timing
 
 
 class EMSFederate:
@@ -22,7 +24,9 @@ class EMSFederate:
     grid_spec : GridSpecification
     """
     def __init__(self, federate, grid_spec):
-        self._ems = CompositeHeuristicEMS(grid_spec)
+        grid = GridModel(grid_spec)
+        self._ems = EMS(grid,
+                        dispatcher=CompositeHeuristicEMS(grid))
         self.federate = federate
         self.control_endpoint = federate.get_endpoint_by_name("control")
         self.reliability_endpoint = federate.get_endpoint_by_name(
@@ -76,18 +80,15 @@ class EMSFederate:
                 self.reliability_endpoint.get_message().data
             )
 
-    def _update_control_inputs(self):
-        self._ems.update(self.pending_control_messages())
-
     def _update_reliability(self):
-        self._ems.apply_reliability_events(
+        self._ems.grid.apply_reliability_events(
             self.pending_reliability_messages()
         )
 
     def _send_control_messages(self):
         # TODO extend this to work for control messages to the grid federate
         #      as well as storage control federates (as currently implemented)
-        for device, action in self._ems.control_actions():
+        for device, action in self._ems.output():
             self.federate.log_message(
                 f"sending control message: {action}",
                 HelicsLogLevel.TRACE
@@ -106,8 +107,7 @@ class EMSFederate:
             Time to advance to in seconds.
         """
         self._update_reliability()
-        self._update_control_inputs()
-        self._ems.step(time)
+        self._ems.update(time, self.pending_control_messages(), None)
         self._send_control_messages()
 
     def run(self, hours):
@@ -118,10 +118,22 @@ class EMSFederate:
         hours : float
             How long to run the EMS federate. [hours]
         """
-        time = 0.0
-        while time < hours * 3600:
+        schedule = timing.schedule(
+            self.federate,
+            self._ems.next_update,
+            hours * 3600
+        )
+        for time in schedule:
             self._step(time)
-            time = self.federate.request_time(self._ems.next_update())
+
+
+def _create_ems(grid_spec):
+    if grid_spec.ems is None:
+        return CompositeHeuristicEMS(grid_spec)
+    if grid_spec.ems.ems_type == 'composite-heuristic':
+        return CompositeHeuristicEMS(grid_spec)
+    raise ValueError(f"Unknown ems type: {grid_spec.ems.ems_type}."
+                     " Valid EMS types are: 'composite-heuristic'.")
 
 
 def run():
@@ -153,6 +165,7 @@ def run():
                                GridSpecification.from_json(args.grid_config))
     federate.enter_executing_mode()
     ems_federate.run(args.hours)
+    federate.disconnect()
 
 
 if __name__ == '__main__':

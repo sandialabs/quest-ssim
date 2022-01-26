@@ -46,13 +46,15 @@ class StorageDevice(ABC):
     def kw_rated(self) -> float:
         """Return kW rating of the device when in `state`."""
 
+    @property
     @abstractmethod
-    def get_state(self) -> StorageState:
-        """Return the state of the storage device."""
+    def state(self) -> StorageState:
+        """State of the storage device"""
 
+    @state.setter
     @abstractmethod
-    def set_state(self, state: StorageState):
-        """Set the state of the storage device."""
+    def state(self, new_state: StorageState):
+        """Change the state of the storage device."""
 
     @abstractmethod
     def set_power(self, kw, kvar=None, pf=None):
