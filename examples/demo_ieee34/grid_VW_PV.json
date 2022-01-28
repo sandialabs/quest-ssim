@@ -144,7 +144,8 @@
     "invcontrol": [
         {
             "name": "InvCtrl1",
-            "der_list": ["PVsystem.PV1", "PVsystem.PV2", "PVsystem.PV3", "PVsystem.PV4", "PVsystem.PV5", "Storage.S5"],
+            "der_list": ["PVsystem.PV1", "PVsystem.PV2", "PVsystem.PV3",
+                "PVsystem.PV4", "PVsystem.PV5"],
             "inv_control_mode": "voltwatt",
             "function_curve_1": {"x":  [0.9, 1.01, 1.08, 1.20],
                                "y":  [1.0, 1.0, 0.0, 0.0]}
