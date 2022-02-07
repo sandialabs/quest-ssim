@@ -10,7 +10,7 @@ from helics import (
 )
 
 from ssim import reliability
-from ssim.grid import GridSpecification, PVStatus
+from ssim.grid import GridSpecification, PVStatus, BusVoltageStatus
 from ssim.opendss import DSSModel
 from ssim.ems import GeneratorControlMessage
 from ssim.federates import timing
@@ -271,9 +271,10 @@ class GridFederate:
         helicsFederateLogDebugMessage(
             federate, f"publications: {federate.publications.keys()}"
         )
-        self._grid_model = DSSModel.from_grid_spec(
-            GridSpecification.from_json(grid_file)
-        )
+        g_spec = GridSpecification.from_json(grid_file)
+        self._grid_model = DSSModel.from_grid_spec(g_spec)
+        self.busses_to_measure = set(bus["name"] for bus in g_spec.busses_to_measure)
+
         self._federate = federate
         self._storage_interface = [
             StorageInterface(federate, device)
@@ -290,10 +291,21 @@ class GridFederate:
             GeneratorInterface(federate, generator)
             for generator in self._grid_model.generators.values()
         ]
+        self.metrics_endpoint = federate.get_endpoint_by_name(
+            "metrics"
+        )
 
     def _update_storage(self):
         for storage in self._storage_interface:
             storage.update()
+
+    def _update_bus_voltages(self, time: float):
+        for bus_name in self.busses_to_measure:
+            voltage = self._grid_model.mean_node_voltage(bus_name)
+            message = BusVoltageStatus(bus_name, voltage, time)
+            self.metrics_endpoint.send_data(
+                message.to_json(), destination="metrics"
+            )
 
     def _publish(self):
         for storage in self._storage_interface:
@@ -362,6 +374,7 @@ class GridFederate:
         self._update_storage()
         self._grid_model.solve(time)
         self._grid_model.record_state()
+        self._update_bus_voltages(time)
         self._publish()
 
     def run(self, hours: float):
