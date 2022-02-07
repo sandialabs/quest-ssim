@@ -39,7 +39,7 @@ class MetricsFederate:
         self.endpoint = federate.get_endpoint_by_name("metrics")
         g_spec = GridSpecification.from_json(grid_config)
 
-        self.csv_file = open("metric_log.csv", 'w')
+        self.csv_file = open("metric_log.csv", 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_fields = ["time"]
 
@@ -83,14 +83,15 @@ class MetricsFederate:
         self._metricMgr.add_accumulator(name, accumulator)
 
     def _update_metrics(self, time):
-        values = [str(time)]
+        values = [0.0] * len(self.csv_fields)
+        values[0] = time
         while self.endpoint.has_message():
             message = self.endpoint.get_message()
             bv_msg: BusVoltageStatus = StatusMessage.from_json(message.data)  # noqa
-            curr_metric: MetricTimeAccumulator = self._metricMgr.get_accumulator(bv_msg.name)
+            curr_metric: MetricTimeAccumulator = self._metricMgr[bv_msg.name]
             met_val = curr_metric.accumulate(bv_msg.voltage, bv_msg.time)
             index = self.csv_fields.index(bv_msg.name)
-            values.insert(index, met_val)
+            values[index] = met_val
 
         self.csv_writer.writerow(values)
 
