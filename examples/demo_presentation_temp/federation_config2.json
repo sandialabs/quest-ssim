@@ -2,7 +2,7 @@
   "federates": [
     {
       "directory": ".",
-      "exec": "helics_broker -f 7",
+      "exec": "helics_broker -f 8",
       "host": "localhost",
       "name": "broker"
     },
@@ -47,6 +47,12 @@
       "exec": "logger-federate --hours 24 grid_config2.json ../federate-config/logger.json",
       "host": "localhost",
       "name": "logger"
+    },
+    {
+      "directory": ".",
+      "exec": "metrics-federate grid_config2.json ../federate-config/metrics.json",
+      "host": "localhost",
+      "name": "metrics"
     }
   ],
   "name": "ssim_demo"
