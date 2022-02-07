@@ -2,8 +2,12 @@
     "dss_file": "../ieee13demo/IEEE13Nodeckt.dss",
     "busses_to_log": ["670", "632", "680", "646", "611"],
     "busses_to_measure": [
-        {"name":  "670", "objective":  1.0, "limit":  0.95}
-        ],
+        {"name":  "670", "objective":  1.0, "limit":  0.95},
+        {"name":  "632", "objective":  1.0, "limit":  0.95},
+        {"name":  "680", "objective":  1.0, "limit":  0.95},
+        {"name":  "646", "objective":  1.0, "limit":  0.95},
+        {"name":  "611", "objective":  1.0, "limit":  0.95}
+    ],
     "storage": [
         {
             "name": "S1",
