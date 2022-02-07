@@ -357,7 +357,7 @@ class MetricTimeAccumulator(MetricAccumulator):
         MetricAccumulator.__init__(self, m)
         self._curr_time = init_time
 
-    def accumulate(self, value: float, curr_time: float):
+    def accumulate(self, value: float, curr_time: float) -> float:
         """Adds in normalized value weighted by the difference between the last
         time this method was called and the time provided.
 
@@ -374,9 +374,10 @@ class MetricTimeAccumulator(MetricAccumulator):
             "current time provided to accumulate function must be greater than " + \
             "or equal to any prior time provided."
         if curr_time == self._curr_time:
-            return
-        MetricAccumulator.accumulate(self, value, curr_time - self._curr_time)
+            return 0.0
+        val = MetricAccumulator.accumulate(self, value, curr_time - self._curr_time)
         self._curr_time = curr_time
+        return val
 
 
 class MetricManager:
@@ -400,21 +401,20 @@ class MetricManager:
                 "Metric accumulator names must be unique. An accumulator already"
                 f" exists with the name {name}. Try using a different name"
             )
-        self._all_metrics.insert(name, accum)
+        self._all_metrics[name] = accum
 
     @property
     def all_metrics(self) -> dict:
         return self._all_metrics
 
-    @property
-    def get_accumulator(self, name: str):
+    def __getitem__(self, name: str):
         return self._all_metrics.get(name)
 
     @property
     def get_total_accumulation(self) -> float:
         ret = 0.0
-        for accumulator in self._all_metrics:
-            ret += accumulator.accumulated_value()
+        for accumulator in self._all_metrics.values():
+            ret += accumulator.accumulated_value
         return ret
 
 
