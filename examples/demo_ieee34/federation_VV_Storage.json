@@ -2,7 +2,7 @@
   "federates": [
     {
       "directory": ".",
-      "exec": "helics_broker -f 4",
+      "exec": "helics_broker -f 8",
       "host": "localhost",
       "name": "broker"
     },
