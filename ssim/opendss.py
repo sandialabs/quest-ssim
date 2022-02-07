@@ -227,6 +227,14 @@ class PVSystem:
                             {"bus1": bus, "phases": phases,
                              "Pmpp": pmpp, "kVA": inverter_kva,
                              **system_parameters})
+        # temporarily attaches a PQ monitor to each PV system
+        # no need to merge this edit, we will add the functionality to add
+        # monitors later
+        monitor_name = "Mon_" + name
+        element_name = "PVSystem." + name
+        dssutil.run_command(f"new monitor.{monitor_name}",
+                            {"element": element_name, "terminal": 1,
+                             "mode": 1, "ppolar": "no"})
 
     def _activate(self):
         """Make this the active PV system in OpenDSS."""

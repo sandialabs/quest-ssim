@@ -1,0 +1,53 @@
+{
+  "federates": [
+    {
+      "directory": ".",
+      "exec": "helics_broker -f 4",
+      "host": "localhost",
+      "name": "broker"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S814 --hours 24 grid_config1.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s814"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S828 --hours 24 grid_config1.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s828"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S860 --hours 24 grid_config1.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s860"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S840 --hours 24 grid_config1.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s840"
+    },
+    {
+      "directory": ".",
+      "exec": "grid-federate --hours 24 grid_config1.json ../federate-config/grid-federate.json",
+      "host": "localhost",
+      "name": "grid"
+    },
+    {
+      "directory": ".",
+      "exec": "reliability-federate --hours 24 grid_config1.json ../federate-config/reliability.json",
+      "host": "localhost",
+      "name": "reliability"
+    },
+    {
+      "directory": ".",
+      "exec": "logger-federate --hours 24 grid_config1.json ../federate-config/logger.json",
+      "host": "localhost",
+      "name": "logger"
+    }
+  ],
+  "name": "ssim_demo"
+}
