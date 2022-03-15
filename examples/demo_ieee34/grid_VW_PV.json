@@ -1,0 +1,183 @@
+{
+    "dss_file": "../ieee34demo/ieee34Mod1.dss",
+    "busses_to_log": ["802", "814", "828", "860", "840"],
+    "storage": [
+        {
+            "name": "S1",
+            "bus": "802",
+            "phases": 3,
+            "kwrated": 200,
+            "kva": 220,
+            "kwhrated": 2000,
+            "%stored": 50,
+            "kV": 24.9,
+            "controller": "droop",
+            "controller_params": {
+                "p_droop": 0,
+                "q_droop": 0
+            }
+        },
+        {
+            "name": "S2",
+            "bus": "814",
+            "phases": 3,
+            "kwrated": 200,
+            "kva": 220,
+            "kwhrated": 2000,
+            "%stored": 50,
+            "kV": 24.9,
+            "controller": "droop",
+            "controller_params": {
+                "p_droop": 0,
+                "q_droop": 0
+            }
+        },
+        {
+            "name": "S3",
+            "bus": "828",
+            "phases": 3,
+            "kwrated": 200,
+            "kva": 220,
+            "kwhrated": 2000,
+            "%stored": 50,
+            "kV": 24.9,
+            "controller": "droop",
+            "controller_params": {
+                "p_droop": 0,
+                "q_droop": 0
+            }
+        },
+        {
+            "name": "S4",
+            "bus": "860",
+            "phases": 3,
+            "kwrated": 200,
+            "kva": 220,
+            "kwhrated": 2000,
+            "%stored": 50,
+            "kV": 24.9,
+            "controller": "droop",
+            "controller_params": {
+                "p_droop": 0,
+                "q_droop": 0
+            }
+        },
+        {
+            "name": "S5",
+            "bus": "840",
+            "phases": 3,
+            "kwrated": 200,
+            "kva": 220,
+            "pf": 1,
+            "kwhrated": 2000,
+            "%stored": 50,
+            "kV": 24.9,
+            "controller": "external",
+            "controller_params": {
+                "p_droop": 0,
+                "q_droop": 0
+            }
+        }
+    ],
+    "pvsystem": [
+        {
+            "name": "PV1",
+            "bus": "802",
+            "phases": 3,
+            "pmpp": 500,
+            "kva_rated": 550,
+            "kV": 24.9,
+            "irradiance_profile": "../ieee34demo/5MinuteIrradiance.csv",
+            "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                                    "y":  [0.90, 0.94, 0.98, 0.99]},
+            "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
+        },
+        {
+            "name": "PV2",
+            "bus": "814",
+            "phases": 3,
+            "pmpp": 500,
+            "kva_rated": 550,
+            "kV": 24.9,
+            "irradiance_profile": "../ieee34demo/5MinuteIrradiance.csv",
+            "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                                    "y":  [0.90, 0.94, 0.98, 0.99]},
+            "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
+        },
+        {
+            "name": "PV3",
+            "bus": "828",
+            "phases": 3,
+            "pmpp": 500,
+            "kva_rated": 550,
+            "kV": 24.9,
+            "irradiance_profile": "../ieee34demo/5MinuteIrradiance.csv",
+            "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                                    "y":  [0.90, 0.94, 0.98, 0.99]},
+            "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
+        },
+        {
+            "name": "PV4",
+            "bus": "860",
+            "phases": 3,
+            "pmpp": 500,
+            "kva_rated": 550,
+            "kV": 24.9,
+            "irradiance_profile": "../ieee34demo/5MinuteIrradiance.csv",
+            "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                                    "y":  [0.90, 0.94, 0.98, 0.99]},
+            "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
+        },
+        {
+            "name": "PV5",
+            "bus": "840",
+            "phases": 3,
+            "pmpp": 500,
+            "kva_rated": 550,
+            "kV": 24.9,
+            "irradiance_profile": "../ieee34demo/5MinuteIrradiance.csv",
+            "inverter_efficiency": {"x":  [10, 50, 90, 100],
+                                    "y":  [0.90, 0.94, 0.98, 0.99]},
+            "pt_curve": {"x": [0, 25, 75, 100], "y":  [1.2, 1.0, 0.8, 0.6]}
+        }
+    ],
+    "invcontrol": [
+        {
+            "name": "InvCtrl1",
+            "der_list": ["PVsystem.PV1", "PVsystem.PV2", "PVsystem.PV3",
+                "PVsystem.PV4", "PVsystem.PV5"],
+            "inv_control_mode": "voltwatt",
+            "function_curve_1": {"x":  [0.9, 1.01, 1.08, 1.20],
+                               "y":  [1.0, 1.0, 0.0, 0.0]}
+        }
+    ],
+    "reliability": {
+        "seed": 1234567,
+        "line": {
+            "mtbf": 1000000,
+            "min_repair": 1,
+            "max_repair": 10
+        },
+        "switch": {
+            "mtbf": 100,
+            "min_repair": 5,
+            "max_repair": 8,
+            "p_open": 1.0,
+            "p_closed": 0.0,
+            "p_current": 0.0
+        },
+        "generator":
+        {
+            "aging": {
+                "mtbf": 5000,
+                "min_repair": 1.0,
+                "max_repair": 1.0
+            },
+            "operating_wear_out": {
+                "mtbf": 1000,
+                "min_repair": 2.0,
+                "max_repair": 2.0
+            }
+        }
+    }
+}

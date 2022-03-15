@@ -1,0 +1,59 @@
+{
+  "federates": [
+    {
+      "directory": ".",
+      "exec": "helics_broker -f 8",
+      "host": "localhost",
+      "name": "broker"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S1 --hours 24 grid_VW_PV.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s1"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S2 --hours 24 grid_VW_PV.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s2"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S3 --hours 24 grid_VW_PV.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s3"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S4 --hours 24 grid_VW_PV.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s4"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S5 --hours 24 grid_VW_PV.json ../federate-config/generic-storage.json",
+      "host": "localhost",
+      "name": "s5"
+    },
+    {
+      "directory": ".",
+      "exec": "grid-federate --hours 24 grid_VW_PV.json ../federate-config/grid-federate.json",
+      "host": "localhost",
+      "name": "grid"
+    },
+    {
+      "directory": ".",
+      "exec": "reliability-federate --hours 24 grid_VW_PV.json ../federate-config/reliability.json",
+      "host": "localhost",
+      "name": "reliability"
+    },
+    {
+      "directory": ".",
+      "exec": "logger-federate --hours 24 grid_VW_PV.json ../federate-config/logger.json",
+      "host": "localhost",
+      "name": "logger"
+    }
+  ],
+  "name": "ssim_demo"
+}

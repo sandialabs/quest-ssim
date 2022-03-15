@@ -244,6 +244,7 @@ class GridSpecification:
         self.inv_control: List[InvControlSpecification] = []
         self.busses_to_log: List[str] = []
         self.ems = None
+        self.busses_to_measure: List[dict] = []
 
     def add_storage(self, specs: StorageSpecification):
         """Add a storage device to the grid specification.
@@ -308,6 +309,8 @@ class GridSpecification:
             spec = json.load(f)
         grid = cls(pathlib.Path(spec["dss_file"]))
         grid.busses_to_log = set(spec.get("busses_to_log", []))
+        grid.busses_to_measure = spec.get("busses_to_measure", [])
+
         for device in spec["storage"]:
             grid.add_storage(
                 StorageSpecification.from_dict(device)
@@ -349,7 +352,7 @@ class StatusMessage:
         return json.dumps({"message_type": message_type, **message_data})
 
     @classmethod
-    def from_json(self, jsonstr):
+    def from_json(cls, jsonstr: str):
         """Parse a JSON string and return the status message it represents.
 
         Parameters
@@ -371,6 +374,8 @@ class StatusMessage:
             return GeneratorStatus(**message)
         if message_type == "LoadStatus":
             return LoadStatus(**message)
+        if message_type == "BusVoltageStatus":
+            return BusVoltageStatus(**message)
 
 
 @dataclass
@@ -424,3 +429,14 @@ class LoadStatus(StatusMessage):
     name: str
     kw: float
     kvar: float
+
+
+@dataclass
+class BusVoltageStatus(StatusMessage):
+    """Status of the voltage at a bus"""
+
+    __slots__ = ['name', 'voltage', 'time']
+
+    name: str
+    voltage: float
+    time: float

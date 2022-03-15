@@ -2,7 +2,7 @@
   "federates": [
     {
       "directory": ".",
-      "exec": "helics_broker -f 5",
+      "exec": "helics_broker -f 6",
       "host": "localhost",
       "name": "broker"
     },
@@ -33,6 +33,12 @@
     {
       "directory": ".",
       "exec": "ems-federate --hours 1025 grid.json ../federate-config/ems.json",
+      "host": "localhost",
+      "name": "ems"
+    },
+    {
+      "directory": ".",
+      "exec": "metrics-federate grid.json ../federate-config/metrics.json",
       "host": "localhost",
       "name": "ems"
     }

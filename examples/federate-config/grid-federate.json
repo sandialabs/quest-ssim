@@ -15,6 +15,9 @@
   "endpoints": [
     {
       "name": "reliability"
+    },
+    {
+      "name": "metrics"
     }
   ]
 }
