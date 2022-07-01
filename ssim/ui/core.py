@@ -8,8 +8,22 @@ class Project:
         self.name = name
         self._grid_model = None
         self._storage_options = None
-        self._metrics = None
+        self._metrics = []
 
+    def add_metric(self, metric):
+        self._metrics.append(metric)
+
+    def configurations(self):
+        """Return an iterator over all configurations in this project."""
+        raise NotImplementedError()
+
+    def num_configurations(self):
+        """Return the total number of configurations in this project."""
+        raise NotImplementedError()
+
+    def evaluated_configurations(self):
+        """Return the number of configurations that have been evaluated."""
+        raise NotImplementedError()
 
 class Configuration:
     """A specific grid configuration to be evalueated."""
