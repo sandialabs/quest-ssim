@@ -1,0 +1,12 @@
+{
+  "name": "metrics",
+  "core_type": "zmq",
+  "core_name": "metrics_core",
+  "observer": true,
+  "endpoints": [
+    {
+      "global": true,
+      "name": "metrics"
+    }
+  ]
+}

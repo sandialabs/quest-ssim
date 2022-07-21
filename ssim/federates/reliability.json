@@ -1,0 +1,12 @@
+{
+  "name": "reliability",
+  "core_name": "reliability_core",
+  "core_type": "zmq",
+  "log_level": "debug",
+  "time_delta": 1,
+  "endpoints": [
+    {
+      "name": "reliability"
+    }
+  ]
+}

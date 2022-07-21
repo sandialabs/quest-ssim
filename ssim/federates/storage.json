@@ -1,0 +1,13 @@
+{
+  "log_level": "trace",
+  "core_type": "zmq",
+  "time_delta": 0.1,
+  "subscriptions": [],
+  "publications": [
+    {
+      "key": "power",
+      "unit": "kW",
+      "type": "complex"
+    }
+  ]
+}
