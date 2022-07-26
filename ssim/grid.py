@@ -15,6 +15,11 @@ from typing import Optional, List, Tuple
 Curve = Tuple[Tuple[float, float], ...]
 
 
+def _curve_to_dict(curve):
+    xs, ys = zip(*curve)
+    return {"x": xs, "y": ys}
+
+
 def _curve_from_dict(curve):
     if curve.keys() < {"x", "y"}:
         raise ValueError("Invalid curve specification. Must include keys "
@@ -110,6 +115,27 @@ class StorageSpecification:
             params=params
         )
 
+    def to_dict(self):
+        """Return a dictionary representation this device.
+
+        The dictionary represents the device as it would appear in the
+        grid configuration JSON file.
+        """
+        return {
+            "name": self.name,
+            "bus": self.bus,
+            "kwhrated": self.kwh_rated,
+            "kwrated": self.kw_rated,
+            "phases": self.phases,
+            "%stored": self.soc * 100,
+            "controller": self.controller,
+            "controller_params": self.controller_params,
+            **self.params,
+            **({"inverter_efficiency":
+                _curve_to_dict(self.inverter_efficiency)}
+               if self.inverter_efficiency else {})
+        }
+
 
 @dataclass
 class InvControlSpecification:
@@ -186,7 +212,7 @@ class PVSpecification:
 
     #: Maximum DC array output at changing temperature relative to `pmpp`.
     pt_curve: Optional[Curve] = None
-
+    
     @classmethod
     def from_dict(cls, params: dict):
         """Build a PVSpecification instance from a dict with OpenDSS keys.
@@ -214,6 +240,21 @@ class PVSpecification:
             params=params
         )
 
+    def to_dict(self):
+        """Return a dictionary representation of this PV system."""
+        pv = {
+            "name": self.name,
+            "bus": self.bus,
+            "pmpp": self.pmpp,
+            "kva_rated": self.kva_rated,
+            "phases": self.phases,
+            **self.params
+        }
+        if self.inverter_efficiency is not None:
+            pv["inverter_efficiency"] = str(self.inverter_efficiency)
+        if self.pt_curve is not None:
+            pv["inverter_efficiency"] = _curve_to_dict(self.pt_curve)
+        return pv
 
 @dataclass
 class EMSSpecification:
