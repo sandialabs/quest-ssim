@@ -1,0 +1,34 @@
+<SSim>:
+    name: 'ssim'
+
+    GridLayout:
+        # orientation: "vertical"
+        cols: 1
+        rows: 6
+
+        TextInput:
+            text: "unnamed"
+            pos_hint_x: 0
+            pos_hint_y: 0
+            size_hint_x: "100px"
+            size_hint_y: "25px"
+
+        Button:
+            text: "select grid model"
+            on_press: root.manager.launch_ssp()
+
+        Button:
+            text: "select storage"
+            on_press: root.manager.launch_storage_configuration()
+
+        Button:
+            text: "configure loads"
+            on_press: root.manager.launch_load_configuration()
+
+        Button:
+            text: "configure metrics"
+            on_press: root.manager.launch_metrics_configuration()
+
+        Button:
+            text: "Run"
+            on_press: root.manager.launch_ssim_run()

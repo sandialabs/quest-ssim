@@ -261,7 +261,7 @@ class Configuration:
     def _load_results(self):
         # TODO load the output files/data into a results object (maybe
         # just create a results object that load the data lazily to
-        # keep memory usage low)
+        # keep memory usage low)'
         pass
 
     def _grid_config(self):
