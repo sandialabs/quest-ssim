@@ -1,4 +1,4 @@
-<SSim>:
+<SSimScreen>:
     name: 'ssim'
 
     BoxLayout:
@@ -9,6 +9,7 @@
 
         TextInput:
             text: "unnamed"
+            multiline: False
 
         Button:
             text: "select grid model"
@@ -16,16 +17,56 @@
 
         Button:
             text: "select storage"
-            on_press: root.report("storage")
+            on_press: root.open_der_configuration()
 
         Button:
             text: "configure loads"
-            on_press: root.report("loads")
+            on_press: root.open_load_configuration()
 
         Button:
             text: "configure metrics"
-            on_press: root.report("metrics")
+            on_release: root.open_metric_configuration()
 
         Button:
             text: "Run"
-            on_press: root.report("run")
+            on_press: root.do_run_simulation()
+
+<DERConfigurationScreen>:
+    name: "der-config"
+
+    BoxLayout:
+        orientation: "vertical"    
+
+        Button:
+            text: "back"
+            on_press: root.manager.current = 'ssim'
+
+<LoadConfigurationScreen>:
+    name: "load-config"
+
+    BoxLayout:
+        orientation: "vertical"    
+
+        Button:
+            text: "back"
+            on_press: root.manager.current = 'ssim'
+
+<MetricConfigurationScreen>:
+    name: "metric-config"
+
+    BoxLayout:
+        orientation: "vertical"    
+
+        Button:
+            text: "back"
+            on_press: root.manager.current = 'ssim'
+
+<RunSimulationScreen>:
+    name: "run-sim"
+
+    BoxLayout:
+        orientation: "vertical"    
+
+        Button:
+            text: "back"
+            on_press: root.manager.current = 'ssim'
