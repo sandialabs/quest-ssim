@@ -10,42 +10,59 @@ class SSimApp(App):
 
     def __init__(self, *args, **kwargs):
         self.project = Project("unnamed") # TODO name
-        super(SSimApp, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def build(self):
 
         screen_manager = ScreenManager()
-        screen_manager.add_widget(SSimScreen(name="ssim"))
-        screen_manager.add_widget(DERConfigurationScreen(name="der-config"))
-        screen_manager.add_widget(LoadConfigurationScreen(name="load-config"))
-        screen_manager.add_widget(MetricConfigurationScreen(name="metric-config"))
-        screen_manager.add_widget(RunSimulationScreen(name="run-sim"))
+        screen_manager.add_widget(SSimScreen(self.project, name="ssim"))
+        screen_manager.add_widget(DERConfigurationScreen(self.project, name="der-config"))
+        screen_manager.add_widget(LoadConfigurationScreen(self.project, name="load-config"))
+        screen_manager.add_widget(MetricConfigurationScreen(self.project, name="metric-config"))
+        screen_manager.add_widget(RunSimulationScreen(self.project, name="run-sim"))
         screen_manager.current = "ssim"
 
         return screen_manager
 
 
-class DERConfigurationScreen(Screen):
+class SSimBaseScreen(Screen):
+    """Base class for screens that holds the fundamental ssim data structures.
+
+    Attributes:
+        project : :py:class:`ssim.ui.Project`
+
+    Parameters
+    ----------
+    project : ssim.ui.Project
+        Project object where the simulation configuration is being constructed.
+    """
+
+    def __init__(self, project, *args, **kwargs):
+        self.project = project
+        super().__init__(*args, **kwargs)
+
+
+class DERConfigurationScreen(SSimBaseScreen):
     pass
 
 
-class LoadConfigurationScreen(Screen):
+class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
 
-class MetricConfigurationScreen(Screen):
+class MetricConfigurationScreen(SSimBaseScreen):
     pass
 
 
-class LoadConfigurationScreen(Screen):
+class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
 
-class RunSimulationScreen(Screen):
+class RunSimulationScreen(SSimBaseScreen):
     pass
 
 
-class SSimScreen(Screen):
+class SSimScreen(SSimBaseScreen):
 
     def report(self, message):
         Logger.debug("button pressed: %s", message)
