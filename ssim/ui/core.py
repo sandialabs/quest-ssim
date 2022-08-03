@@ -9,6 +9,7 @@ import pkg_resources
 import subprocess
 
 from ssim import grid
+from ssim.opendss import DSSModel
 
 # To Do
 #
@@ -62,6 +63,13 @@ class Project:
         self._storage_devices = []
         self._pvsystems = []
         self._metrics = []
+
+    @property
+    def bus_names(self):
+        return self._grid_model.bus_names
+
+    def set_grid_model(self, model_path):
+        self._grid_model = DSSModel(model_path)
 
     def add_metric(self, metric):
         self._metrics.append(metric)

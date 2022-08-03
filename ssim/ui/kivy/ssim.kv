@@ -1,6 +1,6 @@
 <SSimScreen>:
     name: 'ssim'
-
+    bus_list: bus_list
     BoxLayout:
         orientation: "vertical"
 
@@ -13,7 +13,7 @@
 
         Button:
             text: "select grid model"
-            on_press: root.report("grid")
+            on_press: root.select_grid_model()
 
         Button:
             text: "select storage"
@@ -25,11 +25,15 @@
 
         Button:
             text: "configure metrics"
-            on_release: root.open_metric_configuration()
+            on_press: root.open_metric_configuration()
 
         Button:
             text: "Run"
             on_press: root.do_run_simulation()
+
+        TextInput:
+            id: bus_list
+            multiline: True
 
 <DERConfigurationScreen>:
     name: "der-config"
@@ -40,6 +44,10 @@
         Button:
             text: "back"
             on_press: root.manager.current = 'ssim'
+
+        Button:
+            text: "save"
+            on_press: root.save_config()
 
 <LoadConfigurationScreen>:
     name: "load-config"
@@ -70,3 +78,23 @@
         Button:
             text: "back"
             on_press: root.manager.current = 'ssim'
+
+
+<LoadGridDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Load"
+                on_release: root.load(filechooser.path, filechooser.selection)
