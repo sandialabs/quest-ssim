@@ -1182,6 +1182,10 @@ class DSSModel:
         for load in dssdirect.Loads.AllNames():
             yield Load(load)
 
+    @property
+    def bus_names(self):
+        return dssdirect.Circuit.AllBusNames()
+
     @staticmethod
     def node_voltage(bus):
         """Return a list of node voltage magnitudes at `bus` [pu]."""
