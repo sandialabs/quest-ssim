@@ -73,10 +73,44 @@
     name: "run-sim"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"   
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                Label:
+                    text: "Configurations that will be evaluated:"
+                    size_hint_y: None
+                    height: 50
+                TextInput:
+                    id: config_list
+                    mutliline: True
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                spacing: 5
+                Label:
+                    text: "Total number of configurations 256 (128 completed)"
+                    size_hint_y: None
+                    height: 50
+                Button: 
+                    text: "View Saved Results"
+                Button: 
+                    text: "Resume"
+                Button:
+                    text: "Remove Configuration"
+                Button:
+                    text: "Go"
 
         Button:
             text: "back"
+            size_hint_y: None
+            height: 100
             on_press: root.manager.current = 'ssim'
 
 
