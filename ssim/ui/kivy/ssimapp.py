@@ -1,8 +1,10 @@
 """Storage Sizing and Placement Kivy application"""
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.app import App
+from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty
+from kivy.uix.popup import Popup
 
 from ssim.ui import Project
 
@@ -67,17 +69,32 @@ class RunSimulationScreen(SSimBaseScreen):
     pass
 
 
+class SelectGridDialog(FloatLayout):
+    load = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+
+
 class SSimScreen(SSimBaseScreen):
 
+    grid_path = ObjectProperty(None)
     bus_list = ObjectProperty(None)
 
     def report(self, message):
         Logger.debug("button pressed: %s", message)
 
+    def dismiss_popup(self):
+        self._popup.dismiss()
+
+    def load_grid(self, path, filename):
+        Logger.debug("loading file %s", filename[0])
+        self.project.set_grid_model(filename[0])
+        self.bus_list.text = '\n'.join(self.project.bus_names)
+        self.dismiss_popup()
+
     def select_grid_model(self):
-        self.project.set_grid_model("examples/ieee13demo/IEEE13Nodeckt.dss")
-        Logger.debug("busses: %s", self.project.bus_names)
-        self.bus_list.text = "\n".join(self.project.bus_names)
+        chooser = SelectGridDialog(load=self.load_grid, cancel=self.dismiss_popup)
+        self._popup = Popup(title="select grid model", content=chooser)
+        self._popup.open()
 
     def open_der_configuration(self):
         self.manager.current = "der-config"

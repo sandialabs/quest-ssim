@@ -80,13 +80,15 @@
             on_press: root.manager.current = 'ssim'
 
 
-<LoadGridDialog>:
+<SelectGridDialog>:
     BoxLayout:
         size: root.size
         pos: root.pos
         orientation: "vertical"
         FileChooserListView:
             id: filechooser
+            path: "."
+            filters: ["*.dss"]
 
         BoxLayout:
             size_hint_y: None
