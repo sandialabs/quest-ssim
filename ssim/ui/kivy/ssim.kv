@@ -86,9 +86,8 @@
                     text: "Configurations that will be evaluated:"
                     size_hint_y: None
                     height: 50
-                TextInput:
+                ConfigScroller:
                     id: config_list
-                    mutliline: True
 
             BoxLayout:
                 orientation: "vertical"
@@ -112,6 +111,28 @@
             size_hint_y: None
             height: 100
             on_press: root.manager.current = 'ssim'
+
+
+<SelectableLabel>:
+    # Draw a background to indicate selection
+    canvas.before:
+        Color:
+            rgba: (.0, 0.9, .1, .3) if self.selected else (0, 0, 0, 1)
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+
+<ConfigScroller>:
+    viewclass: 'SelectableLabel'
+    SelectableRecycleBoxLayout:
+        default_size: None, dp(56)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: True
+        touch_multiselect: True
 
 
 <SelectGridDialog>:
