@@ -63,10 +63,107 @@
     name: "metric-config"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"
+
+        BoxLayout:
+            #cols: 3
+            orientation: "horizontal"
+
+            BoxLayout:
+                orientation: "vertical"
+
+                canvas.before:
+                    Color:
+                        rgba: .5, .5, .5, 1
+                    Line:
+                        width: 2
+                        rectangle: self.x, self.y, self.width, self.height
+
+                Label:
+                    text: "Class of Metrics to Configure"
+                    size_hint: 1.0, 0.05
+                    color: 0,0,0,1
+
+                ScrollView:
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+
+                    MDList:
+                        id: metriclist
+
+                        TwoLineIconListItem:
+                            text: "Voltage"
+                            secondary_text: "set voltage targets by bus"
+                            icon: "plus"
+                            on_release: root.configure_voltage_metrics()
+
+                        TwoLineIconListItem:
+                            text: "Some other metric values"
+                            secondary_text: "set ..."
+                            icon: "plus"
+                            on_release: root.configure_some_other_metrics()
+
+            BoxLayout:
+                orientation: "vertical"
+
+                canvas.before:
+                    Color:
+                        rgba: .5, .5, .5, 1
+                    Line:
+                        width: 2
+                        rectangle: self.x, self.y, self.width, self.height
+
+                Label:
+                    id: interlabel
+                    text: "Metric Objects"
+                    size_hint: 1.0, 0.05
+                    color: 0,0,0,1
+
+                ScrollView:
+                    MDList:
+                        id: interlist
+
+                        canvas.before:
+                            Color:
+                                rgba: .5, .5, .5, 1
+                            Line:
+                                width: 2
+                                rectangle: self.x, self.y, self.width, self.height
+
+            BoxLayout:
+                orientation: "vertical"
+
+                canvas.before:
+                    Color:
+                        rgba: .5, .5, .5, 1
+                    Line:
+                        width: 2
+                        rectangle: self.x, self.y, self.width, self.height
+
+                Label:
+                    id: metriclabel
+                    text: "Defined Metrics"
+                    size_hint: 1.0, 0.05
+                    color: 0,0,0,1
+
+                ScrollView:
+                    MDList:
+                        id: metriclist
+
+                        canvas.before:
+                            Color:
+                                rgba: .5, .5, .5, 1
+                            Line:
+                                width: 2
+                                rectangle: self.x, self.y, self.width, self.height
 
         Button:
             text: "back"
+            size_hint: 1.0, 0.05
             on_press: root.manager.current = 'ssim'
 
 <RunSimulationScreen>:
@@ -98,3 +195,15 @@
             Button:
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
+
+<NoGridPopupContent>:
+
+    Label:
+        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to set voltage metrics.'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
