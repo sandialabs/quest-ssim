@@ -86,8 +86,15 @@
                     text: "Configurations that will be evaluated:"
                     size_hint_y: None
                     height: 50
-                ConfigScroller:
-                    id: config_list
+                ScrollView:
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+                    MDList:
+                        id: config_list
 
             BoxLayout:
                 orientation: "vertical"
@@ -112,28 +119,20 @@
             height: 100
             on_press: root.manager.current = 'ssim'
 
+<ListItemWithCheckbox>:
+    id: the_list_item
+    markup: True
 
-<SelectableLabel>:
-    # Draw a background to indicate selection
-    canvas.before:
-        Color:
-            rgba: (.0, 0.9, .1, .3) if self.selected else (0, 0, 0, 1)
-        Rectangle:
-            pos: self.pos
-            size: self.size
+    LeftCheckbox:
+        id: check
+        active: True
 
-
-<ConfigScroller>:
-    viewclass: 'SelectableLabel'
-    SelectableRecycleBoxLayout:
-        default_size: None, dp(56)
-        default_size_hint: 1, None
-        size_hint_y: None
-        height: self.minimum_height
-        orientation: 'vertical'
-        multiselect: True
-        touch_multiselect: True
-
+    IconRightWidget:
+        icon: 'trash-can-outline'
+        theme_text_color: "Custom"
+        text_color: 1, 0, 0, 1
+        on_release:
+            root.delete_item(the_list_item)
 
 <SelectGridDialog>:
     BoxLayout:
@@ -155,3 +154,14 @@
             Button:
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
+
+<NoGridPopupContent>:
+    Label:
+        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to run an analysis.'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2

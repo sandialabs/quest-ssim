@@ -1,63 +1,21 @@
 """Storage Sizing and Placement Kivy application"""
 from kivy.logger import Logger, LOG_LEVELS
-from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty
 from kivy.uix.popup import Popup
-from kivy.uix.recycleview import RecycleView
+from kivy.uix.boxlayout import BoxLayout
 from kivymd.app import MDApp
-from kivy.properties import BooleanProperty
-from kivy.uix.recycleboxlayout import RecycleBoxLayout
-from kivy.uix.behaviors import FocusBehavior
-from kivy.uix.recycleview.layout import LayoutSelectionBehavior
-from kivy.uix.recycleview.views import RecycleDataViewBehavior
+from kivymd.uix.list import TwoLineIconListItem
+
+# Adding the following two imports for checkboxes
+from kivymd.uix.list import TwoLineAvatarIconListItem, ILeftBodyTouch
+from kivymd.uix.selectioncontrol import MDCheckbox
 
 from ssim.ui import Project
 
 
-class ConfigScroller(RecycleView):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.data = [{"text": str(x)} for x in range(20)]
-
-        # TO DO:  get actual number of configurations from the Project class
-
-
-class SelectableRecycleBoxLayout(FocusBehavior, LayoutSelectionBehavior,
-                                 RecycleBoxLayout):
-    ''' Adds selection and focus behaviour to the view. '''
-
-
-class SelectableLabel(RecycleDataViewBehavior, Label):
-    ''' Add selection support to the Label '''
-    index = None
-    selected = BooleanProperty(False)
-    selectable = BooleanProperty(True)
-
-    def refresh_view_attrs(self, rv, index, data):
-        ''' Catch and handle the view changes '''
-        self.index = index
-        return super(SelectableLabel, self).refresh_view_attrs(
-            rv, index, data)
-
-    def on_touch_down(self, touch):
-        ''' Add selection on touch down '''
-        if super(SelectableLabel, self).on_touch_down(touch):
-            return True
-        if self.collide_point(*touch.pos) and self.selectable:
-            return self.parent.select_with_touch(self.index, touch)
-
-    def apply_selection(self, rv, index, is_selected):
-        ''' Respond to the selection of items in the view. '''
-        self.selected = is_selected
-        if is_selected:
-            print("selection changed to {0}".format(rv.data[index]))
-        else:
-            print("selection removed for {0}".format(rv.data[index]))
-            
-
-class SSimApp(App):
+class SSimApp(MDApp):
 
     def __init__(self, *args, **kwargs):
         self.project = Project("unnamed") # TODO name
@@ -105,15 +63,47 @@ class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
 
+class NoGridPopupContent(BoxLayout):
+    pass
+
+
 class MetricConfigurationScreen(SSimBaseScreen):
     pass
 
 
-class LoadConfigurationScreen(SSimBaseScreen):
-    pass
-
-
 class RunSimulationScreen(SSimBaseScreen):
+
+    def on_enter(self):
+        self.populate_confgurations()
+        for i in range(20):
+            # self.ids.config_list.add_widget(
+            #     TwoLineIconListItem(text=f"Single-line item {i}",
+            #                         secondary_text="Details")
+            # )
+            self.ids.config_list.add_widget(
+                ListItemWithCheckbox(pk="pk",
+                                     text=f"Single-line item {i}",
+                                     secondary_text="Details")
+            )
+
+    def populate_confgurations(self):
+        # item_list = self.ids.interlist
+        # TODO: Need to populate the MDlist dynamically
+        configs = self.project.configurations
+
+
+class ListItemWithCheckbox(TwoLineAvatarIconListItem):
+
+    def __init__(self, pk=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pk = pk
+
+    def delete_item(self, the_list_item):
+        self.parent.remove_widget(the_list_item)
+
+    
+class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
+    '''Custom left container'''
     pass
 
 
@@ -155,6 +145,15 @@ class SSimScreen(SSimBaseScreen):
 
     def do_run_simulation(self):
         self.manager.current = "run-sim"
+        if self.project._grid_model is None:
+            poppup_content = NoGridPopupContent()
+            poppup_content.orientation = "vertical"
+            popup = Popup(title='No Grid Model', content=poppup_content,
+                          auto_dismiss=False, size_hint=(0.4, 0.4))
+            poppup_content.ids.dismissBtn.bind(on_press=popup.dismiss)
+            # open the popup
+            popup.open()
+            return
 
 
 if __name__ == '__main__':
