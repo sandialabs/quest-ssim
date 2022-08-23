@@ -10,6 +10,7 @@ import subprocess
 
 from ssim import grid
 from ssim.opendss import DSSModel
+from ssim.metrics import MetricManager
 
 # To Do
 #
@@ -62,7 +63,7 @@ class Project:
         self._grid_model = None
         self._storage_devices = []
         self._pvsystems = []
-        self._metrics = []
+        self._metricMgrs = {}
 
     @property
     def bus_names(self):
@@ -71,8 +72,11 @@ class Project:
     def set_grid_model(self, model_path):
         self._grid_model = DSSModel(model_path)
 
-    def add_metric(self, metric):
-        self._metrics.append(metric)
+    def add_metric(self, category, key, metric):
+        if category not in self._metricMgrs:
+            self._metricMgrs[category] = MetricManager()
+
+        self._metricMgrs[category].add_accumulator(key, metric)
 
     def add_storage_option(self, storage_options):
         self._storage_devices.append(storage_options)

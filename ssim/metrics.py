@@ -6,7 +6,17 @@ class ImprovementType(int, enum.Enum):
     Minimize = 0
     Maximize = 1
     SeekValue = 2
+    
+    @staticmethod
+    def parse(str):
+        if str == "Minimize":
+            return ImprovementType.Minimize
 
+        if str == "Maximize":
+            return ImprovementType.Maximize
+
+        if str == "Seek Value":
+            return ImprovementType.SeekValue
 
 def get_default_improvement_type(limit: float, objective: float):
     """A utility method to choose an appropriate improvement type based on the
@@ -353,7 +363,7 @@ class MetricAccumulator:
 
 class MetricTimeAccumulator(MetricAccumulator):
 
-    def __init__(self, m: Metric, init_time: float):
+    def __init__(self, m: Metric, init_time=0.0):
         MetricAccumulator.__init__(self, m)
         self._curr_time = init_time
 

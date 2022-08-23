@@ -1,3 +1,7 @@
+
+#:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
+#:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
+
 <SSimScreen>:
     name: 'ssim'
     bus_list: bus_list
@@ -58,6 +62,15 @@
         Button:
             text: "back"
             on_press: root.manager.current = 'ssim'
+
+<BusListItemWithCheckbox>:
+
+    IconLeftWidget:
+        icon: root.icon
+
+    RightCheckbox:
+        id: check
+        listItem: root
 
 <MetricConfigurationScreen>:
     name: "metric-config"
@@ -144,15 +157,14 @@
                         width: 2
                         rectangle: self.x, self.y, self.width, self.height
 
-                Label:
-                    id: metriclabel
-                    text: "Defined Metrics"
-                    size_hint: 1.0, 0.05
-                    color: 0,0,0,1
+                BoxLayout:
+                    orientation: "vertical"
 
-                ScrollView:
-                    MDList:
-                        id: metriclist
+                    Label:
+                        id: metriclabel
+                        text: "Metric Settings"
+                        size_hint: 1.0, 0.05
+                        color: 0,0,0,1
 
                         canvas.before:
                             Color:
@@ -160,6 +172,65 @@
                             Line:
                                 width: 2
                                 rectangle: self.x, self.y, self.width, self.height
+                                
+                    Label:
+                        id: limitlabel
+                        text: "Limit"
+                        size_hint: 1.0, 0.05
+                        color: 0,0,0,1
+
+                        canvas.before:
+                            Color:
+                                rgba: .5, .5, .5, 1
+                            Line:
+                                width: 2
+                                rectangle: self.x, self.y, self.width, self.height
+                                
+                    TextInput:
+                        id: limitText
+                        size_hint: 1.0, 0.05
+                        
+                    Label:
+                        id: objectivelabel
+                        text: "Objective"
+                        size_hint: 1.0, 0.05
+                        color: 0,0,0,1
+                        rectangle: self.x, self.y, self.width, self.height
+
+                    TextInput:
+                        id: objectiveText
+                        size_hint: 1.0, 0.05
+                        
+                    MDRaisedButton:
+                        id: caller
+                        text: "Sense"
+                        size_hint: 1.0, 0.05
+                        on_release: root.drop()
+                        
+                    Button:
+                        text: "store"
+                        size_hint: 1.0, 0.05
+                        on_release: root.store_metrics()
+            
+                BoxLayout:
+                    orientation: "vertical"
+
+                    Label:
+                        id: currMetriclabel
+                        text: "Defined Metrics"
+                        size_hint: 1.0, 0.05
+                        color: 0,0,0,1
+
+                    ScrollView:
+                        MDList:
+                            id: metriclist
+
+                            canvas.before:
+                                Color:
+                                    rgba: .5, .5, .5, 1
+                                Line:
+                                    width: 2
+                                    rectangle: self.x, self.y, self.width, self.height
 
         Button:
             text: "back"
@@ -197,7 +268,7 @@
                 on_release: root.load(filechooser.path, filechooser.selection)
 
 <NoGridPopupContent>:
-
+    orientation: "vertical"
     Label:
         text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to set voltage metrics.'
         text_size: self.width, None
@@ -206,4 +277,9 @@
     Button:
         id: dismissBtn
         text: 'Dismiss'
+        size_hint: 1, 0.2
+
+    Button:
+        id: mainScreenBtn
+        text: 'Return to Main Screen'
         size_hint: 1, 0.2
