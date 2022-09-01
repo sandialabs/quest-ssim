@@ -171,6 +171,19 @@ class MetricConfigurationScreen(SSimBaseScreen):
 class RunSimulationScreen(SSimBaseScreen):
 
     def on_enter(self):
+        print("================================================")
+        # print(self.project._storage_devices)
+        # print(self.project._storage_devices[0].num_configurations)
+        # configs = list(self.project.configurations())
+        # print(configs)
+        # ctr = 0
+        # for config in configs:
+        #     print(ctr)
+        #     print(config.storage[0])
+        #     ctr += 1
+        for config in self.project.configurations():
+            print(config.storage)
+        print("=================================================")
         self.populate_confgurations()
         for i in range(20):
             # self.ids.config_list.add_widget(
