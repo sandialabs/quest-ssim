@@ -2,11 +2,17 @@
 import functools
 
 from kivy.logger import Logger, LOG_LEVELS
-from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty
 from kivy.uix.popup import Popup
+from kivy.uix.boxlayout import BoxLayout
+from kivymd.app import MDApp
+from kivymd.uix.list import TwoLineIconListItem
+
+# Adding the following two imports for checkboxes
+from kivymd.uix.list import TwoLineAvatarIconListItem, ILeftBodyTouch
+from kivymd.uix.selectioncontrol import MDCheckbox
 
 from kivymd.app import MDApp
 from kivymd.uix.menu import MDDropdownMenu
@@ -154,15 +160,47 @@ class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
 
+class NoGridPopupContent(BoxLayout):
+    pass
+
+
 class MetricConfigurationScreen(SSimBaseScreen):
     pass
 
 
-class LoadConfigurationScreen(SSimBaseScreen):
-    pass
-
-
 class RunSimulationScreen(SSimBaseScreen):
+
+    def on_enter(self):
+        self.populate_confgurations()
+        for i in range(20):
+            # self.ids.config_list.add_widget(
+            #     TwoLineIconListItem(text=f"Single-line item {i}",
+            #                         secondary_text="Details")
+            # )
+            self.ids.config_list.add_widget(
+                ListItemWithCheckbox(pk="pk",
+                                     text=f"Single-line item {i}",
+                                     secondary_text="Details")
+            )
+
+    def populate_confgurations(self):
+        # item_list = self.ids.interlist
+        # TODO: Need to populate the MDlist dynamically
+        configs = self.project.configurations
+
+
+class ListItemWithCheckbox(TwoLineAvatarIconListItem):
+
+    def __init__(self, pk=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pk = pk
+
+    def delete_item(self, the_list_item):
+        self.parent.remove_widget(the_list_item)
+
+    
+class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
+    '''Custom left container'''
     pass
 
 
@@ -205,6 +243,15 @@ class SSimScreen(SSimBaseScreen):
 
     def do_run_simulation(self):
         self.manager.current = "run-sim"
+        if self.project._grid_model is None:
+            poppup_content = NoGridPopupContent()
+            poppup_content.orientation = "vertical"
+            popup = Popup(title='No Grid Model', content=poppup_content,
+                          auto_dismiss=False, size_hint=(0.4, 0.4))
+            poppup_content.ids.dismissBtn.bind(on_press=popup.dismiss)
+            # open the popup
+            popup.open()
+            return
 
 
 if __name__ == '__main__':

@@ -174,12 +174,66 @@
     name: "run-sim"
 
     BoxLayout:
-        orientation: "vertical"
+        orientation: "vertical"   
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                Label:
+                    text: "Configurations that will be evaluated:"
+                    size_hint_y: None
+                    height: 50
+                ScrollView:
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+                    MDList:
+                        id: config_list
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                spacing: 5
+                Label:
+                    text: "Total number of configurations 256 (128 completed)"
+                    size_hint_y: None
+                    height: 50
+                Button: 
+                    text: "View Saved Results"
+                Button: 
+                    text: "Resume"
+                Button:
+                    text: "Remove Configuration"
+                Button:
+                    text: "Go"
 
         Button:
             text: "back"
+            size_hint_y: None
+            height: 100
             on_press: root.manager.current = 'ssim'
 
+<ListItemWithCheckbox>:
+    id: the_list_item
+    markup: True
+
+    LeftCheckbox:
+        id: check
+        active: True
+
+    IconRightWidget:
+        icon: 'trash-can-outline'
+        theme_text_color: "Custom"
+        text_color: 1, 0, 0, 1
+        on_release:
+            root.delete_item(the_list_item)
 
 <SelectGridDialog>:
     BoxLayout:
@@ -201,3 +255,14 @@
             Button:
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
+
+<NoGridPopupContent>:
+    Label:
+        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to run an analysis.'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
