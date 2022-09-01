@@ -68,6 +68,9 @@ class Project:
     def bus_names(self):
         return self._grid_model.bus_names
 
+    def phases(self, bus):
+        return self._grid_model.available_phases(bus)
+
     def set_grid_model(self, model_path):
         self._grid_model = DSSModel(model_path)
 
