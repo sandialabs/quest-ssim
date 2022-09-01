@@ -39,21 +39,122 @@
     name: "der-config"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"
 
-        Button:
-            text: "back"
-            on_press: root.manager.current = 'ssim'
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+            height: 1.0
 
-        Button:
-            text: "save"
-            on_press: root.save_config()
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                height: 0.95
+
+                ScrollView:
+                    size_hint: (1.0, 0.8)
+                    MDList:
+                        id: ess_list
+
+                Button:
+                    size_hint: (1.0, 0.1)
+                    text: "New Storage"
+                    on_press: root.new_storage()
+
+                Button:
+                    size_hint: (1.0, 0.1)
+                    text: "Delete Storage"
+
+            Button:
+                text: "list of PV"
+
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+            spacing: 5
+
+            Button:
+                height: 10
+                text: "back"
+                on_press: root.manager.current = 'ssim'
+
+            Button:
+                height: 10
+                text: "save"
+                # Might need something different here to handle the
+                on_press: root.manager.current = 'ssim'
+
+
+<BusListitem>:
+
+    LeftCheckBox:
+        id: selected
+
+
+<StorageConfigurationScreen>:
+    name: "configure-storage"
+
+    BoxLayout:
+        orientation: "vertical"
+
+        BoxLayout:
+            orientation: "horizontal"
+
+            BoxLayout:
+                orientation: "vertical"
+
+                Label:
+                    text: "device name"
+                    color: "black"
+
+                TextInput:
+                    text: root.ess.name
+                    on_text: root.ess.name = self.text
+                    multiline: False
+
+                Label:
+                    text: "device power (kW)"
+                    color: "black"
+
+                BoxLayout:
+                    orientation: "horizontal"
+
+                    BoxLayout:
+                        orientation: "vertical"
+
+                        TextInput:
+                            text: ""
+
+                        Button:
+                            text: "add power option"
+                            # on_release: root.add_power()
+
+                ScrollView:
+                    MDList:
+                        id: size_list
+
+            ScrollView:
+                MDList:
+                    id: bus_list
+
+        BoxLayout:
+            size_hint: (1.0, 0.05)
+            orientation: "horizontal"
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
 
 <LoadConfigurationScreen>:
     name: "load-config"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"
 
         Button:
             text: "back"
@@ -63,7 +164,7 @@
     name: "metric-config"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"
 
         Button:
             text: "back"
