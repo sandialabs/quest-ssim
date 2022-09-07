@@ -301,17 +301,29 @@ class Metric:
         return self._super_optimal(resp_norm)
 
     def _validate_inputs(self):
-        if self._imp_type == ImprovementType.Minimize:
-            assert self._limit > self._objective, \
-                "Limit must be greater than objective for minimization"
+        Metric.validate_metric_values(self._limit, self._objective, self._imp_type, True)
+            
+    @staticmethod
+    def validate_metric_values(
+        limit: float, objective: float, imp_type: ImprovementType, do_assert: bool = False
+        ):
+        
+        try:
+            if imp_type == ImprovementType.Minimize:
+                assert limit > objective, "Limit must be greater than objective for minimization"
 
-        elif self._imp_type == ImprovementType.Maximize:
-            assert self._limit < self._objective, \
-                "Limit must be less than objective for maximization"
+            elif imp_type == ImprovementType.Maximize:
+                assert limit < objective, "Limit must be less than objective for maximization"
 
-        else:
-            assert self._limit != self._objective, \
-                "Limit cannot be equal to objective."
+            else:
+                assert limit != objective, "Limit cannot be equal to objective."
+
+            return None
+        except AssertionError as err:
+            if do_assert:
+                raise
+
+            return str(err)
 
 
 class MetricAccumulator:
@@ -434,7 +446,6 @@ class MetricManager:
         :return: The metric accumulator associated with the supplied key or None.
         """
         return self._all_metrics.get(name)
-        
 
     @property
     def all_metrics(self) -> dict:

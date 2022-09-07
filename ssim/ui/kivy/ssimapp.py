@@ -70,6 +70,9 @@ class NoGridPopupContent(BoxLayout):
 class MissingMetricValuesPopupContent(BoxLayout):
     pass
 
+class InvalidMetricValuesPopupContent(BoxLayout):
+    pass
+
 class BusListItemWithCheckbox(OneLineAvatarIconListItem):
     '''Custom list item.'''
     icon = StringProperty("android")
@@ -190,6 +193,13 @@ class MetricConfigurationScreen(SSimBaseScreen):
         limit = MetricConfigurationScreen.__parse_float(self.ids.limitText.text)
         obj = MetricConfigurationScreen.__parse_float(self.ids.objectiveText.text)
         sense = ImprovementType.parse(self.ids.caller.text)
+
+        err = Metric.validate_metric_values(limit, obj, sense, False)
+
+        if err is not None:
+            self.__show_invalid_metric_value_popup(err)
+            return
+
         if limit is None or obj is None or sense is None:
             self.__show_missing_metric_value_popup()
         else:
@@ -241,6 +251,18 @@ class MetricConfigurationScreen(SSimBaseScreen):
             title='Missing Metric Values', content=content, auto_dismiss=False,
             size_hint=(0.4, 0.4)
             )
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+    
+    def __show_invalid_metric_value_popup(self, msg):
+        content = InvalidMetricValuesPopupContent()
+
+        popup = Popup(
+            title='Invalid Metric Values', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+            )
+        content.ids.msg_label.text = str(msg)
         content.ids.dismissBtn.bind(on_press=popup.dismiss)
         popup.open()
         return
