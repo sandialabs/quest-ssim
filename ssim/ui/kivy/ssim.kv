@@ -120,19 +120,42 @@
                 BoxLayout:
                     orientation: "horizontal"
 
+                    ScrollView:
+                        MDList:
+                            id: power_list
+
                     BoxLayout:
                         orientation: "vertical"
 
                         TextInput:
+                            id: power_input
                             text: ""
 
                         Button:
                             text: "add power option"
-                            # on_release: root.add_power()
+                            on_release: root.add_power(float(power_input.text))
 
-                ScrollView:
-                    MDList:
-                        id: size_list
+                Label:
+                    text: "duration (hours)"
+                    color: "black"
+
+                BoxLayout:
+                    orientation: "horizontal"
+
+                    ScrollView:
+                        MDList:
+                            id: duration_list
+
+                    BoxLayout:
+                        orientation: "vertical"
+
+                        TextInput:
+                            id: duration_input
+                            text: ""
+
+                        Button:
+                            text: "add duration option"
+                            on_release: root.add_duration(float(duration_input.text))
 
             ScrollView:
                 MDList:
