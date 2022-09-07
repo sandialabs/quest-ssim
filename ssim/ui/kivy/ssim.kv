@@ -76,7 +76,6 @@
         id: left_icon
         icon: 'chart-line'
 
-
 <BusListItemWithCheckbox>:
 
     IconRightWidget:
@@ -163,6 +162,8 @@
 
             BoxLayout:
                 orientation: "vertical"
+                padding: 5
+                spacing: 5
 
                 canvas.before:
                     Color:
@@ -173,33 +174,27 @@
 
                 BoxLayout:
                     orientation: "vertical"
+                    size_hint: 1.0, 0.55
 
                     Label:
                         id: metriclabel
                         text: "Metric Settings"
                         size_hint: 1.0, 0.05
                         color: 0,0,0,1
-
+                        
                         canvas.before:
                             Color:
                                 rgba: .5, .5, .5, 1
                             Line:
-                                width: 2
+                                width: 1
                                 rectangle: self.x, self.y, self.width, self.height
-                                
+
                     Label:
                         id: limitlabel
                         text: "Limit"
                         size_hint: 1.0, 0.05
                         color: 0,0,0,1
 
-                        canvas.before:
-                            Color:
-                                rgba: .5, .5, .5, 1
-                            Line:
-                                width: 2
-                                rectangle: self.x, self.y, self.width, self.height
-                                
                     TextInput:
                         id: limitText
                         size_hint: 1.0, 0.05
@@ -229,22 +224,29 @@
                 BoxLayout:
                     orientation: "vertical"
 
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+
                     Label:
                         id: currMetriclabel
                         text: "Defined Metrics"
                         size_hint: 1.0, 0.05
                         color: 0,0,0,1
 
+                        canvas.before:
+                            Color:
+                                rgba: .5, .5, .5, 1
+                            Line:
+                                width: 1
+                                rectangle: self.x, self.y, self.width, self.height
+                                
                     ScrollView:
                         MDList:
                             id: metriclist
-
-                            canvas.before:
-                                Color:
-                                    rgba: .5, .5, .5, 1
-                                Line:
-                                    width: 2
-                                    rectangle: self.x, self.y, self.width, self.height
 
         Button:
             text: "back"
@@ -260,7 +262,6 @@
         Button:
             text: "back"
             on_press: root.manager.current = 'ssim'
-
 
 <LoadGridDialog>:
     BoxLayout:
@@ -297,7 +298,6 @@
         id: mainScreenBtn
         text: 'Return to Main Screen'
         size_hint: 1, 0.2
-        
   
 <MissingMetricValuesPopupContent>:
     orientation: "vertical"
@@ -310,7 +310,6 @@
         id: dismissBtn
         text: 'Dismiss'
         size_hint: 1, 0.2
-        
   
 <InvalidMetricValuesPopupContent>:
     orientation: "vertical"

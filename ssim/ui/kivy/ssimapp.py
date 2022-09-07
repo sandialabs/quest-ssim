@@ -1,18 +1,13 @@
 """Storage Sizing and Placement Kivy application"""
 
-from telnetlib import theNULL
+from ast import Return
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 from kivymd.app import MDApp
 from ssim.ui import Project
 from kivy.logger import Logger, LOG_LEVELS
-from kivy.app import App
-from kivy.metrics import dp
-from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, TwoLineAvatarIconListItem, OneLineListItem, TwoLineListItem, OneLineAvatarIconListItem
+from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, TwoLineAvatarIconListItem, OneLineAvatarIconListItem
 from kivy.uix.popup import Popup
-from kivy.uix.button import Button
-from kivy.uix.label import Label
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.dropdown import DropDown
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty, StringProperty
 from kivymd.uix.selectioncontrol import MDCheckbox
@@ -125,9 +120,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         ]
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.caller,
-            items=self.menu_items,
-            width_mult=3
+            caller=self.ids.caller, items=self.menu_items, width_mult=3
             )
         self.menu.open()
 
@@ -184,7 +177,6 @@ class MetricConfigurationScreen(SSimBaseScreen):
         else:
             self.ids.caller.text = str(common_sense.name)
 
-
     @staticmethod
     def __parse_float(strval):
         try:
@@ -212,14 +204,33 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
         self.reload_metric_list()
 
+    def reset_metric_list_label(self):
+        if self._currentMetricCategory is None:
+            self.ids.currMetriclabel.text = "Defined Metrics"
+        
+        elif self._currentMetricCategory == "None":
+            self.ids.currMetriclabel.text = "Defined Metrics"
+
+        else:
+            self.ids.currMetriclabel.text = \
+                "Defined \"" + self._currentMetricCategory + "\" Metrics"
+
+
     def reload_metric_list(self):
         self.ids.metriclist.clear_widgets()
+        self.reset_metric_list_label()
         manager = self.project.get_manager(self._currentMetricCategory)
+
+        if manager is None:
+            return
+
         list = self.ids.metriclist
         for mgrKey in manager.all_metrics:
             m = manager.all_metrics.get(mgrKey)
             txt = self._currentMetricCategory + " Metric for " + mgrKey
-            deets = "Limit=" + str(m.metric.limit) + ", " + "Objective=" + str(m.metric.objective) + ", " + "Sense=" + m.metric.improvement_type.name
+            deets = "Limit=" + str(m.metric.limit) + ", " + \
+                "Objective=" + str(m.metric.objective) + ", " + \
+                "Sense=" + m.metric.improvement_type.name
             bItem = MetricListItem(text=txt, secondary_text=deets)
             bItem.bus = mgrKey
             bItem.ids.left_icon.icon = self._metricIcons[self._currentMetricCategory]
@@ -244,13 +255,16 @@ class MetricConfigurationScreen(SSimBaseScreen):
     def configure_voltage_metrics(self):
         self._currentMetricCategory = "Voltage"
         self.load_bussed_into_list()
+        self.reload_metric_list()
+        self.reload_metric_values()
 
     def configure_some_other_metrics(self):
         self._currentMetricCategory = "Unassigned"
         self._selBusses.clear()
         self.ids.interlist.clear_widgets()
-        self.ids.metriclist.clear_widgets()
         self.ids.interlabel.text = "Metric Objects"
+        self.reload_metric_list()
+        self.reload_metric_values()
         print("I'm passing on the other issue...")
 
     def _return_to_main_screen(self, dt):
