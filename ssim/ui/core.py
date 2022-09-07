@@ -80,8 +80,15 @@ class Project:
              
         cat_mgr.add_accumulator(key, metric)
 
+    def remove_metric(self, category, key):
+        cat_mgr = self.get_manager(category)
+        if cat_mgr is None:
+            return
+
+        cat_mgr.remove_accumulator(key)
+
     def get_metric(self, category, key):
-        cat_mgr = self._metricMgrs.get(category)
+        cat_mgr = self.get_manager(category)
         if cat_mgr is None:
             return None
 

@@ -439,6 +439,10 @@ class MetricManager:
         :return: None
         """
         self._all_metrics[name] = accum
+        
+    def remove_accumulator(self, name: str):
+        if name in self._all_metrics:
+            del self._all_metrics[name]
 
     def get_accumulator(self, name: str):
         """

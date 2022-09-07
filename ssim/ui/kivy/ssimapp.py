@@ -7,7 +7,7 @@ from ssim.ui import Project
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.app import App
 from kivy.metrics import dp
-from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, OneLineListItem, TwoLineListItem, OneLineAvatarIconListItem
+from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, TwoLineAvatarIconListItem, OneLineListItem, TwoLineListItem, OneLineAvatarIconListItem
 from kivy.uix.popup import Popup
 from kivy.uix.button import Button
 from kivy.uix.label import Label
@@ -80,6 +80,9 @@ class BusListItemWithCheckbox(OneLineAvatarIconListItem):
     def __int__(self, bus):
         self.text = bus
         self.bus = bus
+        
+class MetricListItem(TwoLineAvatarIconListItem):
+    pass
 
 class RightCheckbox(IRightBodyTouch, MDCheckbox):
     pass
@@ -90,6 +93,8 @@ class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
 class MetricConfigurationScreen(SSimBaseScreen):
 
     _selBusses = []
+    _currentMetricCategory = "None"
+    _metricIcons = {"Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"}
 
     def __reset_checked_bus_list(self):
         self._selBusses.clear()
@@ -131,7 +136,6 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.menu.dismiss()
 
     def reload_metric_values(self):
-        cat = "Voltage"
         metrics = []
         common_limit = None
         common_obj = None
@@ -139,7 +143,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
         ''' Gather up the list of all metrics relevant to the selection'''
         for b in self._selBusses:
-            m = self.project.get_metric(cat, b)
+            m = self.project.get_metric(self._currentMetricCategory, b)
             if m is None:
                 common_limit = None
                 common_obj = None
@@ -189,7 +193,6 @@ class MetricConfigurationScreen(SSimBaseScreen):
             return None
 
     def store_metrics(self):
-        cat = "Voltage"
         limit = MetricConfigurationScreen.__parse_float(self.ids.limitText.text)
         obj = MetricConfigurationScreen.__parse_float(self.ids.objectiveText.text)
         sense = ImprovementType.parse(self.ids.caller.text)
@@ -205,22 +208,29 @@ class MetricConfigurationScreen(SSimBaseScreen):
         else:
             for bus in self._selBusses:
                 accum = MetricTimeAccumulator(Metric(limit, obj, sense))
-                self.project.add_metric(cat, bus, accum)
+                self.project.add_metric(self._currentMetricCategory, bus, accum)
 
         self.reload_metric_list()
 
     def reload_metric_list(self):
-        cat = "Voltage"
         self.ids.metriclist.clear_widgets()
-        manager = self.project.get_manager(cat)
+        manager = self.project.get_manager(self._currentMetricCategory)
         list = self.ids.metriclist
         for mgrKey in manager.all_metrics:
             m = manager.all_metrics.get(mgrKey)
-            txt = "Voltage Metric for " + mgrKey
+            txt = self._currentMetricCategory + " Metric for " + mgrKey
             deets = "Limit=" + str(m.metric.limit) + ", " + "Objective=" + str(m.metric.objective) + ", " + "Sense=" + m.metric.improvement_type.name
-            bItem = TwoLineListItem(text=txt, secondary_text=deets)
+            bItem = MetricListItem(text=txt, secondary_text=deets)
+            bItem.bus = mgrKey
+            bItem.ids.left_icon.icon = self._metricIcons[self._currentMetricCategory]
+            bItem.ids.trash_can.bind(on_release=self.on_delete_metric)
             list.add_widget(bItem)
 
+    def on_delete_metric(self, data):
+        bus = data.listItem.bus
+        self.project.remove_metric(self._currentMetricCategory, bus)
+        self.reload_metric_list()
+        self.reload_metric_values()
 
     def on_item_check_changed(self, ckb, value):
         bus = ckb.listItem.text
@@ -232,9 +242,11 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.reload_metric_values()
 
     def configure_voltage_metrics(self):
+        self._currentMetricCategory = "Voltage"
         self.load_bussed_into_list()
 
     def configure_some_other_metrics(self):
+        self._currentMetricCategory = "Unassigned"
         self._selBusses.clear()
         self.ids.interlist.clear_widgets()
         self.ids.metriclist.clear_widgets()
@@ -284,7 +296,6 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self._selBusses.clear()
         #busses = self.project.bus_names()
         self.ids.interlist.clear_widgets()
-        self.ids.metriclist.clear_widgets()
         self.ids.interlabel.text = "Busses"
 
         if self.project._grid_model is None:
