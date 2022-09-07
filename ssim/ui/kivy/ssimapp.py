@@ -1,12 +1,13 @@
 """Storage Sizing and Placement Kivy application"""
 
+from telnetlib import theNULL
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 from kivymd.app import MDApp
 from ssim.ui import Project
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.app import App
 from kivy.metrics import dp
-from kivymd.uix.list import IRightBodyTouch, OneLineListItem, TwoLineListItem, OneLineAvatarIconListItem
+from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, OneLineListItem, TwoLineListItem, OneLineAvatarIconListItem
 from kivy.uix.popup import Popup
 from kivy.uix.button import Button
 from kivy.uix.label import Label
@@ -66,6 +67,9 @@ class LoadConfigurationScreen(SSimBaseScreen):
 class NoGridPopupContent(BoxLayout):
     pass
 
+class MissingMetricValuesPopupContent(BoxLayout):
+    pass
+
 class BusListItemWithCheckbox(OneLineAvatarIconListItem):
     '''Custom list item.'''
     icon = StringProperty("android")
@@ -75,6 +79,9 @@ class BusListItemWithCheckbox(OneLineAvatarIconListItem):
         self.bus = bus
 
 class RightCheckbox(IRightBodyTouch, MDCheckbox):
+    pass
+
+class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     pass
 
 class MetricConfigurationScreen(SSimBaseScreen):
@@ -121,17 +128,89 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.menu.dismiss()
 
     def reload_metric_values(self):
-        pass
+        cat = "Voltage"
+        metrics = []
+        common_limit = None
+        common_obj = None
+        common_sense = None
+
+        ''' Gather up the list of all metrics relevant to the selection'''
+        for b in self._selBusses:
+            m = self.project.get_metric(cat, b)
+            if m is None:
+                common_limit = None
+                common_obj = None
+                common_sense = None
+                metrics.clear()
+                break
+            else:
+                metrics.append(m)
+    
+        for m in metrics:
+            if common_limit is None:
+                common_limit = m.metric.limit
+                common_obj = m.metric.objective
+                common_sense = m.metric.improvement_type
+            else:
+                if common_limit != m.metric.limit:
+                    common_limit = None
+                    break                
+                if common_obj != m.metric.objective:
+                    common_obj = None
+                    break
+                if common_sense != m.metric.improvement_type:
+                    common_sense = None
+                    break
+
+        if common_limit is None:
+            self.ids.limitText.text = "None or Varied"
+        else:
+            self.ids.limitText.text = str(common_limit)
+
+        if common_obj is None:
+            self.ids.objectiveText.text = "None or Varied"
+        else:
+            self.ids.objectiveText.text = str(common_obj)
+            
+        if common_sense is None:
+            self.ids.caller.text = "None or Varied"
+        else:
+            self.ids.caller.text = str(common_sense.name)
+
+
+    @staticmethod
+    def __parse_float(strval):
+        try:
+            return float(strval)
+        except ValueError:
+            return None
 
     def store_metrics(self):
         cat = "Voltage"
-        limit = float(self.ids.limitText.text)
-        obj = float(self.ids.objectiveText.text)
+        limit = MetricConfigurationScreen.__parse_float(self.ids.limitText.text)
+        obj = MetricConfigurationScreen.__parse_float(self.ids.objectiveText.text)
         sense = ImprovementType.parse(self.ids.caller.text)
+        if limit is None or obj is None or sense is None:
+            self.__show_missing_metric_value_popup()
+        else:
+            for bus in self._selBusses:
+                accum = MetricTimeAccumulator(Metric(limit, obj, sense))
+                self.project.add_metric(cat, bus, accum)
 
-        for bus in self._selBusses:
-            accum = MetricTimeAccumulator(Metric(limit, obj, sense))
-            self.project.add_metric(cat, bus, accum)
+        self.reload_metric_list()
+
+    def reload_metric_list(self):
+        cat = "Voltage"
+        self.ids.metriclist.clear_widgets()
+        manager = self.project.get_manager(cat)
+        list = self.ids.metriclist
+        for mgrKey in manager.all_metrics:
+            m = manager.all_metrics.get(mgrKey)
+            txt = "Voltage Metric for " + mgrKey
+            deets = "Limit=" + str(m.metric.limit) + ", " + "Objective=" + str(m.metric.objective) + ", " + "Sense=" + m.metric.improvement_type.name
+            bItem = TwoLineListItem(text=txt, secondary_text=deets)
+            list.add_widget(bItem)
+
 
     def on_item_check_changed(self, ckb, value):
         bus = ckb.listItem.text
@@ -154,6 +233,17 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
     def _return_to_main_screen(self, dt):
         self.manager.current = "ssim"
+        
+    def __show_missing_metric_value_popup(self):
+        content = MissingMetricValuesPopupContent()
+
+        popup = Popup(
+            title='Missing Metric Values', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+            )
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
 
     def __show_no_grid_model_popup(self):
         content = NoGridPopupContent()

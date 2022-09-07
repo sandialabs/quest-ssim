@@ -73,10 +73,22 @@ class Project:
         self._grid_model = DSSModel(model_path)
 
     def add_metric(self, category, key, metric):
-        if category not in self._metricMgrs:
-            self._metricMgrs[category] = MetricManager()
+        cat_mgr = self.get_manager(category)
+        if cat_mgr is None:
+            cat_mgr= MetricManager()
+            self._metricMgrs[category] = cat_mgr
+             
+        cat_mgr.add_accumulator(key, metric)
 
-        self._metricMgrs[category].add_accumulator(key, metric)
+    def get_metric(self, category, key):
+        cat_mgr = self._metricMgrs.get(category)
+        if cat_mgr is None:
+            return None
+
+        return cat_mgr.get_accumulator(key)
+    
+    def get_manager(self, category):
+        return self._metricMgrs.get(category)
 
     def add_storage_option(self, storage_options):
         self._storage_devices.append(storage_options)

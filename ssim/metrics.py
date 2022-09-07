@@ -9,14 +9,26 @@ class ImprovementType(int, enum.Enum):
     
     @staticmethod
     def parse(str):
-        if str == "Minimize":
+        toParse = str.casefold()
+        if toParse == "Minimize".casefold():
+            return ImprovementType.Minimize
+        
+        if toParse == "Min".casefold():
             return ImprovementType.Minimize
 
-        if str == "Maximize":
+        if toParse == "Maximize".casefold():
+            return ImprovementType.Maximize
+        
+        if toParse == "Max".casefold():
             return ImprovementType.Maximize
 
-        if str == "Seek Value":
+        if toParse == "Seek Value".casefold():
             return ImprovementType.SeekValue
+        
+        if toParse == "Seek".casefold():
+            return ImprovementType.SeekValue
+
+        return None
 
 def get_default_improvement_type(limit: float, objective: float):
     """A utility method to choose an appropriate improvement type based on the
@@ -100,6 +112,19 @@ class Metric:
         self._c = c
         self._g = g
         self._validate_inputs()
+
+        
+    @property
+    def limit(self) -> float:
+        return self._limit
+    
+    @property
+    def objective(self) -> float:
+        return self._objective
+    
+    @property
+    def improvement_type(self) -> ImprovementType:
+        return self._imp_type
 
     def normalize(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value.
@@ -400,18 +425,16 @@ class MetricManager:
         :param name: The name to which the accumulator is keyed.
         :param accum: MetricTimeAccumulator
         :return: None
-
-        Raises
-        ------
-        ValueError
-            If the name is already associated with a metric accumulator.
         """
-        if name in self._all_metrics.keys():
-            raise ValueError(
-                "Metric accumulator names must be unique. An accumulator already"
-                f" exists with the name {name}. Try using a different name"
-            )
         self._all_metrics[name] = accum
+
+    def get_accumulator(self, name: str):
+        """
+        :param name: The name to which the accumulator is keyed.
+        :return: The metric accumulator associated with the supplied key or None.
+        """
+        return self._all_metrics.get(name)
+        
 
     @property
     def all_metrics(self) -> dict:

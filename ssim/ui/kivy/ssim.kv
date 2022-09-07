@@ -65,10 +65,10 @@
 
 <BusListItemWithCheckbox>:
 
-    IconLeftWidget:
+    IconRightWidget:
         icon: root.icon
 
-    RightCheckbox:
+    LeftCheckbox:
         id: check
         listItem: root
 
@@ -282,4 +282,17 @@
     Button:
         id: mainScreenBtn
         text: 'Return to Main Screen'
+        size_hint: 1, 0.2
+        
+  
+<MissingMetricValuesPopupContent>:
+    orientation: "vertical"
+    Label:
+        text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Limit"" and ""Objective"" and select a ""Sense"".'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
         size_hint: 1, 0.2
