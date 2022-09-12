@@ -22,7 +22,7 @@ from ssim.ui import Project, StorageOptions
 class SSimApp(MDApp):
 
     def __init__(self, *args, **kwargs):
-        self.project = Project("unnamed") # TODO name
+        self.project = Project("unnamed")
         super().__init__(*args, **kwargs)
 
     def build(self):
@@ -229,7 +229,7 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
     def delete_item(self, the_list_item):
         self.parent.remove_widget(the_list_item)
 
-    
+
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     '''Custom left container'''
     pass
