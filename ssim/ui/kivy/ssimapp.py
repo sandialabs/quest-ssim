@@ -7,16 +7,13 @@ from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty
 from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
-from kivymd.app import MDApp
-from kivymd.uix.list import TwoLineIconListItem
-
-# Adding the following two imports for checkboxes
-from kivymd.uix.list import TwoLineAvatarIconListItem, ILeftBodyTouch
-from kivymd.uix.selectioncontrol import MDCheckbox
 
 from kivymd.app import MDApp
-from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.list import ILeftBodyTouch, TwoLineIconListItem, OneLineListItem
+from kivymd.uix.list import (
+    TwoLineAvatarIconListItem,
+    ILeftBodyTouch,
+    OneLineListItem
+)
 from kivymd.uix.selectioncontrol import MDCheckbox
 
 from ssim.ui import Project, StorageOptions
