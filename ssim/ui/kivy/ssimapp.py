@@ -19,7 +19,9 @@ from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.list import ILeftBodyTouch, TwoLineIconListItem
 from kivymd.uix.selectioncontrol import MDCheckbox
 
-from ssim.ui import Project, StorageOptions
+from typing import List
+from ssim.ui import Project, StorageOptions, Configuration
+
 
 
 class SSimApp(MDApp):
@@ -170,36 +172,54 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
 class RunSimulationScreen(SSimBaseScreen):
 
-    def on_enter(self):
-        print("================================================")
-        # print(self.project._storage_devices)
-        # print(self.project._storage_devices[0].num_configurations)
-        # configs = list(self.project.configurations())
-        # print(configs)
-        # ctr = 0
-        # for config in configs:
-        #     print(ctr)
-        #     print(config.storage[0])
-        #     ctr += 1
-        for config in self.project.configurations():
-            print(config.storage)
-        print("=================================================")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.configurations: List[Configuration] = []
+        # clear the MDList everytime the RunSimulationScreen is opened
+        # TO DO: Keep track of selected configs
+        self.ids.config_list.clear_widgets()
         self.populate_confgurations()
-        for i in range(20):
-            # self.ids.config_list.add_widget(
-            #     TwoLineIconListItem(text=f"Single-line item {i}",
-            #                         secondary_text="Details")
-            # )
-            self.ids.config_list.add_widget(
-                ListItemWithCheckbox(pk="pk",
-                                     text=f"Single-line item {i}",
-                                     secondary_text="Details")
-            )
-
+    
+    def on_enter(self):
+        self.ids.config_list.clear_widgets()
+        self.configurations: List[Configuration] = []
+        self.populate_confgurations()
+          
+          
     def populate_confgurations(self):
-        # item_list = self.ids.interlist
-        # TODO: Need to populate the MDlist dynamically
-        configs = self.project.configurations
+        # store all the project configurations into a list
+        for config in self.project.configurations():
+            self.configurations.append(config)
+        
+        # populate the UI with the list of configurations
+        ctr = 1
+        for config in self.configurations:
+            secondary_detail_text = []
+            print("*" * 50)
+            print(config)
+            print("*" * 50)
+            for storage in config.storage:
+                if storage is not None:
+                    secondary_detail_text.append(f"storage name: {storage.name}, storage location: {storage.bus}")
+                else:
+                    secondary_detail_text.append('no storage')    
+            final_detail_text = "\n".join(secondary_detail_text)
+            
+            self.ids.config_list.add_widget(
+                    ListItemWithCheckbox(pk="pk",
+                                            text=f"Configuration {ctr}",
+                                            secondary_text=final_detail_text)
+            )
+            ctr += 1
+        # print("=" * 100)
+        
+    def uncheck_configuration(self):
+        print("configuration unchecked")
+    
+    def run_configurations(self):
+        for config in self.configurations:
+            print(config)
+            print(config.evaluate())
 
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
