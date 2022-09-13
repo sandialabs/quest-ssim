@@ -60,7 +60,7 @@ class Project:
     def __init__(self, name: str):
         self.name = name
         self._grid_model = None
-        self._storage_devices = []
+        self.storage_devices = []
         self._pvsystems = []
         self._metrics = []
 
@@ -78,7 +78,7 @@ class Project:
         self._metrics.append(metric)
 
     def add_storage_option(self, storage_options):
-        self._storage_devices.append(storage_options)
+        self.storage_devices.append(storage_options)
 
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
@@ -93,14 +93,14 @@ class Project:
     def _storage_configurations(self):
         return itertools.product(
             *(storage_options.configurations()
-              for storage_options in self._storage_devices)
+              for storage_options in self.storage_devices)
         )
 
     def num_configurations(self):
         """Return the total number of configurations in this project."""
         return functools.reduce(
             lambda ess, acc: ess.num_configurations * acc,
-            self._storage_devices,
+            self.storage_devices,
             initializer=1
         )
 
@@ -170,9 +170,9 @@ class StorageOptions:
                  required=True):
         self.name = name
         self.phases = num_phases
-        self.power = power
-        self.duration = duration
-        self.busses = busses
+        self.power = set(power)
+        self.duration = set(duration)
+        self.busses = set(busses)
         self.min_soc = min_soc
         self.max_soc = max_soc
         self.initial_soc = initial_soc
@@ -182,6 +182,21 @@ class StorageOptions:
         )
         self.soc_model = soc_model
         self.required = False
+
+    def add_bus(self, bus):
+        self.busses.add(bus)
+
+    def add_power(self, power):
+        self.power.add(power)
+
+    def add_duration(self, duration):
+        self.duration.add(duration)
+
+    @property
+    def valid(self):
+        return (len(self.power) > 0
+                and len(self.duration) > 0
+                and len(self.busses) > 0)
 
     @property
     def num_configurations(self):

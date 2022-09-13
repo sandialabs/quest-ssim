@@ -16,7 +16,7 @@ from kivymd.uix.selectioncontrol import MDCheckbox
 
 from kivymd.app import MDApp
 from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.list import ILeftBodyTouch, TwoLineIconListItem
+from kivymd.uix.list import ILeftBodyTouch, TwoLineIconListItem, OneLineListItem
 from kivymd.uix.selectioncontrol import MDCheckbox
 
 from typing import List
@@ -76,10 +76,9 @@ class BusListItem(TwoLineIconListItem):
         self.text = busname
         self.secondary_text = str(busphases)
 
-
     def mark(self, check, the_list_item):
-        '''mark the task as complete or incomplete'''
-        if check.active == True:
+        """mark the task as complete or incomplete"""
+        if check.active:
             self.parent.parent.parent.add_bus(the_list_item)
         else:
             self.parent.parent.parent.remove_bus(the_list_item)
@@ -92,12 +91,40 @@ class StorageConfigurationScreen(SSimBaseScreen):
         self._der_screen = der_screen
         # default storage configuration
         self.ess = StorageOptions(
-            "unnamed", 3, [50.0], [4.0], []
+            "unnamed", 3, [], [], []
         )
         super().__init__(*args, **kwargs)
         for bus in self.project.bus_names:
             bus_list_item = BusListItem(bus, self.project.phases(bus))
             self.ids.bus_list.add_widget(bus_list_item)
+
+    def _update_powers(self):
+        listed_powers = set(
+            float(c.text)
+            for c in self.ids.power_list.children
+        )
+        for power in self.ess.power:
+            if power in listed_powers:
+                continue
+            self.ids.power_list.add_widget(OneLineListItem(text=str(power)))
+
+    def _update_durations(self):
+        listed_durations = set(
+            float(c.text)
+            for c in self.ids.duration_list.children
+        )
+        for duration in self.ess.duration:
+            if duration in listed_durations:
+                continue
+            self.ids.duration_list.add_widget(OneLineListItem(text=str(duration)))
+
+    def add_power(self, power):
+        self.ess.add_power(power)
+        self._update_powers()
+
+    def add_duration(self, duration):
+        self.ess.add_duration(duration)
+        self._update_durations()
 
     def save(self):
         for bus_item in self.ids.bus_list.children:
@@ -105,11 +132,18 @@ class StorageConfigurationScreen(SSimBaseScreen):
             Logger.debug(f"bus_item.ids: {bus_item.ids}")
 
             if bus_item.ids.selected.active:
-                self.ess.busses.append(bus_item.text)
+                self.ess.add_bus(bus_item.text)
+
+        if not self.ess.valid:
+            Logger.error("invalid storage configuration")
+            Logger.error(f"powers: {self.ess.power}, durations: {self.ess.duration}, busses: {self.ess.busses}")
+            return
+
         self.project.add_storage_option(self.ess)
         self._der_screen.add_ess(self.ess)
-        self.ess = StorageOptions("unnamed", 3, [50.0], [4.0], [])
+        self.ess = StorageOptions("unnamed", 3, [], [], [])
         self.manager.current = "der-config"
+        self.manager.remove_widget(self)
 
     def cancel(self):
         self.manager.current = "der-config"
