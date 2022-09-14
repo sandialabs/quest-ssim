@@ -98,7 +98,7 @@ class Project:
         return functools.reduce(
             lambda ess, acc: ess.num_configurations * acc,
             self._storage_devices,
-            initializer=1
+            1
         )
 
     def evaluated_configurations(self):
