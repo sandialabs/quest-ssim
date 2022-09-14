@@ -209,6 +209,7 @@ class RunSimulationScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.configurations: List[Configuration] = []
+        self.storage_options: List[StorageOptions] = []
         # clear the MDList everytime the RunSimulationScreen is opened
         # TO DO: Keep track of selected configs
         self.ids.config_list.clear_widgets()
@@ -224,28 +225,32 @@ class RunSimulationScreen(SSimBaseScreen):
         # store all the project configurations into a list
         for config in self.project.configurations():
             self.configurations.append(config)
-        
+            
         # populate the UI with the list of configurations
         ctr = 1
         for config in self.configurations:
             secondary_detail_text = []
-            print("*" * 50)
-            print(config)
-            print("*" * 50)
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+            
             for storage in config.storage:
                 if storage is not None:
-                    secondary_detail_text.append(f"storage name: {storage.name}, storage location: {storage.bus}")
+                    # print(storage)
+                    secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
+                    tertiary_detail_text.append(f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
                 else:
-                    secondary_detail_text.append('no storage')    
-            final_detail_text = "\n".join(secondary_detail_text)
+                    secondary_detail_text.append('no storage')
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
             
             self.ids.config_list.add_widget(
-                    ListItemWithCheckbox(pk="pk",
-                                            text=f"Configuration {ctr}",
-                                            secondary_text=final_detail_text)
+                    ListItemWithCheckbox(pk="pk", 
+                                         text=f"Configuration {ctr}",
+                                         secondary_text=final_secondary_text,
+                                         tertiary_text=final_tertiary_text)
             )
             ctr += 1
-        # print("=" * 100)
         
     def uncheck_configuration(self):
         print("configuration unchecked")

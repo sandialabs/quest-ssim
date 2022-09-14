@@ -273,9 +273,9 @@ class Configuration:
         return self._load_results()
 
     def _write_configuration(self):
-        with open(self._grid_path) as grid_file:
+        with open(self._grid_path, 'w') as grid_file:
             json.dump(self._grid_config(), grid_file)
-        with open(self._federation_path) as federation_file:
+        with open(self._federation_path, 'w') as federation_file:
             json.dump(self._federation_config(), federation_file)
 
     def _run(self):
