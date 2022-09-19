@@ -128,6 +128,9 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.ids.caller.text = value
         self.menu.dismiss()
 
+    def manage_store_button_enabled_state(self):
+        self.ids.btnStore.disabled = len(self._selBusses) == 0
+
     def reload_metric_values(self):
         metrics = []
         common_limit = None
@@ -215,14 +218,12 @@ class MetricConfigurationScreen(SSimBaseScreen):
             self.ids.currMetriclabel.text = \
                 "Defined \"" + self._currentMetricCategory + "\" Metrics"
 
-
     def reload_metric_list(self):
         self.ids.metriclist.clear_widgets()
         self.reset_metric_list_label()
         manager = self.project.get_manager(self._currentMetricCategory)
 
-        if manager is None:
-            return
+        if manager is None: return
 
         list = self.ids.metriclist
         for mgrKey in manager.all_metrics:
@@ -251,6 +252,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
             self._selBusses.remove(bus)
 
         self.reload_metric_values()
+        self.manage_store_button_enabled_state()
 
     def configure_voltage_metrics(self):
         self._currentMetricCategory = "Voltage"

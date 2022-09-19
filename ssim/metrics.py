@@ -309,6 +309,12 @@ class Metric:
         ):
         
         try:
+            assert limit != None, "A value must be provided for the limit."
+            
+            assert objective != None, "A value must be provided for the objective."
+            
+            assert imp_type != None, "A value must be provided for the sense."
+
             if imp_type == ImprovementType.Minimize:
                 assert limit > objective, "Limit must be greater than objective for minimization"
 

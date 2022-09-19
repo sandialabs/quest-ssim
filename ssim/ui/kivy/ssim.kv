@@ -174,7 +174,7 @@
 
                 BoxLayout:
                     orientation: "vertical"
-                    size_hint: 1.0, 0.55
+                    size_hint: 1.0, 0.65
 
                     Label:
                         id: metriclabel
@@ -210,6 +210,13 @@
                         id: objectiveText
                         size_hint: 1.0, 0.05
                         
+                    Label:
+                        id: senselabel
+                        text: "Sense"
+                        size_hint: 1.0, 0.05
+                        color: 0,0,0,1
+                        rectangle: self.x, self.y, self.width, self.height
+
                     MDRaisedButton:
                         id: caller
                         text: "Sense"
@@ -217,9 +224,11 @@
                         on_release: root.drop()
                         
                     Button:
+                        id: btnStore
                         text: "store"
                         size_hint: 1.0, 0.05
                         on_release: root.store_metrics()
+                        disabled: True
             
                 BoxLayout:
                     orientation: "vertical"
