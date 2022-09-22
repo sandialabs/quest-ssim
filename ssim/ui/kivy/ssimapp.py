@@ -101,7 +101,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
                     self._selBusses.append(cb)
                     
     def drop(self):
-        self.menu_items = [
+        menu_items = [
             {
                 "viewclass": "OneLineListItem",
                 "text": "Minimize",
@@ -120,7 +120,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         ]
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.caller, items=self.menu_items, width_mult=3
+            caller=self.ids.caller, items=menu_items, width_mult=3
             )
         self.menu.open()
 
@@ -208,6 +208,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.reload_metric_list()
 
     def reset_metric_list_label(self):
+        """Resets the label atop the list of all defined metrics to include, or not, the current metric category.
+        """
         if self._currentMetricCategory is None:
             self.ids.currMetriclabel.text = "Defined Metrics"
         
@@ -219,6 +221,11 @@ class MetricConfigurationScreen(SSimBaseScreen):
                 "Defined \"" + self._currentMetricCategory + "\" Metrics"
 
     def reload_metric_list(self):
+        """Reloads the list of all defined metrics.
+
+        This method creates a list item for all metrics previously defined for the
+        current category.
+        """
         self.ids.metriclist.clear_widgets()
         self.reset_metric_list_label()
         manager = self.project.get_manager(self._currentMetricCategory)
