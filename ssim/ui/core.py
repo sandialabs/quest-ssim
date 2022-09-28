@@ -351,7 +351,7 @@ class Configuration:
         ] + list(
             _storage_federate_spec(
                 ess.name, self._grid_path, self.sim_duration)
-            for ess in self.storage
+            for ess in self.storage if ess is not None
         )
         return config
 
