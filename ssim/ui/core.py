@@ -59,6 +59,7 @@ class Project:
 
     def __init__(self, name: str):
         self.name = name
+        self._grid_model_path = None
         self._grid_model = None
         self.storage_devices = []
         self._pvsystems = []
@@ -72,6 +73,7 @@ class Project:
         return self._grid_model.available_phases(bus)
 
     def set_grid_model(self, model_path):
+        self._grid_model_path = model_path
         self._grid_model = DSSModel(model_path)
 
     def add_metric(self, metric):
@@ -84,7 +86,7 @@ class Project:
         """Return an iterator over all grid configurations to be evaluated."""
         for storage_configuration in self._storage_configurations():
             yield Configuration(
-                self._grid_model,
+                self._grid_model_path,
                 self._metrics,
                 self._pvsystems,
                 storage_configuration
@@ -369,7 +371,7 @@ class Configuration:
         ] + list(
             _storage_federate_spec(
                 ess.name, self._grid_path, self.sim_duration)
-            for ess in self.storage
+            for ess in self.storage if ess is not None
         )
         return config
 
