@@ -213,15 +213,15 @@ class RunSimulationScreen(SSimBaseScreen):
         # clear the MDList everytime the RunSimulationScreen is opened
         # TO DO: Keep track of selected configs
         self.ids.config_list.clear_widgets()
-        self.populate_confgurations()
+        self.populate_configurations()
     
     def on_enter(self):
         self.ids.config_list.clear_widgets()
         self.configurations: List[Configuration] = []
-        self.populate_confgurations()
+        self.populate_configurations()
           
           
-    def populate_confgurations(self):
+    def populate_configurations(self):
         # store all the project configurations into a list
         for config in self.project.configurations():
             self.configurations.append(config)
