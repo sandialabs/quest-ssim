@@ -312,7 +312,7 @@ class Configuration:
         return config
 
     def _federation_config(self):
-        config = {}
+        config = {"name": str(self._id)}
         self._configure_broker(config)
         self._configure_federates(config)
         return config
