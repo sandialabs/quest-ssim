@@ -347,7 +347,7 @@ class Configuration:
         config["federates"] = [
             _federate_spec(
                 "metrics",
-                f"metrics-federate --hours {self.sim_duration}"
+                f"metrics-federate"
                 f" {self._grid_path}"
                 f" {_get_federate_config('metrics')}"
             ),
