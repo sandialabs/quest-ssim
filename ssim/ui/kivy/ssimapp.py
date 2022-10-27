@@ -1,5 +1,5 @@
 """Storage Sizing and Placement Kivy application"""
-import functools
+import os
 
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.uix.floatlayout import FloatLayout
@@ -18,6 +18,7 @@ from kivymd.app import MDApp
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.list import ILeftBodyTouch, TwoLineIconListItem, OneLineListItem
 from kivymd.uix.selectioncontrol import MDCheckbox
+from kivy.core.text import LabelBase
 
 from typing import List
 from ssim.ui import Project, StorageOptions, Configuration
@@ -327,5 +328,23 @@ class SSimScreen(SSimBaseScreen):
 
 
 if __name__ == '__main__':
+    LabelBase.register(
+        name='Exo 2',
+        fn_regular=os.path.join('resources', 'fonts',
+                                'Exo_2', 'Exo2-Regular.ttf'),
+        fn_bold=os.path.join('resources', 'fonts',
+                             'Exo_2', 'Exo2-Bold.ttf'),
+        fn_italic=os.path.join('resources', 'fonts',
+                               'Exo_2', 'Exo2-Italic.ttf'))
+
+    LabelBase.register(
+        name='Open Sans',
+        fn_regular=os.path.join('resources', 'fonts',
+                                'Open_Sans', 'OpenSans-Regular.ttf'),
+        fn_bold=os.path.join('resources', 'fonts',
+                             'Open_Sans', 'OpenSans-Bold.ttf'),
+        fn_italic=os.path.join('resources', 'fonts',
+                               'Open_Sans', 'OpenSans-Italic.ttf'))
+
     Logger.setLevel(LOG_LEVELS["debug"])
     SSimApp().run()

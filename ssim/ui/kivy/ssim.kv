@@ -1,15 +1,26 @@
+#:include common.kv
+
 <SSimScreen>:
     name: 'ssim'
     bus_list: bus_list
     BoxLayout:
         orientation: "vertical"
+        padding: 5
+        spacing: 5
 
-        Label:
-            text: "Project Name"
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint: (1.0, 0.5)
 
-        TextInput:
-            text: "unnamed"
-            multiline: False
+            Label:
+                text: "Project Name:"
+                color: C(hex_black)
+                size_hint: (0.33, 1.0)
+
+            TextInput:
+                text: "unnamed"
+                multiline: False
+                valign: "center"
 
         Button:
             text: "select grid model"
