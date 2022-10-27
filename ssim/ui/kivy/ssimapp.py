@@ -1,5 +1,6 @@
 """Storage Sizing and Placement Kivy application"""
 import os
+from threading import Thread
 
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.uix.floatlayout import FloatLayout
@@ -215,6 +216,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # TO DO: Keep track of selected configs
         self.ids.config_list.clear_widgets()
         self.populate_configurations()
+        self._run_thread = None
     
     def on_enter(self):
         self.ids.config_list.clear_widgets()
@@ -256,10 +258,15 @@ class RunSimulationScreen(SSimBaseScreen):
     def uncheck_configuration(self):
         print("configuration unchecked")
     
-    def run_configurations(self):
+    def _evaluate(self):
         for config in self.configurations:
             print(config)
             print(config.evaluate())
+            config.wait()
+
+    def run_configurations(self):
+        self._run_thread = Thread(target=self._evaluate)
+        self._run_thread.start()
 
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):

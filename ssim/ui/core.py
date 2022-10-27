@@ -262,6 +262,7 @@ class Configuration:
         self._id = None
         self._grid_path = None
         self._federation_path = None
+        self._proc = None
         self._workdir = Path(".")
 
     def evaluate(self, basepath=None):
@@ -273,6 +274,13 @@ class Configuration:
         self._write_configuration()
         self._run()
         return self._load_results()
+
+    def wait(self):
+        if self._proc is None:
+            raise RuntimeError(
+                "Tried to wait on evaluation, but no evaluation running"
+            )
+        return self._proc.wait()
 
     def _write_configuration(self):
         with open(self._grid_path, 'w') as grid_file:
