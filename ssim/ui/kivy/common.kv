@@ -55,111 +55,23 @@
 #:set large_font sp(30)
 #:set huge_font sp(40)
 
-# Sets default font (if not specified by class rule).
-<Widget>:
-    font_size: default_font
-    font_name: 'Exo 2'
-
 <TextInput>:
     on_focused: self.focused and clock.Clock.schedule_once(lambda dt: self.select_all())
 
-# This is a label template for left-aligned text. It includes options to prevent text from overflowing.
-<LeftAlignedText>:
-    text_size: self.width, None
-    height: self.texture_size[1]
-    halign: 'left'
-
-# Text style for title labels.
-<TitleTextBase>:
-    font_name: 'Exo 2'
-    font_size: huge_font
-    color: C(hex_primary)
-    bold: True
-
-# Text style for body text labels.
-<BodyTextBase>:
-    font_name: 'Open Sans'
-    font_size: stnd_font
-    color: C(hex_black)
+<BoxLayout>:
+    padding: 5
+    spacing: 5
 
 # This is the generic flat, square Tile Button used throughout the application.
 # Subclass: Button
 <Button>:
-    background_normal: os.path.join('resources', 'images', 'button_normal.png')
-    background_down: os.path.join('resources', 'images', 'button_down.png')
+    background_normal: '' # os.path.join('resources', 'images', 'button_normal.png')
+    background_down: '' # os.path.join('resources', 'images', 'button_down.png')
     background_color: C(hex_primary)
     color: C(hex_white)
     font_name: 'Exo 2'
-    font_size: stnd_font
-    text_size: self.width, None
-    height: self.texture_size[1]
     halign: 'center'
     markup: True
-
-# These are the previous and continue tile buttons for wizards.
-<WizardPrevButton@TileButton>:
-    background_color: C(hex_primary)
-    color: C(hex_white)
-    text: 'Previous'
-    size_hint_x: 0.30
-
-<WizardNextButton@TileButton>:
-    background_color: C(hex_primary)
-    color: C(hex_white)
-    text: 'Next'
-    size_hint_x: 0.30
-
-# This is a TileButton with toggle button behavior.
-<ToggleTileButton>:
-    background_down: os.path.join('resources', 'images', 'button_normal.png')
-    background_color: C(hex_primary) if self.state == 'down' else C(hex_cloud_dancer)
-    color: C(hex_secondary) if self.state == 'down' else C(hex_black)
-
-# This is the menu version of the TileButton used for large menu items.
-# Subclass: TileButton
-<MenuTileButton>:
-    font_name: 'Exo 2'
-    font_size: large_font
-
-# This is the RecycleView class.
-<MyRecycleView>:
-    scroll_type: ['bars', 'content']
-    bar_width: dp(5)
-    bar_color: C(hex_secondary)
-    bar_inactive_color: C(hex_secondary)
-
-    canvas.before:
-        Color:
-            rgba: C(hex_cloud_dancer)
-        Rectangle:
-            size: self.size
-            pos: self.pos
-
-# This is the layout class for RecycleView with selectable labels.
-<SelectableRecycleBoxLayout>:
-    default_size: None, dp(30)
-    default_size_hint: 1, None
-    size_hint_y: None
-    height: self.minimum_height
-    orientation: 'vertical'
-
-# This is the view class for RecycleView with selectable labels.
-<RecycleViewRow>:
-    canvas.before:
-        Color:
-            rgba: C(hex_primary) if self.selected else C(hex_cloud_dancer)
-        Rectangle:
-            size: self.size
-            pos: self.pos
-    name: ''
-    Label:
-        text: root.name
-        text_size: self.size
-        font_size: default_font
-        color: C(hex_white) if root.selected else C(hex_black)
-        valign: 'middle'
-        halign: 'left'
-        padding: (10, 10)
 
 # This is a generic popup with a modified appearance. Subclass from this to make more specific popups.
 # Subclass: Popup
