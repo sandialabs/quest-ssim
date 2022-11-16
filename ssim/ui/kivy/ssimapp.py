@@ -1,21 +1,25 @@
 """Storage Sizing and Placement Kivy application"""
 import os
+import re
 
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.screenmanager import Screen, ScreenManager
-from kivy.properties import ObjectProperty
+from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
+from kivy.core.text import LabelBase
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
     TwoLineAvatarIconListItem,
+    TwoLineIconListItem,
     ILeftBodyTouch,
-    OneLineListItem
+    OneLineRightIconListItem,
+    MDList
 )
 from kivymd.uix.selectioncontrol import MDCheckbox
-from kivy.core.text import LabelBase
+from kivymd.uix.textfield import MDTextField
 
 from ssim.ui import Project, StorageOptions
 
@@ -79,65 +83,146 @@ class BusListItem(TwoLineIconListItem):
         else:
             self.parent.parent.parent.remove_bus(the_list_item)
 
+    @property
+    def active(self):
+        return self.ids.selected.active
+
+
+class TextFieldPositiveFloat(MDTextField):
+    POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper_text_mode = "on_error"
+        self.helper_text = "You must enter a number."
+
+    def text_valid(self):
+        return TextFieldPositiveFloat.POSITIVE_FLOAT.match(self.text) is not None
+
+    def set_text(self, instance, value):
+        if value == "":
+            return
+        self.set_error_message()
+
+    def set_error_message(self):
+        if not self.text_valid():
+            self.error = True
+        else:
+            self.error = False
+
+
+class EditableSetList(MDList):
+    options = ObjectProperty(set())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bind(
+            options=self._update_display
+        )
+
+    def _update_display(self, instance, options):
+        self.clear_widgets()
+        for item in sorted(options):
+            self.add_widget(
+                EditableSetListItem(item, text=str(item))
+            )
+
+    def add_item(self, item):
+        """Add an item to the set."""
+        self.options = self.options.union(set([item]))
+
+    def remove_item(self, item):
+        """Remove an item from the set."""
+        # Don't use set.remove() since we must return a new object 
+        # to trigger the _update_display callback throug kivy
+        self.options = self.options - set([item])
+
+
+class EditableSetListItem(OneLineRightIconListItem):
+    """List item with one line and a delete button"""
+
+    def __init__(self, item, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._value = item
+        self.ids.delete.bind(
+            on_release=self._delete_item
+        )
+
+    def _delete_item(self, item):
+        self.parent.remove_item(self._value)
+
 
 class StorageConfigurationScreen(SSimBaseScreen):
     """Configure a single energy storage device."""
 
     def __init__(self, der_screen, *args, **kwargs):
-        self._der_screen = der_screen
-        # default storage configuration
-        self.ess = StorageOptions(
-            "unnamed", 3, [], [], []
-        )
         super().__init__(*args, **kwargs)
+        self._der_screen = der_screen
+        self._ess_name = "unnamed"
+        self.ids.power_input.bind(
+            on_text_validate=self._add_device_power
+        )
+        self.ids.duration_input.bind(
+            on_text_validate=self._add_device_duration,
+        )
+        self.ids.device_name.bind(
+            on_text_validate=self._assign_name,
+        )
         for bus in self.project.bus_names:
             bus_list_item = BusListItem(bus, self.project.phases(bus))
             self.ids.bus_list.add_widget(bus_list_item)
 
-    def _update_powers(self):
-        listed_powers = set(
-            float(c.text)
-            for c in self.ids.power_list.children
+    def _assign_name(self, textfield):
+        self._ess_name = textfield.text
+
+    def _add_option(self, optionlist, textfield):
+        if textfield.text_valid():
+            duration = float(textfield.text)
+            optionlist.add_item(duration)
+        else:
+            textfield.set_error_message()
+
+    def _add_device_duration(self, textfield):
+        self._add_option(self.ids.duration_list, textfield)
+
+    def _add_device_power(self, textfield):
+        self._add_option(self.ids.power_list, textfield)
+
+    @property
+    def _ess_powers(self):
+        return list(self.ids.power_list.options)
+
+    @property
+    def _ess_durations(self):
+        return list(self.ids.duration_list.options)
+    
+    @property
+    def _selected_busses(self):
+        return list(
+            bus_item.text
+            for bus_item in self.ids.bus_list.children
+            if bus_item.active
         )
-        for power in self.ess.power:
-            if power in listed_powers:
-                continue
-            self.ids.power_list.add_widget(OneLineListItem(text=str(power)))
-
-    def _update_durations(self):
-        listed_durations = set(
-            float(c.text)
-            for c in self.ids.duration_list.children
-        )
-        for duration in self.ess.duration:
-            if duration in listed_durations:
-                continue
-            self.ids.duration_list.add_widget(OneLineListItem(text=str(duration)))
-
-    def add_power(self, power):
-        self.ess.add_power(power)
-        self._update_powers()
-
-    def add_duration(self, duration):
-        self.ess.add_duration(duration)
-        self._update_durations()
 
     def save(self):
-        for bus_item in self.ids.bus_list.children:
-            Logger.debug(f"bus_item: {bus_item}")
-            Logger.debug(f"bus_item.ids: {bus_item.ids}")
+        ess = StorageOptions(
+            self._ess_name,
+            3,
+            self._ess_powers,
+            self._ess_durations,
+            self._selected_busses
+        )
 
-            if bus_item.ids.selected.active:
-                self.ess.add_bus(bus_item.text)
-
-        if not self.ess.valid:
+        if not ess.valid:
             Logger.error("invalid storage configuration")
-            Logger.error(f"powers: {self.ess.power}, durations: {self.ess.duration}, busses: {self.ess.busses}")
+            Logger.error(
+                f"powers: {ess.power}, "
+                f"durations: {ess.duration}, "
+                f"busses: {ess.busses}"
+            )
             return
 
-        self.project.add_storage_option(self.ess)
-        self._der_screen.add_ess(self.ess)
-        self.ess = StorageOptions("unnamed", 3, [], [], [])
+        self._der_screen.add_ess(ess)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
@@ -176,6 +261,7 @@ class DERConfigurationScreen(SSimBaseScreen):
         self.manager.current = "configure-storage"
 
     def add_ess(self, ess):
+        self.project.add_storage_option(ess)
         self.ids.ess_list.add_widget(
             StorageListItem(ess)
         )
