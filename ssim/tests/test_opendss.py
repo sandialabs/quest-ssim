@@ -8,22 +8,9 @@ from ssim import opendss, dssutil, grid
 
 
 @pytest.fixture(scope='function')
-def data_dir(request):
-    return Path(
-        os.path.abspath(os.path.dirname(request.module.__file__))) / "data"
-
-
-@pytest.fixture(scope='function')
-def test_circuit(data_dir):
-    yield opendss.DSSModel(data_dir / "test_circuit.dss")
+def test_circuit(grid_model_path):
+    yield opendss.DSSModel(grid_model_path)
     dssutil.run_command("clear")
-
-
-@pytest.fixture(scope='function')
-def wind_data(data_dir):
-    """Loadshape data used for the wind generator."""
-    with open(data_dir / "ZavWind.csv") as f:
-        return list(float(x) for x in f)
 
 
 def test_set_loadshape_class(test_circuit):
@@ -91,9 +78,26 @@ def test_DSSModel_storage(test_circuit):
     assert 900 < (kw - new_kw) < 1100
 
 
-def test_DSSModel_add_pvsystem(test_circuit, data_dir):
+def test_Storage_state(test_circuit):
+    test_circuit.add_storage(
+        "TestStorage",
+        "loadbus1",
+        3,
+        {"kwhrated": 5000, "kwrated": 1000, "kv": 12.47, "%stored": 50},
+        state=opendss.StorageState.DISCHARGING
+    )
+    s = test_circuit.storage_devices["TestStorage"]
+    s.set_power(0.0)
+    assert s.state is opendss.StorageState.IDLE
+    s.set_power(100)
+    assert s.state is opendss.StorageState.DISCHARGING
+    s.set_power(-100)
+    assert s.state is opendss.StorageState.CHARGING
+
+
+def test_DSSModel_add_pvsystem(test_circuit, triangle_path):
     test_circuit.add_loadshape(
-        "TestProfile", data_dir / "triangle.csv", 1.0, 24)
+        "TestProfile", triangle_path, 1.0, 24)
     test_circuit.add_pvsystem(
         "TestPV", "loadbus1", 3, 12.0, 12.0,
         {"kV": 12.47,
@@ -120,11 +124,12 @@ def test_DSSModel_add_xycurve(test_circuit):
     assert dssdirect.XYCurves.YArray() == [1.0, 1.5, 2.0]
 
 
-@pytest.fixture
-def grid_spec(data_dir):
+@pytest.fixture(scope="function")
+def grid_spec(grid_model_path):
     """GridSpecification for the circuit defined in 'test_circuit.dss'."""
     dssdirect.run_command("clear")
-    return grid.GridSpecification(data_dir / "test_circuit.dss")
+    yield grid.GridSpecification(grid_model_path)
+    dssdirect.run_command("clear")
 
 
 def test_DSSModel_from_gridspec(grid_spec):
@@ -254,14 +259,14 @@ def test_DSSModel_pvsystem_efficiency_curves(grid_spec):
     assert dssdirect.XYCurves.YArray() == [2.0, 1.0, 0.0]
 
 
-def test_DSSModel_pvsystem_irradiance_profiles(grid_spec, data_dir):
+def test_DSSModel_pvsystem_irradiance_profiles(grid_spec, irradiance_path):
     grid_spec.add_pvsystem(
         grid.PVSpecification(
             name="pv1",
             bus="loadbus2",
             pmpp=100,
             kva_rated=100,
-            irradiance_profile=data_dir / "test_irradiance.csv"
+            irradiance_profile=irradiance_path
         )
     )
     opendss.DSSModel.from_grid_spec(grid_spec)
