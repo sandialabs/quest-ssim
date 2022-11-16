@@ -129,12 +129,6 @@ class Storage(StorageDevice):
 
     def set_power(self, kw: float, kvar: float = None, pf: float = None):
         self._set('kW', kw)
-        if self.kw == 0.0:
-            self.state = StorageState.IDLE
-        elif self.kw > 0:
-            self.state = StorageState.DISCHARGING
-        elif self.kw < 0:
-            self.state = StorageState.CHARGING
         if pf is not None:
             self._set('pf', pf)
         if kvar is not None:
