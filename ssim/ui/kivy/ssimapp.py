@@ -211,23 +211,22 @@ class RunSimulationScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.configurations: List[Configuration] = []
+        self.selected_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
-        # clear the MDList everytime the RunSimulationScreen is opened
-        # TO DO: Keep track of selected configs
-        self.ids.config_list.clear_widgets()
-        self.populate_configurations()
         self._run_thread = None
     
     def on_enter(self):
+        # # clear the MDList every time the RunSimulationScreen is opened
+        # # TO DO: Keep track of selected configs
         self.ids.config_list.clear_widgets()
         self.configurations: List[Configuration] = []
         self.populate_configurations()
-          
-          
+
     def populate_configurations(self):
         # store all the project configurations into a list
         for config in self.project.configurations():
             self.configurations.append(config)
+            print(config._id)
             
         # populate the UI with the list of configurations
         ctr = 1
@@ -254,14 +253,26 @@ class RunSimulationScreen(SSimBaseScreen):
                                          tertiary_text=final_tertiary_text)
             )
             ctr += 1
-        
-    def uncheck_configuration(self):
-        print("configuration unchecked")
     
     def _evaluate(self):
-        for config in self.configurations:
+        # step 1: check the configurations that are currently selected
+        mdlist = self.ids.config_list # get reference to the configuration list
+        self.selected_configurations = []
+        print('selected configurations are:')
+        no_of_configurations = len(self.configurations)
+        ctr = no_of_configurations - 1
+        for wid in mdlist.children:
+            if wid.ids.check.active:
+                print('*' * 20)
+                print(wid.text)
+                print('*' * 20)
+                # extract a subset of selected configurations
+                self.selected_configurations.append(self.configurations[ctr])
+            ctr = ctr - 1
+        # run all the configurations
+        for config in self.selected_configurations:
             print(config)
-            print(config.evaluate())
+            config.evaluate()
             config.wait()
 
     def run_configurations(self):
@@ -276,12 +287,24 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
         self.pk = pk
 
     def delete_item(self, the_list_item):
+        print("Delete icon was button was pressed")
+        print(the_list_item)
         self.parent.remove_widget(the_list_item)
 
     
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     '''Custom left container'''
-    pass
+    
+    def __init__(self, pk=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pk = pk
+    
+    def toggle_configuration_check(self, check):
+        # print(check)
+        # if check.active:
+        #     print('Configuration checked')
+        # print("selection made")
+        pass
 
 
 class SelectGridDialog(FloatLayout):
