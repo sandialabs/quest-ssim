@@ -4,7 +4,7 @@ import itertools
 import json
 import tempfile
 from os import path
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import pkg_resources
 import subprocess
 
@@ -180,7 +180,7 @@ class StorageOptions:
         self.initial_soc = initial_soc
         self.control = control or StorageControl(
             'droop',
-            {'real_gain': 500, 'reactive_gain': -300}  # completely arbitrary
+            {'p_droop': 500, 'q_droop': -300}  # completely arbitrary
         )
         self.soc_model = soc_model
         self.required = False
@@ -269,7 +269,7 @@ class Configuration:
         """Run the simulator for this configuration"""
         self._workdir = Path(tempfile.mkdtemp(dir=basepath))
         self._id = path.basename(self._workdir)
-        self._grid_path = self._workdir / "grid.json"
+        self._grid_path = PurePosixPath(self._workdir / "grid.json")
         self._federation_path = self._workdir / "federation.json"
         self._write_configuration()
         self._run()
@@ -305,6 +305,7 @@ class Configuration:
         self._configure_grid_model(config)
         self._configure_storage(config)
         self._configure_pv(config)
+        self._configure_inverters(config)
         self._configure_reliability(config)
         self._configure_metrics(config)
         return config
@@ -325,6 +326,10 @@ class Configuration:
             pv.to_dict()
             for pv in self.pvsystems
         )
+        return config
+
+    def _configure_inverters(self, config):
+        config["invcontrol"] = []
         return config
 
     def _configure_reliability(self, config):
@@ -362,6 +367,7 @@ class Configuration:
             _federate_spec(
                 "logger",
                 f"logger-federate --hours {self.sim_duration}"
+                f" {self._grid_path}"
                 f" {_get_federate_config('logger')}"
             ),
             _federate_spec(
@@ -416,8 +422,10 @@ def _get_federate_config(federate):
     if federate not in {'metrics', 'storage', 'reliability',
                         'logger', 'grid', 'ems'}:
         raise ValueError(f"invalid federate type '{federate}'.")
-    return pkg_resources.resource_filename(
-        "ssim.federates", f"{federate}.json")
+    return PurePosixPath(
+        Path(pkg_resources.resource_filename(
+            "ssim.federates", f"{federate}.json"))
+    )
 
 
 class Results:
