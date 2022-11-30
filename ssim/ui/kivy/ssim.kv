@@ -1,6 +1,7 @@
 #:include common.kv
 
 
+#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
 #:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
 #:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
 
@@ -25,6 +26,10 @@
                 text: "unnamed"
                 multiline: False
                 valign: "center"
+
+        Button:
+            text: "Save to File"
+            on_press: root.write_toml()
 
         Button:
             text: "select grid model"
@@ -70,6 +75,16 @@
     BoxLayout:
         orientation: "vertical"    
 
+        Label:
+            id: currMetriclabel
+            text: "Defined Metrics"
+            size_hint: 1.0, 0.05
+            color: 0,0,0,1
+                               
+        ScrollView:
+            MDList:
+                id: metriclist
+
         Button:
             text: "back"
             on_press: root.manager.current = 'ssim'
@@ -109,25 +124,12 @@
             BoxLayout:
                 orientation: "vertical"
 
-                canvas.before:
-                    Color:
-                        rgba: .5, .5, .5, 1
-                    Line:
-                        width: 2
-                        rectangle: self.x, self.y, self.width, self.height
-
                 Label:
                     text: "Class of Metrics to Configure"
                     size_hint: 1.0, 0.05
                     color: 0,0,0,1
 
                 ScrollView:
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
 
                     MDList:
                         id: metriclist
@@ -146,110 +148,103 @@
 
             BoxLayout:
                 orientation: "vertical"
-
-                canvas.before:
-                    Color:
-                        rgba: .5, .5, .5, 1
-                    Line:
-                        width: 2
-                        rectangle: self.x, self.y, self.width, self.height
-
+                
                 Label:
                     id: interlabel
                     text: "Metric Objects"
                     size_hint: 1.0, 0.05
                     color: 0,0,0,1
 
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint: None, None
+                    size: self.parent.width, 10
+                    
+                    Button:
+                        id: btnSelectAll
+                        text: "Select All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.select_all_metric_objects()
+                        disabled: True
+                        
+                    Button:
+                        id: btnDeselectAll
+                        text: "Deselect All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.deselect_all_metric_objects()
+                        disabled: True
+
                 ScrollView:
                     MDList:
                         id: interlist
 
-                        canvas.before:
-                            Color:
-                                rgba: .5, .5, .5, 1
-                            Line:
-                                width: 2
-                                rectangle: self.x, self.y, self.width, self.height
-
             BoxLayout:
                 orientation: "vertical"
-                padding: 5
-                spacing: 5
-
-                canvas.before:
-                    Color:
-                        rgba: .5, .5, .5, 1
-                    Line:
-                        width: 2
-                        rectangle: self.x, self.y, self.width, self.height
 
                 BoxLayout:
+                    id: metricValueBox
                     orientation: "vertical"
-                    size_hint: 1.0, 0.65
+                    size_hint: None, None
+                    size: self.parent.width, 275
+                    disabled: True
 
                     Label:
                         id: metriclabel
                         text: "Metric Settings"
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 25
                         color: 0,0,0,1
                         
-                        canvas.before:
-                            Color:
-                                rgba: .5, .5, .5, 1
-                            Line:
-                                width: 1
-                                rectangle: self.x, self.y, self.width, self.height
-
                     Label:
                         id: limitlabel
                         text: "Limit"
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 25
                         color: 0,0,0,1
 
                     TextInput:
                         id: limitText
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 35
                         
                     Label:
                         id: objectivelabel
                         text: "Objective"
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 25
                         color: 0,0,0,1
-                        rectangle: self.x, self.y, self.width, self.height
 
                     TextInput:
                         id: objectiveText
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 35
                         
                     Label:
                         id: senselabel
                         text: "Sense"
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 25
                         color: 0,0,0,1
-                        rectangle: self.x, self.y, self.width, self.height
 
                     MDRaisedButton:
                         id: caller
                         text: "Sense"
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 25
                         on_release: root.drop()
                         
                     Button:
                         id: btnStore
                         text: "store"
-                        size_hint: 1.0, 0.05
+                        size_hint: None, None
+                        size: self.parent.width, 25
                         on_release: root.store_metrics()
                         disabled: True
             
                 BoxLayout:
                     orientation: "vertical"
-
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
 
                     Label:
                         id: currMetriclabel
@@ -257,13 +252,6 @@
                         size_hint: 1.0, 0.05
                         color: 0,0,0,1
 
-                        canvas.before:
-                            Color:
-                                rgba: .5, .5, .5, 1
-                            Line:
-                                width: 1
-                                rectangle: self.x, self.y, self.width, self.height
-                                
                     ScrollView:
                         MDList:
                             id: metriclist
@@ -322,18 +310,6 @@
         text: 'Return to Main Screen'
         size_hint: 1, 0.2
   
-<MissingMetricValuesPopupContent>:
-    orientation: "vertical"
-    Label:
-        text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Limit"" and ""Objective"" and select a ""Sense"".'
-        text_size: self.width, None
-        height: self.texture_size[1]
-
-    Button:
-        id: dismissBtn
-        text: 'Dismiss'
-        size_hint: 1, 0.2
-  
 <InvalidMetricValuesPopupContent>:
     orientation: "vertical"
     Label:
@@ -345,3 +321,16 @@
         id: dismissBtn
         text: 'Dismiss'
         size_hint: 1, 0.2
+          
+<MissingMetricValuesPopupContent>:
+    orientation: "vertical"
+    Label:
+        text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Limit"" and ""Objective"" and select a ""Sense"".'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+ 

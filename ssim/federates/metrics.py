@@ -26,7 +26,8 @@ from ssim.metrics import ImprovementType
 
 
 class MetricsFederate:
-    """Manager for metrics and accumulators that record values from other HELICS federates.
+    """Manager for metrics and accumulators that record values from other
+       HELICS federates.
 
     Parameters
     ----------
@@ -47,7 +48,10 @@ class MetricsFederate:
             self.add_accumulator(
                 bv_dict["name"],
                 MetricTimeAccumulator(
-                    Metric(bv_dict["limit"], bv_dict["objective"], ImprovementType.SeekValue),
+                    Metric(
+                        bv_dict["limit"], bv_dict["objective"],
+                        ImprovementType.SeekValue
+                        ),
                     0.0
                 )
             )
@@ -70,8 +74,9 @@ class MetricsFederate:
         Parameters
         ----------
         name : str
-            Unique identifier for the metric accumulator. If a metric accumulator
-            already exists with the same name an exception is raised.
+            Unique identifier for the metric accumulator. If a metric
+            accumulator already exists with the same name an exception is
+            raised.
         accumulator : MetricTimeAccumulator
             The metric accumulator to add.
 
@@ -106,8 +111,8 @@ class MetricsFederate:
         schedule = timing.schedule(self._federate)
         for time in schedule:
             if time == helics_time_maxtime:
-                # Don't update since this is the signal that all other federates
-                # have finished
+                # Don't update since this is the signal that all other
+                # federates have finished
                 return
             self._update_metrics(time)
 

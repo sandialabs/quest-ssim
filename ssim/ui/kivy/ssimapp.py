@@ -142,6 +142,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         common_obj = None
         common_sense = None
 
+        self.ids.metricValueBox.disabled = len(self._selBusses) == 0
+
         ''' Gather up the list of all metrics relevant to the selection'''
         for b in self._selBusses:
             m = self.project.get_metric(self._currentMetricCategory, b)
@@ -213,7 +215,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.reload_metric_list()
 
     def reset_metric_list_label(self):
-        """Resets the label atop the list of all defined metrics to include, or not, the current metric category.
+        """Resets the label atop the list of all defined metrics to include, or
+           not, the current metric category.
         """
         if self._currentMetricCategory is None:
             self.ids.currMetriclabel.text = "Defined Metrics"
@@ -225,11 +228,29 @@ class MetricConfigurationScreen(SSimBaseScreen):
             self.ids.currMetriclabel.text = \
                 "Defined \"" + self._currentMetricCategory + "\" Metrics"
 
+    
+    def manage_selection_buttons_enabled_state(self):
+        self.ids.btnSelectAll.disabled = len(self.ids.interlist.children) == 0
+        self.ids.btnDeselectAll.disabled = len(self.ids.interlist.children) == 0
+
+
+    def deselect_all_metric_objects(self):
+        for wid in self.ids.interlist.children:
+            if isinstance(wid, BusListItemWithCheckbox):
+                wid.ids.check.active = False
+
+    def select_all_metric_objects(self):
+        self._selBusses.clear()
+        for wid in self.ids.interlist.children:
+            if isinstance(wid, BusListItemWithCheckbox):
+                wid.ids.check.active = True
+                self._selBusses.append(wid.text)
+
     def reload_metric_list(self):
         """Reloads the list of all defined metrics.
 
-        This method creates a list item for all metrics previously defined for the
-        current category.
+        This method creates a list item for all metrics previously defined for
+        the current category.
         """
         self.ids.metriclist.clear_widgets()
         self.reset_metric_list_label()
@@ -238,14 +259,13 @@ class MetricConfigurationScreen(SSimBaseScreen):
         if manager is None: return
 
         list = self.ids.metriclist
-        for mgrKey in manager.all_metrics:
-            m = manager.all_metrics.get(mgrKey)
-            txt = self._currentMetricCategory + " Metric for " + mgrKey
+        for key, m in manager.all_metrics.items():
+            txt = self._currentMetricCategory + " Metric for " + key
             deets = "Limit=" + str(m.metric.limit) + ", " + \
                 "Objective=" + str(m.metric.objective) + ", " + \
                 "Sense=" + m.metric.improvement_type.name
             bItem = MetricListItem(text=txt, secondary_text=deets)
-            bItem.bus = mgrKey
+            bItem.bus = key
             bItem.ids.left_icon.icon = self._metricIcons[self._currentMetricCategory]
             bItem.ids.trash_can.bind(on_release=self.on_delete_metric)
             list.add_widget(bItem)
@@ -271,6 +291,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.load_bussed_into_list()
         self.reload_metric_list()
         self.reload_metric_values()
+        self.manage_selection_buttons_enabled_state()
 
     def configure_some_other_metrics(self):
         self._currentMetricCategory = "Unassigned"
@@ -279,6 +300,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.ids.interlabel.text = "Metric Objects"
         self.reload_metric_list()
         self.reload_metric_values()
+        self.manage_selection_buttons_enabled_state()
         print("I'm passing on the other issue...")
 
     def _return_to_main_screen(self, dt):
@@ -322,21 +344,19 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
     def load_bussed_into_list(self):
         self._selBusses.clear()
-        #busses = self.project.bus_names()
-        self.ids.interlist.clear_widgets()
-        self.ids.interlabel.text = "Busses"
+        list = self.ids.interlist
+        list.clear_widgets()
+        list.text = "Busses"
 
         if self.project._grid_model is None:
             self.__show_no_grid_model_popup()
             return
 
-        list = self.ids.interlist
         busses = self.project._grid_model.bus_names
         for x in busses:
             bItem = BusListItemWithCheckbox(text=str(x))
             bItem.ids.check.bind(active=self.on_item_check_changed)
             list.add_widget(bItem)
-
 
 class LoadConfigurationScreen(SSimBaseScreen):
     pass
@@ -367,6 +387,11 @@ class SSimScreen(SSimBaseScreen):
         self.project.set_grid_model(filename[0])
         self.bus_list.text = '\n'.join(self.project.bus_names)
         self.dismiss_popup()
+
+    def write_toml(self):
+        toml = self.project.write_toml()
+        with open('c:/temp/written.toml', 'w') as f:
+            f.write(toml)
 
     def select_grid_model(self):
         chooser = SelectGridDialog(load=self.load_grid, cancel=self.dismiss_popup)

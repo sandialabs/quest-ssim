@@ -82,6 +82,14 @@ class Project:
              
         cat_mgr.add_accumulator(key, metric)
 
+    def write_toml(self) -> str:
+        ret = ""
+        for mgrKey in self._metricMgrs:
+            mgr = self._metricMgrs[mgrKey]
+            ret += mgr.write_toml(mgrKey)
+
+        return ret
+
     def remove_metric(self, category, key):
         cat_mgr = self.get_manager(category)
         if cat_mgr is None:
