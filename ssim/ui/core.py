@@ -10,7 +10,7 @@ import subprocess
 
 from ssim import grid
 from ssim.opendss import DSSModel
-from ssim.metrics import MetricManager
+from ssim.metrics import MetricManager, MetricTimeAccumulator
 
 # To Do
 #
@@ -74,14 +74,6 @@ class Project:
         self._grid_model_path = model_path
         self._grid_model = DSSModel(model_path)
 
-    def add_metric(self, category, key, metric):
-        cat_mgr = self.get_manager(category)
-        if cat_mgr is None:
-            cat_mgr= MetricManager()
-            self._metricMgrs[category] = cat_mgr
-             
-        cat_mgr.add_accumulator(key, metric)
-
     def write_toml(self) -> str:
         ret = ""
         for mgrKey in self._metricMgrs:
@@ -90,6 +82,23 @@ class Project:
 
         return ret
 
+    def read_toml(self, tomlData):
+        for key in tomlData:
+            if key.startswith("metric"):
+                idat = tomlData[key]
+                mta = MetricTimeAccumulator.read_toml(idat)
+                cat = idat["category"]
+                key = idat["key"]
+                self.add_metric(cat, key, mta)
+
+    def add_metric(self, category, key, metric):
+        cat_mgr = self.get_manager(category)
+        if cat_mgr is None:
+            cat_mgr= MetricManager()
+            self._metricMgrs[category] = cat_mgr
+             
+        cat_mgr.add_accumulator(key, metric)
+        
     def remove_metric(self, category, key):
         cat_mgr = self.get_manager(category)
         if cat_mgr is None:
@@ -104,6 +113,9 @@ class Project:
 
         return cat_mgr.get_accumulator(key)
     
+    def clear_metrics(self):
+        self._metricMgrs.clear();
+
     def get_manager(self, category):
         return self._metricMgrs.get(category)
 

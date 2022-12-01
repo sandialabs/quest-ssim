@@ -1,3 +1,4 @@
+from __future__ import annotations
 import enum
 import math
 
@@ -173,6 +174,31 @@ class Metric:
         """
         return self._imp_type
     
+    @staticmethod
+    def read_toml(tomlData) -> Metric:
+        """Reads the properties of a metric class instance from a TOML
+           formatted dictionary and creates and returns a new Metric instance.
+        
+        Parameters
+        ----------
+        tomlData
+            The dictionary that contains the metric properties from which to
+            create a new metric instance.  The minimum set of keys that must
+            be present are "limit", "objective", and "sense".  "sense" must
+            point to something that can be parsed to an ImprovementType
+            enumeration value.
+
+        Returns
+        -------
+        Metric
+            A newly created metric made using the properties in the supplied
+            TOML dictionary.
+        """
+        limit = tomlData["limit"]
+        objective = tomlData["objective"]
+        impType = ImprovementType.parse(tomlData["sense"])
+        return Metric(limit, objective, impType)
+    
     def write_toml(self, category, key) -> str:
         """Writes the properties of this class instance to a string in TOML
            format.
@@ -193,7 +219,7 @@ class Metric:
         Limit
             A TOML formatted string with the properties of this instance.
         """
-        ret = "\n\n[metric]" + "\n"
+        ret = "\n\n[metric-" + category + "-" + key + "]" + "\n"
         if category is not None:
             ret += "category = \"" + category + "\"\n"
         if key is not None:
@@ -544,7 +570,7 @@ class MetricAccumulator:
     m : Metric
         The metric whose value will be accumulated over time.
     """
-    def __init__(self, m: Metric):
+    def __init__(self, m: Metric = None):
         self._metric = m
         self._accumulated = 0.0
         self._total_time = 0.0
@@ -594,6 +620,28 @@ class MetricAccumulator:
             A TOML formatted string with the properties of this instance.
         """
         return self._metric.write_toml(category, key)
+    
+    @staticmethod
+    def read_toml(tomlData) -> MetricAccumulator:
+        """Reads the properties of a metric accumulator class instance from a
+           TOML formatted dictionary and creates and returns a new
+           MetricAccumulator instance.
+        
+        Parameters
+        ----------
+        tomlData
+            The dictionary that contains the metric accumulator properties from
+            which to create a new instance.  The minimum set of keys that must
+            be present are only those associated with a Metric.
+
+        Returns
+        -------
+        Metric Accumulator
+            A newly created metric accumulator made using the properties in the
+            supplied TOML dictionary.
+        """
+        m = Metric.read_toml(tomlData)
+        return MetricAccumulator(m)
 
     @property
     def accumulated_value(self) -> float:
@@ -662,6 +710,28 @@ class MetricTimeAccumulator(MetricAccumulator):
     def __init__(self, m: Metric, init_time=0.0):
         MetricAccumulator.__init__(self, m)
         self._curr_time = init_time
+            
+    @staticmethod
+    def read_toml(tomlData) -> MetricTimeAccumulator:
+        """Reads the properties of a metric time accumulator class instance
+           from a TOML formatted dictionary and creates and returns a new
+           MetricTimeAccumulator instance.
+        
+        Parameters
+        ----------
+        tomlData
+            The dictionary that contains the metric time accumulator properties
+            from which to create a new instance.  The minimum set of keys that
+            must be present are only those associated with a Metric.
+
+        Returns
+        -------
+        Metric Time Accumulator
+            A newly created metric time accumulator made using the properties
+            in the supplied TOML dictionary.
+        """
+        m = Metric.read_toml(tomlData)
+        return MetricTimeAccumulator(m)
 
     def accumulate(self, value: float, curr_time: float) -> float:
         """Adds in normalized value weighted by the difference between the last
@@ -760,7 +830,7 @@ class MetricManager:
             ret += accumulator.write_toml(category, accKey)
 
         return ret
-            
+         
     @property
     def all_metrics(self) -> dict:
         """Allows access to the mapping of all metrics in this manager.

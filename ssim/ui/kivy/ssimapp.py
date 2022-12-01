@@ -2,7 +2,6 @@
 import os
 
 
-from ast import Return
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 from kivymd.app import MDApp
 from ssim.ui import Project
@@ -17,6 +16,7 @@ from kivy.core.text import LabelBase
 from kivy.properties import ObjectProperty, StringProperty
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.menu import MDDropdownMenu
+import tomli
 
 class SSimApp(MDApp):
 
@@ -259,6 +259,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         if manager is None: return
 
         list = self.ids.metriclist
+        list.active = False
         for key, m in manager.all_metrics.items():
             txt = self._currentMetricCategory + " Metric for " + key
             deets = "Limit=" + str(m.metric.limit) + ", " + \
@@ -269,6 +270,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
             bItem.ids.left_icon.icon = self._metricIcons[self._currentMetricCategory]
             bItem.ids.trash_can.bind(on_release=self.on_delete_metric)
             list.add_widget(bItem)
+            
+        list.active = True
 
     def on_delete_metric(self, data):
         bus = data.listItem.bus
@@ -353,10 +356,13 @@ class MetricConfigurationScreen(SSimBaseScreen):
             return
 
         busses = self.project._grid_model.bus_names
+        list.active = False
         for x in busses:
             bItem = BusListItemWithCheckbox(text=str(x))
             bItem.ids.check.bind(active=self.on_item_check_changed)
             list.add_widget(bItem)
+        
+        list.active = True
 
 class LoadConfigurationScreen(SSimBaseScreen):
     pass
@@ -392,7 +398,11 @@ class SSimScreen(SSimBaseScreen):
         toml = self.project.write_toml()
         with open('c:/temp/written.toml', 'w') as f:
             f.write(toml)
-
+            
+        self.project.clear_metrics()
+        tdat = tomli.loads(toml)
+        self.project.read_toml(tdat)
+        
     def select_grid_model(self):
         chooser = SelectGridDialog(load=self.load_grid, cancel=self.dismiss_popup)
         self._popup = Popup(title="select grid model", content=chooser)
