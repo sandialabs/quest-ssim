@@ -1,9 +1,11 @@
 """Storage Sizing and Placement Kivy application"""
 import os
 from threading import Thread
+import matplotlib.pyplot as plt
 
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.uix.floatlayout import FloatLayout
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty
 from kivy.uix.popup import Popup
@@ -286,8 +288,26 @@ class RunSimulationScreen(SSimBaseScreen):
 
 
 class ResultsSummaryScreen(SSimBaseScreen):
-    pass
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
+    def on_enter(self):
+        self.draw_canvas()
+
+    def draw_canvas(self): 
+        # sample plot for testing purposes
+        # TO DO: develop the backend for creating these plots
+        x_data = [1, 2, 3, 4, 5]
+        y_data = [1, 4, 9, 15, 25]
+        fig, ax = plt.subplots()
+        ax.plot(x_data, y_data)
+        ax.set_xlabel('Configuration #')
+        ax.set_ylabel('Aggregate Metics')
+
+        # Add Kivy widget to the canvas
+        self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(fig))
+    
+        
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, pk=None, **kwargs):

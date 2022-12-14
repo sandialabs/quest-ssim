@@ -240,6 +240,7 @@
                     size_hint_y: None
                     height: 50
                 Button: 
+
                     text: "View Saved Results"
                 Button:
                     text: "View Summary"
@@ -269,12 +270,11 @@
             padding: 5
 
             BoxLayout:
+                id: summary_canvas
                 size_hint_x: 1.5
                 orientation: "vertical"
                 padding: 5
                 spacing: 5
-                Button:
-                    text: "Will be placing the plot area here!"
 
             BoxLayout:
                 orientation: "vertical"
@@ -286,32 +286,49 @@
                     BoxLayout: 
                         orientation: "horizontal"
                     
-                        Label:
-                            text: "y-Display"
-                            text_color: "black"
+                        BoxLayout:
+                            orientation: "vertical"
+                            Label:
+                                size_hint_y: 0.1
+                                text: "Select y-Display:"
+                                color: 0,0,0,1
+                            Label:
+                                size_hint_y: 0.1
+                                text: "Aggregate Metric:"
+                                color: 0,0,0,1
 
-                        ScrollView:
-                            canvas.before:
-                                Color:
-                                    rgba: .5, .5, .5, 1
-                                Line:
-                                    width: 2
-                                    rectangle: self.x, self.y, self.width, self.height
-                            MDList:
-                                id: metric_list_summary
-                        Label:
-                            text: "y-Display"
-                            text_color: "black"
+                            ScrollView:
+                                size_hint_y: 0.8
+                                canvas.before:
+                                    Color:
+                                        rgba: .5, .5, .5, 1
+                                    Line:
+                                        width: 2
+                                        rectangle: self.x, self.y, self.width, self.height
+                                MDList:
+                                    id: metric_list_summary
+                        
+                        BoxLayout:
+                            orientation: "vertical"
+                            Label:
+                                size_hint_y: 0.1
+                                text: "Select x-Display:"
+                                color: 0,0,0,1
+                            Label:
+                                size_hint_y: 0.1
+                                text: "Configuration Number:"
+                                color: 0,0,0,1
 
-                        ScrollView:
-                            canvas.before:
-                                Color:
-                                    rgba: .5, .5, .5, 1
-                                Line:
-                                    width: 2
-                                    rectangle: self.x, self.y, self.width, self.height
-                            MDList:
-                                id: metric_list_summary
+                            ScrollView:
+                                size_hint_y: 0.8
+                                canvas.before:
+                                    Color:
+                                        rgba: .5, .5, .5, 1
+                                    Line:
+                                        width: 2
+                                        rectangle: self.x, self.y, self.width, self.height
+                                MDList:
+                                    id: config_list_summary
                 
                 BoxLayout:
                     orientation: "vertical"
