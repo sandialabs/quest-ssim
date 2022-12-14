@@ -241,6 +241,9 @@
                     height: 50
                 Button: 
                     text: "View Saved Results"
+                Button:
+                    text: "View Summary"
+                    on_press: root.open_results_summary()
                 Button: 
                     text: "Resume"
                 Button:
@@ -254,6 +257,77 @@
             size_hint_y: None
             height: 100
             on_press: root.manager.current = 'ssim'
+
+<ResultsSummaryScreen>:
+    name: "results-summary"
+
+    BoxLayout:
+        orientation: "vertical"
+        
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+
+            BoxLayout:
+                size_hint_x: 1.5
+                orientation: "vertical"
+                padding: 5
+                spacing: 5
+                Button:
+                    text: "Will be placing the plot area here!"
+
+            BoxLayout:
+                orientation: "vertical"
+
+                BoxLayout:
+                    orientation: "vertical"
+                    padding: 5
+                    
+                    BoxLayout: 
+                        orientation: "horizontal"
+                    
+                        Label:
+                            text: "y-Display"
+                            text_color: "black"
+
+                        ScrollView:
+                            canvas.before:
+                                Color:
+                                    rgba: .5, .5, .5, 1
+                                Line:
+                                    width: 2
+                                    rectangle: self.x, self.y, self.width, self.height
+                            MDList:
+                                id: metric_list_summary
+                        Label:
+                            text: "y-Display"
+                            text_color: "black"
+
+                        ScrollView:
+                            canvas.before:
+                                Color:
+                                    rgba: .5, .5, .5, 1
+                                Line:
+                                    width: 2
+                                    rectangle: self.x, self.y, self.width, self.height
+                            MDList:
+                                id: metric_list_summary
+                
+                BoxLayout:
+                    orientation: "vertical"
+                    padding: 5
+                    spacing: 5
+                    Button:
+                        text: "View Details"
+                    Button:
+                        text: "Compare"
+                    Button:
+                        text: "Save Figure"
+
+        Button:
+            text: "back"
+            size_hint_y: None
+            on_press: root.manager.current = 'run-sim'
 
 <ListItemWithCheckbox>:
     id: the_list_item

@@ -44,6 +44,8 @@ class SSimApp(MDApp):
             MetricConfigurationScreen(self.project, name="metric-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
+        screen_manager.add_widget(
+            ResultsSummaryScreen(self.project, name="results-summary"))    
         screen_manager.current = "ssim"
 
         return screen_manager
@@ -279,6 +281,12 @@ class RunSimulationScreen(SSimBaseScreen):
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
 
+    def open_results_summary(self):
+        self.manager.current = "results-summary"
+
+
+class ResultsSummaryScreen(SSimBaseScreen):
+    pass
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
