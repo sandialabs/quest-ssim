@@ -54,11 +54,12 @@ class StorageController(ABC):
 
 class DroopController(StorageController):
     """Simple droop controller"""
-    def __init__(self, p_droop, q_droop, voltage_tolerance=1.0e-3):
+    def __init__(self, p_droop, q_droop, device: grid.StorageSpecification, voltage_tolerance=1.0e-3):
         self._voltage_tolerance = voltage_tolerance
         self.p_droop = p_droop
         self.q_droop = q_droop
         self._last_voltage = 0.0
+        self.device = device
 
     def step(self,
              time: float,
@@ -69,7 +70,12 @@ class DroopController(StorageController):
             power = complex(voltage_error * self.p_droop,
                             voltage_error * self.q_droop)
             self._last_voltage = voltage
-            return power
+            return self._limit(power)
+
+    def _limit(self, power):
+        # XXX should probably be limited to the kva rating of the device.
+        return complex(min(power.real, self.device.kw_rated),
+                       min(power.imag, self.device.kw_rated))
 
     def apply_control(self, control_messages: Iterable[dict]):
         # DroopController does not respond to control messages.
@@ -270,7 +276,7 @@ def _get_controller(device):
     if device.controller == 'cycle':
         return CycleController(device)
     if device.controller == 'droop':
-        return DroopController(**device.controller_params)
+        return DroopController(device=device, **device.controller_params)
     if device.controller == 'external':
         return ExternalController(device)
     if device.controller is None:
