@@ -17,6 +17,10 @@ class ImprovementType(int, enum.Enum):
         """A utility method to parse a string into a member of the
            ImprovementType enumeration.
 
+        This will match the words minimize, min, maximize, max, seek value,
+        seekvalue, seek, and the digits 0, 1, and 2.  The matching is case
+        insensitive.
+
         Parameters
         ----------
         str :
@@ -50,6 +54,9 @@ class ImprovementType(int, enum.Enum):
         
         if toParse == "seek":
             return ImprovementType.SeekValue
+        
+        if toParse.isdigit():
+            return ImprovementType(int(toParse))
 
         return None
 
@@ -115,14 +122,14 @@ class Metric:
         recommended that you use the default value.
     """
     def __init__(
-            self,
-            limit: float,
-            objective: float,
-            imp_type: ImprovementType = None,
-            a: float=5.0,
-            b: float=5.0,
-            c: float=0.0,
-            g: float=0.2
+        self,
+        limit: float,
+        objective: float,
+        imp_type: ImprovementType = None,
+        a: float=5.0,
+        b: float=5.0,
+        c: float=0.0,
+        g: float=0.2
     ):
         self._limit = limit
         self._objective = objective
@@ -332,7 +339,8 @@ class Metric:
             metrics limit and objective, and the other curve parameters of this
             metric.
         """
-        return -(self._a * norm_val * norm_val) / 2.0 + self._b * norm_val + self._c
+        return -(self._a * norm_val * norm_val) / 2.0 + \
+            self._b * norm_val + self._c
 
     def _feasible(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
@@ -464,7 +472,8 @@ class Metric:
     def _validate_inputs(self, do_assert: bool = True):
         """Tests the validity/usability of the values stored in this metric.
 
-        This uses the static validate_metric_values method.  See it for details.
+        This uses the static validate_metric_values method.  See it for
+        details.
         
         Parameters
         ----------

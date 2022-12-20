@@ -72,6 +72,17 @@ ssim.dssutil
 .. automodule:: ssim.dssutil
    :members:
 
+Metrics API
+-----------
+
+ssim.metrics
+^^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: ssim.metrics
+   :members:
+   :show-inheritance:
+
+
 Federates
 ---------
 
@@ -88,10 +99,17 @@ ssim.federates.storage
 .. automodule:: ssim.federates.storage
    :members:
    :show-inheritance:
-
+   
 ssim.federates.logger
 ^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: ssim.federates.logger
+   :members:
+   :show-inheritance:
+   
+ssim.federates.metrics
+^^^^^^^^^^^^^^^^^^^^^
+
+.. automodule:: ssim.federates.metrics
    :members:
    :show-inheritance:

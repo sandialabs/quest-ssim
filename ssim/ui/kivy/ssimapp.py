@@ -75,7 +75,7 @@ class InvalidMetricValuesPopupContent(BoxLayout):
 
 class BusListItemWithCheckbox(OneLineAvatarIconListItem):
     '''Custom list item.'''
-    icon = StringProperty("android")
+    #icon = StringProperty("android")
 
     def __int__(self, bus):
         self.text = bus
@@ -105,7 +105,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
                     print(wid.text, wid.secondary_text)
                     self._selBusses.append(cb)
                     
-    def drop(self):
+    def drop_sense_menu(self):
         menu_items = [
             {
                 "viewclass": "OneLineListItem",
@@ -230,8 +230,9 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
     
     def manage_selection_buttons_enabled_state(self):
-        self.ids.btnSelectAll.disabled = len(self.ids.interlist.children) == 0
-        self.ids.btnDeselectAll.disabled = len(self.ids.interlist.children) == 0
+        numCldrn = len(self.ids.interlist.children) == 0
+        self.ids.btnSelectAll.disabled = numCldrn
+        self.ids.btnDeselectAll.disabled = numCldrn
 
 
     def deselect_all_metric_objects(self):
@@ -404,7 +405,9 @@ class SSimScreen(SSimBaseScreen):
         self.project.read_toml(tdat)
         
     def select_grid_model(self):
-        chooser = SelectGridDialog(load=self.load_grid, cancel=self.dismiss_popup)
+        chooser = SelectGridDialog(
+            load=self.load_grid, cancel=self.dismiss_popup
+            )
         self._popup = Popup(title="select grid model", content=chooser)
         self._popup.open()
 
