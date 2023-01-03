@@ -47,7 +47,9 @@ class SSimApp(MDApp):
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
         screen_manager.add_widget(
-            ResultsSummaryScreen(self.project, name="results-summary"))    
+            ResultsSummaryScreen(self.project, name="results-summary"))
+        screen_manager.add_widget(
+            ResultsCompareScreen(self.project, name="results-compare"))    
         screen_manager.current = "ssim"
 
         return screen_manager
@@ -306,7 +308,13 @@ class ResultsSummaryScreen(SSimBaseScreen):
 
         # Add Kivy widget to the canvas
         self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(fig))
-    
+
+    def open_results_compare(self):
+        self.manager.current = "results-compare"
+
+
+class ResultsCompareScreen(SSimBaseScreen):
+    pass
         
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
