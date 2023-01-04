@@ -135,7 +135,7 @@ class EditableSetList(MDList):
 
     def remove_item(self, item):
         """Remove an item from the set."""
-        # Don't use set.remove() since we must return a new object 
+        # Don't use set.remove() since we must return a new object
         # to trigger the _update_display callback throug kivy
         self.options = self.options - set([item])
 
@@ -154,28 +154,53 @@ class EditableSetListItem(OneLineRightIconListItem):
         self.parent.remove_item(self._value)
 
 
+class TextFieldOpenDSSName(MDTextField):
+    """Text field that enforces OpenDSS name requirements."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def text_valid(self):
+        return (
+            len(self.text) > 0
+            and '\t' not in self.text
+            and ' ' not in self.text
+            and '.' not in self.text
+            and '=' not in self.text
+        )
+
+    def set_text(self, instance, value):
+        if value == "":
+            self.error = True
+        else:
+            self.set_error_message()
+
+    def set_error_message(self):
+        if not self.text_valid():
+            self.error = True
+        else:
+            self.error = False
+
+
 class StorageConfigurationScreen(SSimBaseScreen):
     """Configure a single energy storage device."""
 
     def __init__(self, der_screen, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._der_screen = der_screen
-        self._ess_name = "unnamed"
         self.ids.power_input.bind(
             on_text_validate=self._add_device_power
         )
         self.ids.duration_input.bind(
-            on_text_validate=self._add_device_duration,
+            on_text_validate=self._add_device_duration
         )
         self.ids.device_name.bind(
             on_text_validate=self._assign_name,
         )
-        for bus in self.project.bus_names:
-            bus_list_item = BusListItem(bus, self.project.phases(bus))
-            self.ids.bus_list.add_widget(bus_list_item)
 
     def _assign_name(self, textfield):
-        self._ess_name = textfield.text
+        if textfield.text_valid():
+            self._ess_name = textfield.text
 
     def _add_option(self, optionlist, textfield):
         if textfield.text_valid():
@@ -197,7 +222,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
     @property
     def _ess_durations(self):
         return list(self.ids.duration_list.options)
-    
+
     @property
     def _selected_busses(self):
         return list(
@@ -207,8 +232,11 @@ class StorageConfigurationScreen(SSimBaseScreen):
         )
 
     def save(self):
+        if not self.ids.device_name.text_valid():
+            return
+
         ess = StorageOptions(
-            self._ess_name,
+            self.ids.device_name.text,
             3,
             self._ess_powers,
             self._ess_durations,
@@ -230,6 +258,13 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
     def cancel(self):
         self.manager.current = "der-config"
+
+    def on_enter(self, *args):
+        self.ids.bus_list.clear_widgets()
+        for bus in self.project.bus_names:
+            bus_list_item = BusListItem(bus, self.project.phases(bus))
+            self.ids.bus_list.add_widget(bus_list_item)
+        return super().on_enter(*args)
 
 
 class PVConfigurationScreen(SSimBaseScreen):

@@ -115,10 +115,11 @@
             BoxLayout:
                 orientation: "vertical"
 
-                MDTextField:
+                TextFieldOpenDSSName:
                     id: device_name
                     hint_text: "Device Name"
-                    text: "unnamed"
+                    helper_text_mode: "on_error"
+                    helper_text: "invalid name"
 
                 BoxLayout:
                     orientation: "vertical"
