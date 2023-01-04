@@ -93,8 +93,8 @@ class TextFieldPositiveFloat(MDTextField):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.helper_text_mode = "on_error"
-        self.helper_text = "You must enter a number."
+        self.helper_text_mode = "on_focus"
+        self.helper_text = "Press enter"
 
     def text_valid(self):
         return TextFieldPositiveFloat.POSITIVE_FLOAT.match(self.text) is not None
@@ -107,8 +107,10 @@ class TextFieldPositiveFloat(MDTextField):
     def set_error_message(self):
         if not self.text_valid():
             self.error = True
+            self.helper_text = "You must enter a number."
         else:
             self.error = False
+            self.helper_text = "Press enter"
 
 
 class EditableSetList(MDList):
