@@ -2,6 +2,7 @@
 import functools
 import itertools
 import json
+import os
 import tempfile
 from os import path
 from pathlib import Path, PurePosixPath
@@ -64,6 +65,10 @@ class Project:
         self.storage_devices = []
         self._pvsystems = []
         self._metrics = []
+
+    @property
+    def base_dir(self):
+        return Path(os.path.abspath(self.name))
 
     @property
     def bus_names(self):
@@ -267,12 +272,15 @@ class Configuration:
 
     def evaluate(self, basepath=None):
         """Run the simulator for this configuration"""
-        self._workdir = Path(tempfile.mkdtemp(dir=basepath))
+        if basepath is not None:
+            os.makedirs(basepath, exist_ok=True)
+        self._workdir = Path(os.path.abspath(tempfile.mkdtemp(dir=basepath)))
         self._id = path.basename(self._workdir)
         self._grid_path = PurePosixPath(self._workdir / "grid.json")
         self._federation_path = self._workdir / "federation.json"
         self._write_configuration()
         self._run()
+        self._mark_done()
         return self._load_results()
 
     def wait(self):
@@ -293,6 +301,9 @@ class Configuration:
             ["helics", "run", "--path", str(self._federation_path)],
             cwd=self._workdir
         )
+
+    def _mark_done(self):
+        (self._workdir / "evaluated").touch()
 
     def _load_results(self):
         # TODO load the output files/data into a results object (maybe
@@ -428,8 +439,43 @@ def _get_federate_config(federate):
     )
 
 
+class ProjectResults:
+    """Container of all results for a project.
+
+    Parameters
+    ----------
+    project : Project
+       Project that the results belong to
+    """
+
+    def __init__(self, project):
+        self.base_dir = project.base_dir
+
+    def results(self):
+        for configuration_dir in self._resulted_configurations():
+            yield Results(self.base_dir / configuration_dir)
+
+    def _resulted_configurations(self):
+        for item in os.listdir(self.base_dir):
+            if not self._is_configuration_dir(item):
+                continue
+            if self._is_evaluated(item):
+                yield item
+
+    def _is_configuration_dir(self, item):
+        if item in {'.', '..'}:
+            return False
+        return (
+            os.path.exists(self.base_dir / item / "federation.json")
+            and os.path.exists(self.base_dir / item / "grid.json")
+        )
+
+    def _is_evaluated(self, item):
+        return os.path.exists(self.base_dir / item / "evaluated")
+
+
 class Results:
     """Results from simulating a specific configuration."""
 
-    def __init__(self):
+    def __init__(self, config_dir):
         pass

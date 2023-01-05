@@ -278,7 +278,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # run all the configurations
         for config in self.selected_configurations:
             print(config)
-            config.evaluate()
+            config.evaluate(basepath=self.project.base_dir)
             config.wait()
 
     def run_configurations(self):
