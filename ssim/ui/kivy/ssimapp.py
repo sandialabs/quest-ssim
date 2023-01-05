@@ -398,15 +398,25 @@ class SSimScreen(SSimBaseScreen):
 
     def do_run_simulation(self):
         self.manager.current = "run-sim"
-        if self.project._grid_model is None:
-            poppup_content = NoGridPopupContent()
-            poppup_content.orientation = "vertical"
-            popup = Popup(title='No Grid Model', content=poppup_content,
-                          auto_dismiss=False, size_hint=(0.4, 0.4))
-            poppup_content.ids.dismissBtn.bind(on_press=popup.dismiss)
-            # open the popup
-            popup.open()
+        if self.project.grid_model is None:
+            show_no_grid_popup("ssim", self.manager)
             return
+
+
+def show_no_grid_popup(dismiss_screen=None, manager=None):
+    poppup_content = NoGridPopupContent()
+    poppup_content.orientation = "vertical"
+    popup = Popup(title='No Grid Model', content=poppup_content,
+                  auto_dismiss=False, size_hint=(0.4, 0.4))
+
+    def dismiss(*args):
+        popup.dismiss()
+        if (dismiss_screen is not None) and (manager is not None):
+            manager.current = dismiss_screen
+
+    poppup_content.ids.dismissBtn.bind(on_press=dismiss)
+    # open the popup
+    popup.open()
 
 
 if __name__ == '__main__':
