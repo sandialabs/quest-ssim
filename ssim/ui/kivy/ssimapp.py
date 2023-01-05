@@ -303,6 +303,11 @@ class DERConfigurationScreen(SSimBaseScreen):
             StorageListItem(ess)
         )
 
+    def on_pre_enter(self, *args):
+        if self.project.grid_model is None:
+            show_no_grid_popup("ssim", self.manager)
+        return super().on_pre_enter(*args)
+
 
 class StorageListItem(TwoLineIconListItem):
     def __init__(self, ess, *args, **kwargs):
