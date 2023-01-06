@@ -445,20 +445,23 @@ class ProjectResults:
     Parameters
     ----------
     project : Project
-       Project that the results belong to
+       Project that the results belong to.
     """
 
     def __init__(self, project):
         self.base_dir = project.base_dir
 
     def results(self):
+        # Iterate over the resulted configurations and yield iterator of Results
         for configuration_dir in self._resulted_configurations():
             yield Results(self.base_dir / configuration_dir)
 
     def _resulted_configurations(self):
         for item in os.listdir(self.base_dir):
+            # check to see if the directory is from a configuration
             if not self._is_configuration_dir(item):
                 continue
+            # check to see if the configuration has been completely evaluated
             if self._is_evaluated(item):
                 yield item
 
@@ -473,9 +476,38 @@ class ProjectResults:
     def _is_evaluated(self, item):
         return os.path.exists(self.base_dir / item / "evaluated")
 
+    # TO DO: Add methods for the plotting function
+    def plot_metrics(self):
+        for result in self.results():
+            result.metrics_log()
 
 class Results:
     """Results from simulating a specific configuration."""
 
     def __init__(self, config_dir):
+        self.config_dir = config_dir
+
+    # Do we want to design the Results class with a specific set of outputs in
+    # mind or should we design to make it more generic?
+    def bus_voltages(self):
+        # read the csv file
+        # return time and other columns in the csv file as dictionary?
         pass
+    
+    def grid_state(self):
+        pass
+
+    def pde_loading(self):
+        pass
+
+    def storage_state(self):
+        pass
+
+    def metrics_log(self):
+        pass
+
+
+ 
+    
+
+    # TO DO: All the csv files should be processed within this class
