@@ -70,6 +70,10 @@ class Project:
         return self._grid_model.bus_names
 
     @property
+    def storage_names(self):
+        return set(device.name for device in self.storage_devices)
+
+    @property
     def grid_model(self):
         return self._grid_model
 

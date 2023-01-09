@@ -189,12 +189,22 @@ class StorageConfigurationScreen(SSimBaseScreen):
             on_text_validate=self._add_device_duration
         )
         self.ids.device_name.bind(
-            on_text_validate=self._assign_name,
+            on_text_validate=self._check_name
         )
 
-    def _assign_name(self, textfield):
-        if textfield.text_valid():
-            self._ess_name = textfield.text
+    def _check_name(self):
+        textfield = self.ids.device_name
+        if not textfield.text_valid():
+            textfield.helper_text = "invalid name"
+            textfield.error = True
+            return False
+        existing_names = {name.lower() for name in self.project.storage_names}
+        if textfield.text.lower() in existing_names:
+            textfield.helper_text = "Name already exists"
+            textfield.error = True
+            return False
+        textfield.error = False
+        return True
 
     def _add_option(self, optionlist, textfield):
         if textfield.text_valid():
@@ -231,7 +241,8 @@ class StorageConfigurationScreen(SSimBaseScreen):
             3,
             self._ess_powers,
             self._ess_durations,
-            self._selected_busses
+            self._selected_busses,
+            required=self.ids.required.active
         )
 
         if not ess.valid:
@@ -298,7 +309,7 @@ class DERConfigurationScreen(SSimBaseScreen):
 
     def on_pre_enter(self, *args):
         if self.project.grid_model is None:
-            show_no_grid_popup("ssim", self.manager)
+            _show_no_grid_popup("ssim", self.manager)
         return super().on_pre_enter(*args)
 
 
@@ -397,11 +408,18 @@ class SSimScreen(SSimBaseScreen):
     def do_run_simulation(self):
         self.manager.current = "run-sim"
         if self.project.grid_model is None:
-            show_no_grid_popup("ssim", self.manager)
+            _show_no_grid_popup("ssim", self.manager)
             return
 
 
-def show_no_grid_popup(dismiss_screen=None, manager=None):
+def _show_no_grid_popup(dismiss_screen=None, manager=None):
+    """Show a popup dialog warning that no grid model is selected.
+
+    Parameters
+    ----------
+    dismiss_screen : str, optional
+
+    """
     poppup_content = NoGridPopupContent()
     poppup_content.orientation = "vertical"
     popup = Popup(title='No Grid Model', content=poppup_content,

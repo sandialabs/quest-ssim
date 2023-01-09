@@ -143,9 +143,30 @@
                         EditableSetList:
                             id: duration_list
 
-            ScrollView:
-                MDList:
-                    id: bus_list
+            BoxLayout:
+                orientation: "vertical"
+                MDLabel:
+                    title: "Select possible busses"
+                    size_hint_y: None
+                    height: 0
+                MDScrollView:
+                    size_hint: (1.0, 1.0)
+                    MDList:
+                        size_hint_y: None
+                        height: 0
+                        id: bus_list
+                BoxLayout:
+                    orientation: "horizontal"
+                    MDLabel:
+                        id: required_label
+                        size_hint_y: None
+                        height: 0
+                        text: "required?"
+                    MDSwitch:
+                        id: required
+                        size_hint_y: None
+                        height: 0
+                        active: False
 
         BoxLayout:
             size_hint: (1.0, 0.15)
