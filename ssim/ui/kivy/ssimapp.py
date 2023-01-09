@@ -21,7 +21,7 @@ from kivymd.uix.list import (
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.textfield import MDTextField
 
-from ssim.ui import Project, StorageOptions
+from ssim.ui import Project, StorageOptions, is_valid_opendss_name
 
 
 class SSimApp(MDApp):
@@ -161,13 +161,7 @@ class TextFieldOpenDSSName(MDTextField):
         super().__init__(*args, **kwargs)
 
     def text_valid(self):
-        return (
-            len(self.text) > 0
-            and '\t' not in self.text
-            and ' ' not in self.text
-            and '.' not in self.text
-            and '=' not in self.text
-        )
+        return is_valid_opendss_name(self.text)
 
     def set_text(self, instance, value):
         if value == "":
@@ -232,9 +226,6 @@ class StorageConfigurationScreen(SSimBaseScreen):
         )
 
     def save(self):
-        if not self.ids.device_name.text_valid():
-            return
-
         ess = StorageOptions(
             self.ids.device_name.text,
             3,
@@ -244,8 +235,9 @@ class StorageConfigurationScreen(SSimBaseScreen):
         )
 
         if not ess.valid:
-            Logger.error("invalid storage configuration")
             Logger.error(
+                "invalid storage configuration - "
+                f"name: {ess.name}, "
                 f"powers: {ess.power}, "
                 f"durations: {ess.duration}, "
                 f"busses: {ess.busses}"
@@ -258,6 +250,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
     def cancel(self):
         self.manager.current = "der-config"
+        self.manager.remove_widget(self)
 
     def on_enter(self, *args):
         self.ids.bus_list.clear_widgets()

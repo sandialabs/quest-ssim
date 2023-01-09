@@ -199,8 +199,13 @@ class StorageOptions:
         self.duration.add(duration)
 
     @property
+    def name_valid(self):
+        return is_valid_opendss_name(self.name)
+
+    @property
     def valid(self):
-        return (len(self.power) > 0
+        return (self.name_valid
+                and len(self.power) > 0
                 and len(self.duration) > 0
                 and len(self.busses) > 0)
 
@@ -414,6 +419,20 @@ def _get_federate_config(federate):
         raise ValueError(f"invalid federate type '{federate}'.")
     return pkg_resources.resource_filename(
         "ssim.federates", f"{federate}.json")
+
+
+_OPENDSS_ILLEGAL_CHARACTERS = "\t\n .="
+
+
+def is_valid_opendss_name(name: str):
+    """Return true if `name` is a valid name in OpenDSS.
+
+    OpenDSS names may not contain whitespace, '.', or '='.
+    """
+    return (
+        len(name) > 0
+        and not any(c in _OPENDSS_ILLEGAL_CHARACTERS for c in name)
+    )
 
 
 class Results:
