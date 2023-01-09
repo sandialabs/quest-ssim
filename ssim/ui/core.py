@@ -191,7 +191,7 @@ class StorageOptions:
             {'real_gain': 500, 'reactive_gain': -300}  # completely arbitrary
         )
         self.soc_model = soc_model
-        self.required = False
+        self.required = required
 
     def add_bus(self, bus):
         self.busses.add(bus)
