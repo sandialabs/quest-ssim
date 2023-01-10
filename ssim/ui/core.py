@@ -3,6 +3,7 @@ import functools
 import itertools
 import json
 import os
+import pandas as pd
 import tempfile
 from os import path
 from pathlib import Path, PurePosixPath
@@ -479,7 +480,7 @@ class ProjectResults:
     # TO DO: Add methods for the plotting function
     def plot_metrics(self):
         for result in self.results():
-            result.metrics_log()
+            col_names, metric_value, df_metrics = result.metrics_log()
 
 class Results:
     """Results from simulating a specific configuration."""
@@ -504,7 +505,19 @@ class Results:
         pass
 
     def metrics_log(self):
-        pass
+        """Returns name of columns of the logged metrics, the accumulated value
+        of the metric, and the time-series log as a pandas dataframe"""
+
+        df_metrics = pd.read_csv(self.config_dir / "metric_log.csv")
+        # extract column names
+        col_names = list(df_metrics.columns)
+        num_rows = df_metrics.shape[0]
+        # extract accumulated value of the metric from the last row
+        accumulated_metric = df_metrics.iloc[-1:].loc[num_rows - 1,'time']
+        # extract all the datapoints as a pandas dataframe
+        data = df_metrics.iloc[0 : num_rows-1]
+
+        return col_names, accumulated_metric, data
 
 
  
