@@ -9,6 +9,7 @@ from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
 from kivy.core.text import LabelBase
+from kivy.clock import Clock
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -94,7 +95,7 @@ class TextFieldPositiveFloat(MDTextField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper_text_mode = "on_focus"
-        self.helper_text = "Press enter"
+        self.helper_text = "Input value and press enter"
 
     def text_valid(self):
         return TextFieldPositiveFloat.POSITIVE_FLOAT.match(self.text) is not None
@@ -110,8 +111,38 @@ class TextFieldPositiveFloat(MDTextField):
             self.helper_text = "You must enter a number."
         else:
             self.error = False
-            self.helper_text = "Press enter"
+            self.helper_text = "Input value and press enter"
 
+
+class TextFieldPositivePercentage(MDTextField):
+    POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper_text_mode = "on_focus"
+        self.helper_text = "Input percentage value (0-100)"
+
+    def text_valid(self):
+        if TextFieldPositivePercentage.POSITIVE_FLOAT.match(self.text) is None:
+            return False
+
+        value = float(self.text)
+        if value < 0.0: return False
+        if value > 100: return False
+        return True
+
+    def set_text(self, instance, value):
+        if value == "":
+            return
+        self.set_error_message()
+
+    def set_error_message(self):
+        if not self.text_valid():
+            self.error = True
+            self.helper_text = "You must enter a value between 0 and 100."
+        else:
+            self.error = False
+            self.helper_text = "Input percentage value"
 
 class EditableSetList(MDList):
     options = ObjectProperty(set())
@@ -210,8 +241,13 @@ class StorageConfigurationScreen(SSimBaseScreen):
         if textfield.text_valid():
             duration = float(textfield.text)
             optionlist.add_item(duration)
+            textfield.text = ""
+            Clock.schedule_once(lambda dt: self._refocus_field(textfield), 0.05)
         else:
             textfield.set_error_message()
+
+    def _refocus_field(self, textfield):
+        textfield.focus = True
 
     def _add_device_duration(self, textfield):
         self._add_option(self.ids.duration_list, textfield)
@@ -235,8 +271,19 @@ class StorageConfigurationScreen(SSimBaseScreen):
             if bus_item.active
         )
 
-    def save(self):
-        ess = StorageOptions(
+    def edit_control_params(self):
+        ess = self._make_options()
+
+        self.manager.add_widget(
+            StorageControlConfigurationScreen(
+                self, self.project, ess, name="configure-storage-controls"
+            )
+        )
+
+        self.manager.current = "configure-storage-controls"
+
+    def _make_options(self) -> StorageOptions:
+        return StorageOptions(
             self.ids.device_name.text,
             3,
             self._ess_powers,
@@ -244,6 +291,9 @@ class StorageConfigurationScreen(SSimBaseScreen):
             self._selected_busses,
             required=self.ids.required.active
         )
+
+    def save(self):
+        ess = self._make_options()
 
         if not ess.valid:
             Logger.error(
@@ -270,6 +320,13 @@ class StorageConfigurationScreen(SSimBaseScreen):
             self.ids.bus_list.add_widget(bus_list_item)
         return super().on_enter(*args)
 
+class StorageControlConfigurationScreen(SSimBaseScreen):
+    """Configure the control strategy of a single energy storage device."""
+
+    def __init__(self, der_screen, config, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._der_screen = der_screen
+        self._config = args[0]
 
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""

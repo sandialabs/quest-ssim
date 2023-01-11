@@ -102,6 +102,27 @@
     LeftCheckBox:
         id: selected
 
+<StorageControlConfigurationScreen>:
+    name: "configure-storage-controls"
+
+    BoxLayout:
+        orientation: "vertical"
+
+        TextFieldPositivePercentage:
+            id: min_soc
+            hint_text: "Minimum State of Charge (%)"
+
+        TextFieldPositivePercentage:
+            id: max_soc
+            hint_text: "Maximum State of Charge (%)"
+
+        TextFieldPositivePercentage:
+            id: init_soc
+            hint_text: "Initial State of Charge (%)"
+
+        BoxLayout:
+            orientation: "vertical"
+            size_hint: (1.0, 0.7)
 
 <StorageConfigurationScreen>:
     name: "configure-storage"
@@ -145,8 +166,9 @@
 
             BoxLayout:
                 orientation: "vertical"
+                spacing: 10
                 MDLabel:
-                    title: "Select possible busses"
+                    text: "Select possible busses"
                     size_hint_y: None
                     height: 0
                 MDScrollView:
@@ -155,7 +177,9 @@
                         size_hint_y: None
                         height: 0
                         id: bus_list
+
                 BoxLayout:
+                    size_hint: (1.0, 0.06)
                     orientation: "horizontal"
                     MDLabel:
                         id: required_label
@@ -167,6 +191,11 @@
                         size_hint_y: None
                         height: 0
                         active: False
+
+                Button:
+                    text: "Edit Control Parameters"
+                    size_hint: (1.0, 0.06)
+                    on_press: root.edit_control_params()
 
         BoxLayout:
             size_hint: (1.0, 0.15)
