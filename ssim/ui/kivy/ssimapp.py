@@ -112,7 +112,7 @@ class SSimScreen(SSimBaseScreen):
         self.manager.current = "run-sim"
 
 
-if __name__ == '__main__':
+def main():
     LabelBase.register(
         name='Exo 2',
         fn_regular=os.path.join('resources', 'fonts',
@@ -133,3 +133,7 @@ if __name__ == '__main__':
 
     Logger.setLevel(LOG_LEVELS["debug"])
     SSimApp().run()
+
+
+if __name__ == '__main__':
+    main()
