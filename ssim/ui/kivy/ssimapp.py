@@ -75,7 +75,7 @@ class InvalidMetricValuesPopupContent(BoxLayout):
 
 class BusListItemWithCheckbox(OneLineAvatarIconListItem):
     '''Custom list item.'''
-    #icon = StringProperty("android")
+    icon = StringProperty("android")
 
     def __int__(self, bus):
         self.text = bus
