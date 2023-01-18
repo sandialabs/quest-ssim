@@ -104,6 +104,7 @@
 
 <StorageControlConfigurationScreen>:
     name: "configure-storage-controls"
+    on_enter: self.set_mode_label_text()
 
     BoxLayout:
         orientation: "vertical"
@@ -120,9 +121,69 @@
             id: init_soc
             hint_text: "Initial State of Charge (%)"
 
+        Label:
+            id: mode_label
+            markup: True
+            text: "Select a control mode for this storage asset:"
+            color: C(hex_black)
+            size_hint: (1.0, 0.05)
+
         BoxLayout:
+            orientation: "horizontal"
+            size_hint: (1.0, 0.2)
+
+            MDRaisedButton:
+                id: droop_mode
+                text: "Droop"
+                md_bg_color: '#005376'
+                on_press: root.set_droop_mode()
+
+            MDRaisedButton:
+                id: vv_mode
+                text: "Volt-Var"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_var_mode()
+
+            MDRaisedButton:
+                id: vw_mode
+                text: "Volt-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_watt_mode()
+
+            MDRaisedButton:
+                id: var_watt_mode
+                text: "Var-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_var_watt_mode()
+
+            MDRaisedButton:
+                id: vv_vw_mode
+                text: "Volt-Var & Volt-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_var_and_volt_watt_mode()
+
+            MDRaisedButton:
+                id: const_pf_mode
+                text: "Constant Power Factor"
+                md_bg_color: '#005376'
+                on_press: root.set_const_power_factor_mode()
+
+        BoxLayout:
+            id: param_box
             orientation: "vertical"
             size_hint: (1.0, 0.7)
+
+        BoxLayout:
+            size_hint: (1.0, 0.15)
+            orientation: "horizontal"
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
 
 <StorageConfigurationScreen>:
     name: "configure-storage"

@@ -10,6 +10,9 @@ from kivy.uix.popup import Popup
 from kivy.uix.boxlayout import BoxLayout
 from kivy.core.text import LabelBase
 from kivy.clock import Clock
+from kivymd.uix.menu import MDDropdownMenu
+from kivymd.uix.button import MDFlatButton ,MDRectangleFlatIconButton
+from kivymd.uix.list import OneLineListItem
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -88,6 +91,29 @@ class BusListItem(TwoLineIconListItem):
     def active(self):
         return self.ids.selected.active
 
+class TextFieldFloat(MDTextField):
+    SIMPLE_FLOAT = re.compile(r"(+|-)?\d+(\.\d*)?$")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper_text_mode = "on_focus"
+        self.helper_text = "Input value and press enter"
+
+    def text_valid(self):
+        return TextFieldFloat.SIMPLE_FLOAT.match(self.text) is not None
+
+    def set_text(self, instance, value):
+        if value == "":
+            return
+        self.set_error_message()
+
+    def set_error_message(self):
+        if not self.text_valid():
+            self.error = True
+            self.helper_text = "You must enter a number."
+        else:
+            self.error = False
+            self.helper_text = "Input value and press enter"
 
 class TextFieldPositiveFloat(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
@@ -143,6 +169,12 @@ class TextFieldPositivePercentage(MDTextField):
         else:
             self.error = False
             self.helper_text = "Input percentage value"
+
+    def percentage(self):
+        return float(self.text)
+
+    def fraction(self):
+        return self.percentage() / 100.0
 
 class EditableSetList(MDList):
     options = ObjectProperty(set())
@@ -222,6 +254,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
         self.ids.device_name.bind(
             on_text_validate=self._check_name
         )
+        self.options = None
 
     def _check_name(self):
         textfield = self.ids.device_name
@@ -239,8 +272,8 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
     def _add_option(self, optionlist, textfield):
         if textfield.text_valid():
-            duration = float(textfield.text)
-            optionlist.add_item(duration)
+            value = float(textfield.text)
+            optionlist.add_item(value)
             textfield.text = ""
             Clock.schedule_once(lambda dt: self._refocus_field(textfield), 0.05)
         else:
@@ -272,18 +305,18 @@ class StorageConfigurationScreen(SSimBaseScreen):
         )
 
     def edit_control_params(self):
-        ess = self._make_options()
+        self._record_option_data()
 
         self.manager.add_widget(
             StorageControlConfigurationScreen(
-                self, self.project, ess, name="configure-storage-controls"
+                self, self.project, self.options, name="configure-storage-controls"
             )
         )
 
         self.manager.current = "configure-storage-controls"
 
-    def _make_options(self) -> StorageOptions:
-        return StorageOptions(
+    def _record_option_data(self) -> StorageOptions:
+        self.options = StorageOptions(
             self.ids.device_name.text,
             3,
             self._ess_powers,
@@ -293,19 +326,19 @@ class StorageConfigurationScreen(SSimBaseScreen):
         )
 
     def save(self):
-        ess = self._make_options()
+        self._record_option_data()
 
-        if not ess.valid:
+        if not self.options.valid:
             Logger.error(
                 "invalid storage configuration - "
-                f"name: {ess.name}, "
-                f"powers: {ess.power}, "
-                f"durations: {ess.duration}, "
-                f"busses: {ess.busses}"
+                f"name: {self.options.name}, "
+                f"powers: {self.options.power}, "
+                f"durations: {self.options.duration}, "
+                f"busses: {self.options.busses}"
             )
             return
 
-        self._der_screen.add_ess(ess)
+        self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
@@ -322,11 +355,102 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
-
     def __init__(self, der_screen, config, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._der_screen = der_screen
-        self._config = args[0]
+        self._options = args[0]
+
+        self.ids.min_soc.text = str(self._options.min_soc*100.0)
+        self.ids.max_soc.text = str(self._options.max_soc*100.0)
+        self.ids.init_soc.text = str(self._options.initial_soc*100.0)
+
+        Clock.schedule_once(lambda dt: self.__set_focus(self.ids.max_soc), 0.05)
+        Clock.schedule_once(lambda dt: self.__set_focus(self.ids.min_soc), 0.05)
+        Clock.schedule_once(lambda dt: self.__set_focus(self.ids.init_soc), 0.05)
+
+        self.def_btn_color = '#005376'
+
+        if not self._options is None:
+            if self._options.control.mode == "droop":
+                self.set_droop_mode()
+            elif self._options.control.mode == "voltvar":
+                self.set_volt_var_mode()
+            elif self._options.control.mode == "voltwatt":
+                self.set_volt_watt_mode()
+            elif self._options.control.mode == "varwatt":
+                self.set_var_watt_mode()
+            elif self._options.control.mode == "vv_vw":
+                self.set_volt_var_and_volt_watt_mode()
+            elif self._options.control.mode == "constantpf":
+                self.set_const_power_factor_mode()
+            else:
+                self.set_droop_mode()
+    @staticmethod
+    def __set_focus(widget, value = True):
+        widget.focus = value
+
+    def set_mode_label_text(self):
+        self.ids.mode_label.text = "Select a control mode for this storage asset: [b]" +\
+            self.device_name + "[/b]"
+
+    @property
+    def device_name(self):
+        return "" if self._options is None else self._options.name
+
+    def set_droop_mode(self):
+        if self.set_mode("droop", self.ids.droop_mode):
+            self._options.control.params["p_droop"] = 500
+            self._options.control.params["q_droop"] = -300
+        self.ids.param_box.add_widget(MDTextField(
+            hint_text="P Droop", text=str(self._options.control.params["p_droop"])
+            ))
+        self.ids.param_box.add_widget(MDTextField(
+            hint_text="Q Droop", text=str(self._options.control.params["q_droop"])
+            ))
+        self.ids.param_box.add_widget(BoxLayout(size_hint=(1.0, 0.8)))
+
+    def set_volt_var_mode(self):
+        self.set_mode("voltvar", self.ids.vv_mode)
+
+    def set_volt_watt_mode(self):
+        self.set_mode("voltwatt", self.ids.vw_mode)
+
+    def set_var_watt_mode(self):
+        self.set_mode("varwatt", self.ids.var_watt_mode)
+
+    def set_volt_var_and_volt_watt_mode(self):
+        self.set_mode("vv_vw", self.ids.vv_vw_mode)
+
+    def set_const_power_factor_mode(self):
+        self.set_mode("constantpf", self.ids.const_pf_mode)
+
+    def set_mode(self, name, button) -> bool:
+        self.manage_button_selection_states(button)
+        if self._options.control.mode == name: return False
+        self._options.control.mode = name
+        self._options.control.params.clear()
+        self.ids.param_box.clear_widgets()
+        return True
+
+    def manage_button_selection_states(self, selbutton):
+        self.ids.droop_mode.md_bg_color = "red" if selbutton is self.ids.droop_mode else self.def_btn_color
+        self.ids.vv_mode.md_bg_color = "red" if selbutton is self.ids.vv_mode else self.def_btn_color
+        self.ids.vw_mode.md_bg_color = "red" if selbutton is self.ids.vw_mode else self.def_btn_color
+        self.ids.var_watt_mode.md_bg_color = "red" if selbutton is self.ids.var_watt_mode else self.def_btn_color
+        self.ids.vv_vw_mode.md_bg_color = "red" if selbutton is self.ids.vv_vw_mode else self.def_btn_color
+        self.ids.const_pf_mode.md_bg_color = "red" if selbutton is self.ids.const_pf_mode else self.def_btn_color
+
+    def save(self):
+        self._options.min_soc = self.ids.min_soc.fraction()
+        self._options.max_soc = self.ids.max_soc.fraction()
+        self._options.initial_soc = self.ids.init_soc.fraction()
+
+        self.manager.current = "configure-storage"
+
+    def cancel(self):
+        self.manager.current = "configure-storage"
+        self.manager.remove_widget(self)
+
 
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""

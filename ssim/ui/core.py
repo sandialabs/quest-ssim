@@ -188,7 +188,7 @@ class StorageOptions:
         self.initial_soc = initial_soc
         self.control = control or StorageControl(
             'droop',
-            {'p_droop': 500, 'q_droop': -300}  # completely arbitrary
+            {'p_droop': 500.0, 'q_droop': -300.0}  # completely arbitrary
         )
         self.soc_model = soc_model
         self.required = required
