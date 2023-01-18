@@ -1,6 +1,10 @@
 """Storage Sizing and Placement Kivy application"""
-import os
+from contextlib import ExitStack
+import itertools
 
+from importlib_resources import files, as_file
+
+import kivy
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.app import App
 from kivy.uix.floatlayout import FloatLayout
@@ -10,6 +14,24 @@ from kivy.uix.popup import Popup
 from kivy.core.text import LabelBase
 
 from ssim.ui import Project
+
+
+_FONT_FILES = {
+    "exo_regular": "Exo2-Regular.ttf",
+    "exo_bold": "Exo2-Bold.ttf",
+    "exo_italic": "Exo2-Italic.ttf",
+    "opensans_regular": "OpenSans-Regular.ttf",
+    "opensans_bold": "OpenSans-Bold.ttf",
+    "opensans_italic": "OpenSans-Italic.ttf"
+}
+
+
+_IMAGE_FILES = [
+    "button_down.png", "button_normal.png", "gray.png", "white.png"
+]
+
+
+_KV_FILES = ["common.kv", "ssim.kv"]
 
 
 class SSimApp(App):
@@ -112,27 +134,64 @@ class SSimScreen(SSimBaseScreen):
         self.manager.current = "run-sim"
 
 
-def main():
+def _configure_fonts(exo_regular, exo_bold, exo_italic,
+                     opensans_regular, opensans_bold, opensans_italic):
+    # Configure the fonts use but the quest style
     LabelBase.register(
         name='Exo 2',
-        fn_regular=os.path.join('resources', 'fonts',
-                                'Exo_2', 'Exo2-Regular.ttf'),
-        fn_bold=os.path.join('resources', 'fonts',
-                             'Exo_2', 'Exo2-Bold.ttf'),
-        fn_italic=os.path.join('resources', 'fonts',
-                               'Exo_2', 'Exo2-Italic.ttf'))
+        fn_regular=exo_regular,
+        fn_bold=exo_bold,
+        fn_italic=exo_italic
+    )
 
     LabelBase.register(
         name='Open Sans',
-        fn_regular=os.path.join('resources', 'fonts',
-                                'Open_Sans', 'OpenSans-Regular.ttf'),
-        fn_bold=os.path.join('resources', 'fonts',
-                             'Open_Sans', 'OpenSans-Bold.ttf'),
-        fn_italic=os.path.join('resources', 'fonts',
-                               'Open_Sans', 'OpenSans-Italic.ttf'))
+        fn_regular=opensans_regular,
+        fn_bold=opensans_bold,
+        fn_italic=opensans_italic
+    )
 
+
+def _paths(package, names):
+    basepath = files(package)
+    # all names need to be referenced individually so that each file
+    # is guaranteed to exist when they are referenced.  As far as I
+    # can tell there is no way to just make a directory containing all
+    # resources in a package using importlib_resources.
+    return list(as_file(basepath.joinpath(name)) for name in names)
+
+
+def _font_paths():
+    return dict(
+        zip(_FONT_FILES.keys(),
+            _paths("ssim.ui.kivy.fonts", _FONT_FILES.values()))
+    )
+
+
+def _kv_paths():
+    return _paths("ssim.ui.kivy", _KV_FILES)
+
+
+def _image_paths():
+    return _paths("ssim.ui.kivy.images", _IMAGE_FILES)
+
+
+def main():
+    """Run the storage-sim kivy application."""
     Logger.setLevel(LOG_LEVELS["debug"])
-    SSimApp().run()
+    with ExitStack() as stack:
+        font_paths = {font_name: str(stack.enter_context(font_path))
+                      for font_name, font_path in _font_paths().items()}
+        kv_paths = [stack.enter_context(kv) for kv in _kv_paths()]
+        image_paths = [stack.enter_context(img) for img in _image_paths()]
+        _configure_fonts(**font_paths)
+        resource_dirs = set(
+            resource.parent
+            for resource in itertools.chain(kv_paths, image_paths)
+        )
+        for resource_dir in resource_dirs:
+            kivy.resources.resource_add_path(resource_dir)
+        SSimApp().run()
 
 
 if __name__ == '__main__':
