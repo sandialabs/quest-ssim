@@ -5,7 +5,7 @@ import re
 
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 from kivymd.app import MDApp
-from ssim.ui import Project
+from ssim.ui import Project, StorageOptions, is_valid_opendss_name
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.uix.floatlayout import FloatLayout
 from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, TwoLineAvatarIconListItem, OneLineAvatarIconListItem
@@ -34,10 +34,6 @@ from kivy.properties import ObjectProperty, StringProperty
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.menu import MDDropdownMenu
 import tomli
-
-class SSimApp(MDApp):
-from ssim.ui import Project, StorageOptions, is_valid_opendss_name
-
 
 class SSimApp(MDApp):
 
