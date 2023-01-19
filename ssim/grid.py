@@ -72,6 +72,9 @@ class StorageSpecification:
     #: Type of the controller for this device.
     controller: str
 
+    #: Additional parameters to be passed to the controller constructor.
+    controller_params: dict = field(default_factory=dict)
+
     #: Number of phases to which the device is connected.
     phases: int = 3
 
@@ -83,9 +86,6 @@ class StorageSpecification:
 
     #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
     inverter_efficiency: Optional[Curve] = None
-
-    #: Additional parameters to be passed to the controller constructor.
-    controller_params: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, params: dict):
