@@ -135,6 +135,15 @@ class StorageControl:
         self.mode = mode
         self.params = params
 
+    def write_toml(self, name)->str:
+        ret = "\n\n[" + name + ".control-mode]\n"
+        ret += "mode = " + self.mode + "\n"
+
+        #ret += "\n\n[" + name + ".control-mode.params]\n"
+        for key in self.params:
+            ret += key + " = " + str(self.params[key]) + "\n"
+
+        return ret
 
 class StorageOptions:
     """Set of configuration options available for a specific device.
@@ -192,6 +201,20 @@ class StorageOptions:
         )
         self.soc_model = soc_model
         self.required = required
+
+    def write_toml(self)->str:
+        ret = "\n\n[" + self.name + "]\n"
+        ret += "phases = " + str(self.phases) + "\n"
+        ret += "required = " + str(self.required) + "\n"
+        ret += "min_soc = " + str(self.min_soc) + "\n"
+        ret += "max_soc = " + str(self.max_soc) + "\n"
+        ret += "initial_soc = " + str(self.initial_soc) + "\n"
+        ret += "busses = [" + str(", ".join(self.busses)) + "]\n"
+        ret += "power = [" + str(', '.join(map(str, self.power))) + "]\n"
+        ret += "duration = [" + str(', '.join(map(str, self.duration))) + "]\n"
+
+        if self.control: ret += self.control.write_toml(self.name)
+        return ret
 
     def add_bus(self, bus):
         self.busses.add(bus)

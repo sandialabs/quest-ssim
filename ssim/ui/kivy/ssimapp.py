@@ -91,8 +91,9 @@ class BusListItem(TwoLineIconListItem):
     def active(self):
         return self.ids.selected.active
 
+
 class TextFieldFloat(MDTextField):
-    SIMPLE_FLOAT = re.compile(r"(+|-)?\d+(\.\d*)?$")
+    SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -114,6 +115,7 @@ class TextFieldFloat(MDTextField):
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
+
 
 class TextFieldPositiveFloat(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
@@ -175,6 +177,7 @@ class TextFieldPositivePercentage(MDTextField):
 
     def fraction(self):
         return self.percentage() / 100.0
+
 
 class EditableSetList(MDList):
     options = ObjectProperty(set())
@@ -255,6 +258,12 @@ class StorageConfigurationScreen(SSimBaseScreen):
             on_text_validate=self._check_name
         )
         self.options = None
+
+    def on_kv_post(self, base_widget):
+        self.ids.bus_list.clear_widgets()
+        for bus in self.project.bus_names:
+            bus_list_item = BusListItem(bus, self.project.phases(bus))
+            self.ids.bus_list.add_widget(bus_list_item)
 
     def _check_name(self):
         textfield = self.ids.device_name
@@ -338,6 +347,8 @@ class StorageConfigurationScreen(SSimBaseScreen):
             )
             return
 
+        mytoml = self.options.write_toml()
+
         self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
@@ -347,11 +358,8 @@ class StorageConfigurationScreen(SSimBaseScreen):
         self.manager.remove_widget(self)
 
     def on_enter(self, *args):
-        self.ids.bus_list.clear_widgets()
-        for bus in self.project.bus_names:
-            bus_list_item = BusListItem(bus, self.project.phases(bus))
-            self.ids.bus_list.add_widget(bus_list_item)
         return super().on_enter(*args)
+
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
@@ -364,9 +372,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.ids.max_soc.text = str(self._options.max_soc*100.0)
         self.ids.init_soc.text = str(self._options.initial_soc*100.0)
 
-        Clock.schedule_once(lambda dt: self.__set_focus(self.ids.max_soc), 0.05)
-        Clock.schedule_once(lambda dt: self.__set_focus(self.ids.min_soc), 0.05)
-        Clock.schedule_once(lambda dt: self.__set_focus(self.ids.init_soc), 0.05)
+        self._param_field_map = {}
+
+        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.max_soc), 0.05)
+        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.min_soc), 0.05)
+        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.init_soc), 0.05)
 
         self.def_btn_color = '#005376'
 
@@ -386,8 +396,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             else:
                 self.set_droop_mode()
     @staticmethod
-    def __set_focus(widget, value = True):
+    def __set_focus_clear_sel(widget, value = True):
         widget.focus = value
+        Clock.schedule_once(lambda dt: widget.cancel_selection(), 0.05)
 
     def set_mode_label_text(self):
         self.ids.mode_label.text = "Select a control mode for this storage asset: [b]" +\
@@ -401,13 +412,23 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         if self.set_mode("droop", self.ids.droop_mode):
             self._options.control.params["p_droop"] = 500
             self._options.control.params["q_droop"] = -300
-        self.ids.param_box.add_widget(MDTextField(
+
+        pfield = TextFieldFloat(
             hint_text="P Droop", text=str(self._options.control.params["p_droop"])
-            ))
-        self.ids.param_box.add_widget(MDTextField(
+            )
+        qfield = TextFieldFloat(
             hint_text="Q Droop", text=str(self._options.control.params["q_droop"])
-            ))
+            )
+        self.ids.param_box.add_widget(pfield)
+        self.ids.param_box.add_widget(qfield)
         self.ids.param_box.add_widget(BoxLayout(size_hint=(1.0, 0.8)))
+
+        self._param_field_map.clear()
+        self._param_field_map["p_droop"] = pfield
+        self._param_field_map["q_droop"] = qfield
+
+        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pfield), 0.05)
+        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(qfield), 0.05)
 
     def set_volt_var_mode(self):
         self.set_mode("voltvar", self.ids.vv_mode)
@@ -444,6 +465,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self._options.min_soc = self.ids.min_soc.fraction()
         self._options.max_soc = self.ids.max_soc.fraction()
         self._options.initial_soc = self.ids.init_soc.fraction()
+
+        self._options.control.params.clear()
+
+        for key in self._param_field_map:
+            self._options.control.params[key] = float(self._param_field_map[key].text)
 
         self.manager.current = "configure-storage"
 
