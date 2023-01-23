@@ -332,14 +332,42 @@ class StorageConfigurationScreen(SSimBaseScreen):
         self.manager.current = "configure-storage-controls"
 
     def _record_option_data(self) -> StorageOptions:
-        self.options = StorageOptions(
-            self.ids.device_name.text,
-            3,
-            self._ess_powers,
-            self._ess_durations,
-            self._selected_busses,
-            required=self.ids.required.active
-        )
+
+        if self.options:
+            self.options.power = self._ess_powers
+            self.options.duration = self._ess_durations
+            self.options.busses = self._selected_busses
+            self.options.required = self.ids.required.active
+            self.options.name = self.ids.device_name.text
+            self.options.phases = 3
+        else:
+            self.options = StorageOptions(
+                self.ids.device_name.text,
+                3,
+                self._ess_powers,
+                self._ess_durations,
+                self._selected_busses,
+                required=self.ids.required.active
+            )
+
+    def __show_invalid_input_values_popup(self, msg):
+        content = MessagePopupContent()
+
+        popup = Popup(
+            title='Invalid Storage Input', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+            )
+        content.ids.msg_label.text = str(msg)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+
+    def show_error(self, msg):
+        if msg:
+            self.__show_invalid_input_values_popup(msg)
+            return True
+
+        return False
 
     def save(self):
         self._record_option_data()
@@ -352,9 +380,14 @@ class StorageConfigurationScreen(SSimBaseScreen):
                 f"durations: {self.options.duration}, "
                 f"busses: {self.options.busses}"
             )
-            return
 
-        mytoml = self.options.write_toml()
+        if self.show_error(self.options.validate_name()): return
+        if self.show_error(self.options.validate_soc_values()): return
+        if self.show_error(self.options.validate_power_values()):  return
+        if self.show_error(self.options.validate_duration_values()): return
+        if self.show_error(self.options.validate_busses()): return
+
+        #mytoml = self.options.write_toml()
 
         self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
@@ -484,7 +517,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
 
-
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""
 
@@ -498,7 +530,6 @@ class PVConfigurationScreen(SSimBaseScreen):
 
     def cancel(self):
         self.manager.current = "der-config"
-
 
 class DERConfigurationScreen(SSimBaseScreen):
     """Configure energy storage devices and PV generators."""
@@ -526,17 +557,14 @@ class DERConfigurationScreen(SSimBaseScreen):
             _show_no_grid_popup("ssim", self.manager)
         return super().on_pre_enter(*args)
 
-
 class StorageListItem(TwoLineIconListItem):
     def __init__(self, ess, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.text = ess.name
         self.secondary_text = str(ess.power)
 
-
 class LoadConfigurationScreen(SSimBaseScreen):
     pass
-
 
 class NoGridPopupContent(BoxLayout):
     pass
@@ -547,7 +575,7 @@ class NoGridPopupContent(BoxLayout):
 class MissingMetricValuesPopupContent(BoxLayout):
     pass
 
-class InvalidMetricValuesPopupContent(BoxLayout):
+class MessagePopupContent(BoxLayout):
     pass
 
 class BusListItemWithCheckbox(OneLineAvatarIconListItem):
@@ -582,28 +610,30 @@ class MetricConfigurationScreen(SSimBaseScreen):
                     print(wid.text, wid.secondary_text)
                     self._selBusses.append(cb)
 
-    def drop_sense_menu(self):
+    def on_kv_post(self, base_widget):
         menu_items = [
             {
                 "viewclass": "OneLineListItem",
                 "text": "Minimize",
-                "on_release": lambda x="Minimize" : self.set_sense(x)
+                "on_release": lambda x="Minimize": self.set_sense(x)
             },
             {
                 "viewclass": "OneLineListItem",
                 "text": "Maximize",
-                "on_release": lambda x="Maximize" : self.set_sense(x)
+                "on_release": lambda x="Maximize": self.set_sense(x)
             },
             {
                 "viewclass": "OneLineListItem",
                 "text": "Seek Value",
-                "on_release": lambda x="Seek Value" : self.set_sense(x)
+                "on_release": lambda x="Seek Value": self.set_sense(x)
             }
         ]
 
         self.menu = MDDropdownMenu(
             caller=self.ids.caller, items=menu_items, width_mult=3
-            )
+        )
+
+    def drop_sense_menu(self):
         self.menu.open()
 
     def set_sense(self, value):
@@ -678,7 +708,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
         err = Metric.validate_metric_values(limit, obj, sense, False)
 
-        if err is not None:
+        if err:
             self.__show_invalid_metric_value_popup(err)
             return
 
@@ -799,7 +829,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         return
 
     def __show_invalid_metric_value_popup(self, msg):
-        content = InvalidMetricValuesPopupContent()
+        content = MessagePopupContent()
 
         popup = Popup(
             title='Invalid Metric Values', content=content, auto_dismiss=False,
@@ -862,7 +892,6 @@ class RunSimulationScreen(SSimBaseScreen):
         # TODO: Need to populate the MDlist dynamically
         configs = self.project.configurations
 
-
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, pk=None, **kwargs):
@@ -872,16 +901,13 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
     def delete_item(self, the_list_item):
         self.parent.remove_widget(the_list_item)
 
-
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     '''Custom left container'''
     pass
 
-
 class SelectGridDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
-
 
 class SSimScreen(SSimBaseScreen):
 

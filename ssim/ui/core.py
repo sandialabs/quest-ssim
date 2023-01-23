@@ -259,6 +259,30 @@ class StorageOptions:
         if self.control: ret += self.control.write_toml(self.name)
         return ret
 
+    def validate_soc_values(self):
+        if self.min_soc >= self.max_soc:
+            return "The minimum SOC must be less than the maximum."
+
+        if self.initial_soc > 1.0:
+            return "The initial SOC must be less than 100%."
+
+        if self.initial_soc < 0.0:
+            return "The initial SOC must be greater than 0%."
+
+        if self.max_soc > 1.0:
+            return "The maximum SOC must be less than 100%."
+
+        if self.max_soc < 0.0:
+            return "The maximum SOC must be greater than 0%."
+
+        if self.min_soc > 1.0:
+            return "The minimum SOC must be less than 100%."
+
+        if self.min_soc < 0.0:
+            return "The minimum SOC must be greater than 0%."
+
+        return ""
+
     def add_bus(self, bus):
         self.busses.add(bus)
 
@@ -271,6 +295,45 @@ class StorageOptions:
     @property
     def name_valid(self):
         return is_valid_opendss_name(self.name)
+
+    def validate_name(self):
+        if not self.name_valid:
+            return "Storage asset name is invalid.  The name can contain no spaces, " + \
+                "newlines, periods, tabs, or equal signs.  It also cannot be empty."
+    def validate_power_value(self, value):
+        return None if value > 0.0 else "Power values cannot be less than or equal to 0 kW."
+
+    def validate_duration_value(self, value):
+        return None if value > 0.0 else "Duration values cannot be less than or equal to 0 hours."
+
+    def validate_power_values(self):
+        if len(self.power) == 0:
+            return "No power values provided."
+
+        for val in self.power:
+            vv = self.validate_power_value(val)
+            if vv: return vv
+
+        return None
+
+    def validate_duration_values(self):
+        if len(self.duration) == 0:
+            return "No duration values provided."
+
+        for val in self.duration:
+            vv = self.validate_duration_value(val)
+            if vv: return vv
+
+        return None
+
+    def validate_busses(self):
+        if len(self.busses) == 0:
+            return "No busses selected"
+
+        # Don't have access to the master bus list here (I don't think)
+        # but it would be good to check them all against that list.
+
+        return None
 
     @property
     def valid(self):
