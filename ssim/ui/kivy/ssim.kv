@@ -1,4 +1,4 @@
-    #:include common.kv
+#:include common.kv
 
 
 #:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
@@ -28,7 +28,7 @@
                 valign: "center"
 
         Button:
-            text: "Save to File"
+            text: "save to file"
             on_press: root.write_toml()
 
         Button:
@@ -407,29 +407,13 @@
                         size: self.parent.width, 25
                         color: 0,0,0,1
 
-                    Label:
-                        id: limitlabel
-                        text: "Limit"
-                        size_hint: None, None
-                        size: self.parent.width, 25
-                        color: 0,0,0,1
-
-                    TextInput:
+                    TextFieldMultiFloat:
+                        hint_text: "Limit Value"
                         id: limitText
-                        size_hint: None, None
-                        size: self.parent.width, 35
 
-                    Label:
-                        id: objectivelabel
-                        text: "Objective"
-                        size_hint: None, None
-                        size: self.parent.width, 25
-                        color: 0,0,0,1
-
-                    TextInput:
+                    TextFieldMultiFloat:
+                        hint_text: "Objective Value"
                         id: objectiveText
-                        size_hint: None, None
-                        size: self.parent.width, 35
 
                     Label:
                         id: senselabel

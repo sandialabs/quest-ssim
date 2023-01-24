@@ -124,6 +124,41 @@ class TextFieldFloat(MDTextField):
             self.helper_text = "Input value and press enter"
 
 
+class TextFieldMultiFloat(MDTextField):
+    SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper_text_mode = "on_focus"
+        self.helper_text = "Input numeric value"
+
+    def text_valid(self):
+        return TextFieldFloat.SIMPLE_FLOAT.match(self.text) is not None
+
+    def set_text(self, instance, value):
+        if value == "":
+            return
+        self.set_error_message()
+
+    def set_varied_mode(self):
+        self.text = ""
+        self.helper_text = "Multiple varied values"
+        self.error = False
+
+    def set_not_set_mode(self):
+        self.text = ""
+        self.helper_text = "No values set"
+        self.error = False
+
+    def set_error_message(self):
+        if not self.text_valid():
+            self.error = True
+            self.helper_text = "You must enter a number."
+        else:
+            self.error = False
+            self.helper_text = "Input value and press enter"
+
+
 class TextFieldPositiveFloat(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
 
@@ -143,7 +178,7 @@ class TextFieldPositiveFloat(MDTextField):
     def set_error_message(self):
         if not self.text_valid():
             self.error = True
-            self.helper_text = "You must enter a number."
+            self.helper_text = "You must enter a non-negative number."
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
@@ -648,6 +683,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         common_limit = None
         common_obj = None
         common_sense = None
+        have_no_metric_busses = False
 
         self.ids.metricValueBox.disabled = len(self._selBusses) == 0
 
@@ -655,37 +691,40 @@ class MetricConfigurationScreen(SSimBaseScreen):
         for b in self._selBusses:
             m = self.project.get_metric(self._currentMetricCategory, b)
             if m is None:
-                common_limit = None
-                common_obj = None
-                common_sense = None
-                metrics.clear()
-                break
+                have_no_metric_busses = True
             else:
                 metrics.append(m)
 
-        for m in metrics:
-            if common_limit is None:
-                common_limit = m.metric.limit
-                common_obj = m.metric.objective
-                common_sense = m.metric.improvement_type
-            else:
-                if common_limit != m.metric.limit:
-                    common_limit = None
-                    break
-                if common_obj != m.metric.objective:
-                    common_obj = None
-                    break
-                if common_sense != m.metric.improvement_type:
-                    common_sense = None
-                    break
+        if not have_no_metric_busses:
+            for m in metrics:
+                if common_limit is None:
+                    common_limit = m.metric.limit
+                    common_obj = m.metric.objective
+                    common_sense = m.metric.improvement_type
+                else:
+                    if common_limit != m.metric.limit:
+                        common_limit = None
+                        break
+                    if common_obj != m.metric.objective:
+                        common_obj = None
+                        break
+                    if common_sense != m.metric.improvement_type:
+                        common_sense = None
+                        break
+        else:
+            common_limit = None
+            common_obj = None
+            common_sense = None
+
+        is_varied = len(metrics) > 0
 
         if common_limit is None:
-            self.ids.limitText.text = "None or Varied"
+            self.ids.limitText.set_varied_mode() if is_varied else self.ids.limitText.set_not_set_mode()
         else:
             self.ids.limitText.text = str(common_limit)
 
         if common_obj is None:
-            self.ids.objectiveText.text = "None or Varied"
+            self.ids.objectiveText.set_varied_mode() if is_varied else self.ids.objectiveText.set_not_set_mode()
         else:
             self.ids.objectiveText.text = str(common_obj)
 
@@ -799,6 +838,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
     def configure_voltage_metrics(self):
         self._currentMetricCategory = "Voltage"
+        self.ids.interlabel.text = "Busses"
         self.load_bussed_into_list()
         self.reload_metric_list()
         self.reload_metric_values()
