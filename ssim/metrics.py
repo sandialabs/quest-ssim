@@ -226,14 +226,14 @@ class Metric:
         Limit
             A TOML formatted string with the properties of this instance.
         """
-        ret = "\n\n[metric-" + category + "-" + key + "]" + "\n"
+        ret = f"\n\n[metric-{category}-{key}]\n"
         if category is not None:
-            ret += "category = \"" + category + "\"\n"
+            ret += f"category = \"{category}\"\n"
         if key is not None:
-            ret += "key = \"" + key + "\"\n"
-        ret += "limit = " + str(self._limit) + "\n"
-        ret += "objective = " + str(self._objective) + "\n"
-        ret += "sense = \"" + str(self._imp_type.name) + "\"\n"
+            ret += f"key = \"{key}\"\n"
+        ret += f"limit = {str(self._limit)}\n"
+        ret += f"objective = {str(self._objective)}\n"
+        ret += f"sense = \"{str(self._imp_type.name)}\"\n"
         return ret
 
     def normalize(self, value: float) -> float:
@@ -601,8 +601,7 @@ class MetricAccumulator:
         Normalized Value
             The result of normalizing the supplied value parameter.
         """
-        if d_time == 0.0:
-            return 0.0
+        if d_time == 0.0: return 0.0
         met_val = self._metric.normalize(value)
         self._total_time += d_time
         self._accumulated += d_time * met_val
@@ -763,8 +762,7 @@ class MetricTimeAccumulator(MetricAccumulator):
         assert curr_time >= self._curr_time, \
             "current time provided to accumulate function must be greater " + \
             "than or equal to any prior time provided."
-        if curr_time == self._curr_time:
-            return 0.0
+        if curr_time == self._curr_time: return 0.0
         val = MetricAccumulator.accumulate(
             self, value, curr_time - self._curr_time
             )

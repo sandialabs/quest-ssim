@@ -86,6 +86,14 @@ class Project:
         self._grid_model = DSSModel(model_path)
 
     def write_toml(self) -> str:
+        """Writes the properties of this class instance to a string in TOML
+           format.
+
+        Returns
+        -------
+        Limit
+            A TOML formatted string with the properties of this project instance.
+        """
         ret = ""
         for mgrKey in self._metricMgrs:
             mgr = self._metricMgrs[mgrKey]
@@ -179,12 +187,12 @@ class StorageControl:
         self.params = params
 
     def write_toml(self, name)->str:
-        ret = "\n\n[" + name + ".control-mode]\n"
-        ret += "mode = " + self.mode + "\n"
+        ret = f"\n\n[{name}.control-mode]\n"
+        ret += f"mode = {self.mode}\n"
 
-        #ret += "\n\n[" + name + ".control-mode.params]\n"
+        #ret += f"\n\n[{name}.control-mode.params]\n"
         for key in self.params:
-            ret += key + " = " + str(self.params[key]) + "\n"
+            ret += f"{key} = {str(self.params[key])}\n"
 
         return ret
 
@@ -246,15 +254,15 @@ class StorageOptions:
         self.required = required
 
     def write_toml(self)->str:
-        ret = "\n\n[" + self.name + "]\n"
-        ret += "phases = " + str(self.phases) + "\n"
-        ret += "required = " + str(self.required) + "\n"
-        ret += "min_soc = " + str(self.min_soc) + "\n"
-        ret += "max_soc = " + str(self.max_soc) + "\n"
-        ret += "initial_soc = " + str(self.initial_soc) + "\n"
-        ret += "busses = [" + str(", ".join(self.busses)) + "]\n"
-        ret += "power = [" + str(', '.join(map(str, self.power))) + "]\n"
-        ret += "duration = [" + str(', '.join(map(str, self.duration))) + "]\n"
+        ret = f"\n\n[{self.name}]\n"
+        ret += f"phases = {str(self.phases)}\n"
+        ret += f"required = {str(self.required)}\n"
+        ret += f"min_soc = {str(self.min_soc)}\n"
+        ret += f"max_soc = {str(self.max_soc)}\n"
+        ret += f"initial_soc = {str(self.initial_soc)}\n"
+        ret += f"busses = [{str(', '.join(self.busses))}]\n"
+        ret += f"power = [{str(', '.join(map(str, self.power)))}]\n"
+        ret += f"duration = [{str(', '.join(map(str, self.duration)))}]\n"
 
         if self.control: ret += self.control.write_toml(self.name)
         return ret
@@ -301,10 +309,12 @@ class StorageOptions:
             return "Storage asset name is invalid.  The name can contain no spaces, " + \
                 "newlines, periods, tabs, or equal signs.  It also cannot be empty."
     def validate_power_value(self, value):
-        return None if value > 0.0 else "Power values cannot be less than or equal to 0 kW."
+        return None if value > 0.0 \
+            else "Power values cannot be less than or equal to 0 kW."
 
     def validate_duration_value(self, value):
-        return None if value > 0.0 else "Duration values cannot be less than or equal to 0 hours."
+        return None if value > 0.0 \
+            else "Duration values cannot be less than or equal to 0 hours."
 
     def validate_power_values(self):
         if len(self.power) == 0:

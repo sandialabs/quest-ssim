@@ -57,7 +57,6 @@ class SSimApp(MDApp):
 
         return screen_manager
 
-
 class SSimBaseScreen(Screen):
     """Base class for screens that holds the fundamental ssim data structures.
 
@@ -74,10 +73,8 @@ class SSimBaseScreen(Screen):
         self.project = project
         super().__init__(*args, **kwargs)
 
-
 class LeftCheckBox(ILeftBodyTouch, MDCheckbox):
     pass
-
 
 class BusListItem(TwoLineIconListItem):
 
@@ -97,7 +94,6 @@ class BusListItem(TwoLineIconListItem):
     @property
     def active(self):
         return self.ids.selected.active
-
 
 class TextFieldFloat(MDTextField):
     SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
@@ -123,7 +119,6 @@ class TextFieldFloat(MDTextField):
             self.error = False
             self.helper_text = "Input value and press enter"
 
-
 class TextFieldMultiFloat(MDTextField):
     SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
 
@@ -133,7 +128,7 @@ class TextFieldMultiFloat(MDTextField):
         self.helper_text = "Input numeric value"
 
     def text_valid(self):
-        return TextFieldFloat.SIMPLE_FLOAT.match(self.text) is not None
+        return TextFieldMultiFloat.SIMPLE_FLOAT.match(self.text) is not None
 
     def set_text(self, instance, value):
         if value == "":
@@ -156,8 +151,7 @@ class TextFieldMultiFloat(MDTextField):
             self.helper_text = "You must enter a number."
         else:
             self.error = False
-            self.helper_text = "Input value and press enter"
-
+            self.helper_text = "Input numeric value"
 
 class TextFieldPositiveFloat(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
@@ -182,7 +176,6 @@ class TextFieldPositiveFloat(MDTextField):
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
-
 
 class TextFieldPositivePercentage(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
@@ -220,7 +213,6 @@ class TextFieldPositivePercentage(MDTextField):
     def fraction(self):
         return self.percentage() / 100.0
 
-
 class EditableSetList(MDList):
     options = ObjectProperty(set())
 
@@ -247,7 +239,6 @@ class EditableSetList(MDList):
         # to trigger the _update_display callback throug kivy
         self.options = self.options - set([item])
 
-
 class EditableSetListItem(OneLineRightIconListItem):
     """List item with one line and a delete button"""
 
@@ -260,7 +251,6 @@ class EditableSetListItem(OneLineRightIconListItem):
 
     def _delete_item(self, item):
         self.parent.remove_item(self._value)
-
 
 class TextFieldOpenDSSName(MDTextField):
     """Text field that enforces OpenDSS name requirements."""
@@ -282,7 +272,6 @@ class TextFieldOpenDSSName(MDTextField):
             self.error = True
         else:
             self.error = False
-
 
 class StorageConfigurationScreen(SSimBaseScreen):
     """Configure a single energy storage device."""
@@ -422,7 +411,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
         if self.show_error(self.options.validate_duration_values()): return
         if self.show_error(self.options.validate_busses()): return
 
-        #mytoml = self.options.write_toml()
+        mytoml = self.options.write_toml()
 
         self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
@@ -434,7 +423,6 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
     def on_enter(self, *args):
         return super().on_enter(*args)
-
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
@@ -774,12 +762,10 @@ class MetricConfigurationScreen(SSimBaseScreen):
             self.ids.currMetriclabel.text = \
                 "Defined \"" + self._currentMetricCategory + "\" Metrics"
 
-
     def manage_selection_buttons_enabled_state(self):
         numCldrn = len(self.ids.interlist.children) == 0
         self.ids.btnSelectAll.disabled = numCldrn
         self.ids.btnDeselectAll.disabled = numCldrn
-
 
     def deselect_all_metric_objects(self):
         for wid in self.ids.interlist.children:
