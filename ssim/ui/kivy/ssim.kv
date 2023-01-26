@@ -32,6 +32,10 @@
             on_press: root.write_toml()
 
         Button:
+            text: "read from file"
+            on_press: root.read_toml()
+
+        Button:
             text: "select grid model"
             on_press: root.select_grid_model()
 
@@ -537,6 +541,27 @@
             id: filechooser
             path: "."
             filters: ["*.dss"]
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Load"
+                on_release: root.load(filechooser.path, filechooser.selection)
+
+<SelectSSIMTOMLDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            path: "."
+            filters: ["*.toml"]
 
         BoxLayout:
             size_hint_y: None

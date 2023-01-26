@@ -122,8 +122,10 @@ class Project:
         self._grid_model = DSSModel(self._grid_model_path)
 
         sodict = tomlData["storage-options"]
-        #for sokey in sodict:
-        #    so
+        for sokey in sodict:
+            so = StorageOptions(sokey, 3, [], [], [])
+            so.read_toml(sokey, sodict[sokey])
+            self.add_storage_option(so)
 
         for mkey in tomlData:
             if mkey == "metrics":
@@ -216,6 +218,11 @@ class Project:
         """
         self._metricMgrs.clear();
 
+    def clear_options(self):
+        """Removes all metrics from all managers and removes all managers.
+        """
+        self.storage_devices.clear();
+
     def get_manager(self, category: str) -> MetricManager:
         """Retrieves the metric manager identified by the supplied category.
 
@@ -304,7 +311,7 @@ class StorageControl:
 
         return ret
 
-    def read_toml(self, name: str, tomlData):
+    def read_toml(self, tomlData):
         """Reads the properties of this class instance from a TOML formated dictionary.
 
         Parameters
@@ -313,15 +320,11 @@ class StorageControl:
             A TOML formatted dictionary from which to read the properties of this class
             instance.
         """
-        keytag = f"{name}.control-mode"
-
-        if keytag in tomlData:
-            tomlDat = tomlData[keytag]
-            for key in tomlDat:
-                if key == "mode":
-                    self.mode = tomlDat[key]
-                else:
-                    self.params[key] = float(tomlDat[key])
+        for key in tomlData:
+            if key == "mode":
+                self.mode = tomlData[key]
+            else:
+                self.params[key] = float(tomlData[key])
 
 class StorageOptions:
     """Set of configuration options available for a specific device.
@@ -413,15 +416,17 @@ class StorageOptions:
             A TOML formatted dictionary from which to read the properties of this class
             instance.
         """
-        keytag = f"{name}.control-mode"
+        self.phases = tomlData["phases"]
+        self.required = tomlData["required"]
+        self.min_soc = tomlData["min_soc"]
+        self.max_soc = tomlData["max_soc"]
+        self.initial_soc = tomlData["initial_soc"]
+        self.busses = set(tomlData["busses"])
+        self.power = set(tomlData["power"])
+        self.duration = set(tomlData["duration"])
 
-        if keytag in tomlData:
-            tomlDat = tomlData[keytag]
-            for key in tomlDat:
-                if key == "mode":
-                    self.mode = tomlDat[key]
-                else:
-                    self.params[key] = float(tomlDat[key])
+        if "control-mode" in tomlData:
+            self.control.read_toml(tomlData["control-mode"])
 
     def add_bus(self, bus):
         self.busses.add(bus)

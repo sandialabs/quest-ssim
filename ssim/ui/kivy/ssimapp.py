@@ -936,6 +936,10 @@ class SelectGridDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
 
+class SelectSSIMTOMLDialog(FloatLayout):
+    load = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+
 class SSimScreen(SSimBaseScreen):
 
     grid_path = ObjectProperty(None)
@@ -952,6 +956,28 @@ class SSimScreen(SSimBaseScreen):
         self.project.set_grid_model(filename[0])
         self.bus_list.text = '\n'.join(self.project.bus_names)
         self.dismiss_popup()
+
+    def load_toml_file(self, path, filename):
+        Logger.debug("loading file %s", filename[0])
+        self.project.clear_metrics()
+        self.project.clear_options()
+
+        with open('c:/temp/written.toml', 'r') as f:
+            toml = f.read()
+
+        tdat = tomli.loads(toml)
+        self.project.read_toml(tdat)
+        self.bus_list.text = '\n'.join(self.project.bus_names)
+        self.dismiss_popup()
+
+
+    def read_toml(self):
+        chooser = SelectSSIMTOMLDialog(
+            load=self.load_toml_file, cancel=self.dismiss_popup)
+
+        self._popup = Popup(title="select SSIM TOML file", content=chooser)
+        self._popup.open()
+
 
     def write_toml(self):
         toml = self.project.write_toml()
