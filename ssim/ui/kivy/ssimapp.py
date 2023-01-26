@@ -411,7 +411,8 @@ class StorageConfigurationScreen(SSimBaseScreen):
         if self.show_error(self.options.validate_duration_values()): return
         if self.show_error(self.options.validate_busses()): return
 
-        mytoml = self.options.write_toml()
+        #mytoml = self.options.write_toml()
+        #self.options.read_toml(self.options.name)
 
         self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"

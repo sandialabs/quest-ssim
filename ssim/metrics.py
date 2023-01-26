@@ -226,11 +226,7 @@ class Metric:
         Limit
             A TOML formatted string with the properties of this instance.
         """
-        ret = f"\n\n[metric-{category}-{key}]\n"
-        if category is not None:
-            ret += f"category = \"{category}\"\n"
-        if key is not None:
-            ret += f"key = \"{key}\"\n"
+        ret = f"\n\n[metrics.{category}.{key}]\n"
         ret += f"limit = {str(self._limit)}\n"
         ret += f"objective = {str(self._objective)}\n"
         ret += f"sense = \"{str(self._imp_type.name)}\"\n"
@@ -776,17 +772,26 @@ class MetricManager:
         self._all_metrics = {}
 
     def add_accumulator(self, name: str, accum: MetricTimeAccumulator):
-        """ Adds a new time accumulator to this metric manager
+        """ Adds a new time accumulator to this metric manager.
+
+        If the supplied accumulator is None, this will actually remove an
+        existing metric by name if one exists.
         
         Parameters
         ----------
         name : str
             The name to use as a key for the new accumulator.  This key can be
             used to get the accumulator back using get_accumulator.
+        accum : MetricTimeAccumulator
+            The new accumulator to map to the given name.  If this argument is
+            None, then this actually may result in the removal of a metric.
         """
-        self._all_metrics[name] = accum
+        if accum is not None:
+            self._all_metrics[name] = accum
+        else:
+            self.remove_accumulator(name)
         
-    def remove_accumulator(self, name: str):
+    def remove_accumulator(self, name: str) -> bool:
         """ Removes an existing time accumulator from this metric manager
         
         Parameters
@@ -797,8 +802,11 @@ class MetricManager:
         """
         if name in self._all_metrics:
             del self._all_metrics[name]
+            return True
 
-    def get_accumulator(self, name: str):
+        return False
+
+    def get_accumulator(self, name: str) -> MetricTimeAccumulator:
         """Retrieves an existing time accumulator from this metric manager
            using the supplied name.
         
