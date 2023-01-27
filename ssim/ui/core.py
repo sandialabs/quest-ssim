@@ -118,8 +118,7 @@ class Project:
         """
         projdict = tomlData["Project"]
         self.name = projdict["name"]
-        self._grid_model_path = projdict["grid_model_path"]
-        self._grid_model = DSSModel(self._grid_model_path)
+        self.set_grid_model(projdict["grid_model_path"])
 
         sodict = tomlData["storage-options"]
         for sokey in sodict:
@@ -214,13 +213,11 @@ class Project:
         return cat_mgr.get_accumulator(key)
     
     def clear_metrics(self):
-        """Removes all metrics from all managers and removes all managers.
-        """
+        """Removes all metrics from all managers and removes all managers."""
         self._metricMgrs.clear();
 
     def clear_options(self):
-        """Removes all metrics from all managers and removes all managers.
-        """
+        """Removes all storage options from this project."""
         self.storage_devices.clear();
 
     def get_manager(self, category: str) -> MetricManager:
@@ -358,7 +355,6 @@ class StorageOptions:
         If True the device will be included in every configuration.
         Otherwise, the configurations without this device will be
         evaluated.
-
     """
 
     def __init__(self, name, num_phases, power, duration, busses,
@@ -384,8 +380,7 @@ class StorageOptions:
         self.required = required
 
     def write_toml(self)->str:
-        """Writes the properties of this class instance to a string in TOML
-           format.
+        """Writes the properties of this class instance to a string in TOML format.
 
         Returns
         -------
@@ -428,7 +423,14 @@ class StorageOptions:
         if "control-mode" in tomlData:
             self.control.read_toml(tomlData["control-mode"])
 
-    def add_bus(self, bus):
+    def add_bus(self, bus: str):
+        """Adds the supplied bus name to the list of bus names in this storage option.
+
+        Parameters
+        ----------
+        bus
+            The name of the bus to add to this storage options bus list.
+        """
         self.busses.add(bus)
 
     def add_power(self, power: float) -> bool:
@@ -530,14 +532,57 @@ class StorageOptions:
             "newlines, periods, tabs, or equal signs.  It also cannot be empty."
 
     def validate_power_value(self, value: float) -> str:
+        """Checks to see that the supplied power value is valid for use in this class.
+
+        To be valid, the supplied power value must be greater than 0.  No check is done
+        here to be sure that the supplied value is not already in the list.
+
+        Parameters
+        ----------
+        value: float
+            The value to test for usability as a power value for this class.
+
+        Returns
+        -------
+        Error String
+            A string indicating the any error with the supplied power value or None
+            if there are no issues.
+        """
         return None if value > 0.0 \
             else "Power values cannot be less than or equal to 0 kW."
 
     def validate_duration_value(self, value) -> str:
+        """Checks to see that the supplied duration value is valid for use in this class.
+
+        To be valid, the supplied duration value must be greater than 0.  No check is done
+        here to be sure that the supplied value is not already in the list.
+
+        Parameters
+        ----------
+        value: float
+            The value to test for usability as a duration value for this class.
+
+        Returns
+        -------
+        Error String
+            A string indicating the any error with the supplied duration value or None
+            if there are no issues.
+        """
         return None if value > 0.0 \
             else "Duration values cannot be less than or equal to 0 hours."
 
     def validate_power_values(self) -> str:
+        """Checks to see that the power values stored in this class are valid.
+
+        To be valid, there must be at least 1 power value and all power values must
+        pass the test in validate_power_value.
+
+        Returns
+        -------
+        Error String
+            A string indicating the first error found in the power values or None
+            if there are no issues.
+        """
         if len(self.power) == 0:
             return "No power values provided."
 
@@ -548,6 +593,17 @@ class StorageOptions:
         return None
 
     def validate_duration_values(self) -> str:
+        """Checks to see that the duration values stored in this class are valid.
+
+        To be valid, there must be at least 1 duration value and all duration values must
+        pass the test in validate_duration_value.
+
+        Returns
+        -------
+        Error String
+            A string indicating the first error found in the duration values or None
+            if there are no issues.
+        """
         if len(self.duration) == 0:
             return "No duration values provided."
 
@@ -558,6 +614,16 @@ class StorageOptions:
         return None
 
     def validate_busses(self) -> str:
+        """Checks to see that the list of busses stored in this class is valid.
+
+        To be valid, there must be at least 1 bus.
+
+        Returns
+        -------
+        Error String
+            A string indicating the first error found while checking the bus list
+            or None if there are no issues.
+        """
         if len(self.busses) == 0:
             return "No busses selected"
 
@@ -569,9 +635,9 @@ class StorageOptions:
     @property
     def valid(self):
         return (self.name_valid
-                and len(self.power) > 0
-                and len(self.duration) > 0
-                and len(self.busses) > 0)
+                and self.validate_duration_values() is None
+                and self.validate_power_values() is None
+                and self.validate_busses() is None)
 
     @property
     def num_configurations(self):

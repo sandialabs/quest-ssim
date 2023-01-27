@@ -411,9 +411,6 @@ class StorageConfigurationScreen(SSimBaseScreen):
         if self.show_error(self.options.validate_duration_values()): return
         if self.show_error(self.options.validate_busses()): return
 
-        #mytoml = self.options.write_toml()
-        #self.options.read_toml(self.options.name)
-
         self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
@@ -518,12 +515,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return True
 
     def manage_button_selection_states(self, selbutton):
-        self.ids.droop_mode.md_bg_color = "red" if selbutton is self.ids.droop_mode else self.def_btn_color
-        self.ids.vv_mode.md_bg_color = "red" if selbutton is self.ids.vv_mode else self.def_btn_color
-        self.ids.vw_mode.md_bg_color = "red" if selbutton is self.ids.vw_mode else self.def_btn_color
-        self.ids.var_watt_mode.md_bg_color = "red" if selbutton is self.ids.var_watt_mode else self.def_btn_color
-        self.ids.vv_vw_mode.md_bg_color = "red" if selbutton is self.ids.vv_vw_mode else self.def_btn_color
-        self.ids.const_pf_mode.md_bg_color = "red" if selbutton is self.ids.const_pf_mode else self.def_btn_color
+        self.ids.droop_mode.md_bg_color =\
+            "red" if selbutton is self.ids.droop_mode else self.def_btn_color
+        self.ids.vv_mode.md_bg_color =\
+            "red" if selbutton is self.ids.vv_mode else self.def_btn_color
+        self.ids.vw_mode.md_bg_color =\
+            "red" if selbutton is self.ids.vw_mode else self.def_btn_color
+        self.ids.var_watt_mode.md_bg_color =\
+            "red" if selbutton is self.ids.var_watt_mode else self.def_btn_color
+        self.ids.vv_vw_mode.md_bg_color =\
+            "red" if selbutton is self.ids.vv_vw_mode else self.def_btn_color
+        self.ids.const_pf_mode.md_bg_color =\
+            "red" if selbutton is self.ids.const_pf_mode else self.def_btn_color
 
     def save(self):
         self._options.min_soc = self.ids.min_soc.fraction()
@@ -533,7 +536,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self._options.control.params.clear()
 
         for key in self._param_field_map:
-            self._options.control.params[key] = float(self._param_field_map[key].text)
+            self._options.control.params[key] =\
+                float(self._param_field_map[key].text)
 
         self.manager.current = "configure-storage"
 
@@ -561,6 +565,14 @@ class DERConfigurationScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         # comes first so the manager is initialized
         super().__init__(*args, **kwargs)
+
+
+    def load_project_data(self):
+        self.ids.ess_list.clear_widgets()
+        for so in self.project.storage_devices:
+            self.ids.ess_list.add_widget(
+                StorageListItem(so)
+            )
 
     def new_storage(self):
         self.manager.add_widget(
@@ -708,12 +720,14 @@ class MetricConfigurationScreen(SSimBaseScreen):
         is_varied = len(metrics) > 0
 
         if common_limit is None:
-            self.ids.limitText.set_varied_mode() if is_varied else self.ids.limitText.set_not_set_mode()
+            self.ids.limitText.set_varied_mode() if is_varied else\
+                self.ids.limitText.set_not_set_mode()
         else:
             self.ids.limitText.text = str(common_limit)
 
         if common_obj is None:
-            self.ids.objectiveText.set_varied_mode() if is_varied else self.ids.objectiveText.set_not_set_mode()
+            self.ids.objectiveText.set_varied_mode() if is_varied else\
+                self.ids.objectiveText.set_not_set_mode()
         else:
             self.ids.objectiveText.text = str(common_obj)
 
