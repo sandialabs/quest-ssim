@@ -499,6 +499,9 @@ class DERConfigurationScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         # comes first so the manager is initialized
         super().__init__(*args, **kwargs)
+        self.ids.delete_storage.bind(
+            on_release=self.delete_ess
+        )
 
     def new_storage(self):
         self.manager.add_widget(
@@ -513,6 +516,15 @@ class DERConfigurationScreen(SSimBaseScreen):
         self.ids.ess_list.add_widget(
             StorageListItem(ess)
         )
+
+    def delete_ess(self, button):
+        to_remove = []
+        for ess_list_item in self.ids.ess_list.children:
+            if ess_list_item.selected:
+                to_remove.append(ess_list_item)
+                self.project.remove_storage_option(ess_list_item.ess)
+        for widget in to_remove:
+            self.ids.ess_list.remove_widget(widget)
 
     def on_pre_enter(self, *args):
         if self.project.grid_model is None:

@@ -87,6 +87,9 @@ class Project:
     def add_metric(self, metric):
         self._metrics.append(metric)
 
+    def remove_storage_option(self, storage_options):
+        self.storage_devices.remove(storage_options)
+
     def add_storage_option(self, storage_options):
         self.storage_devices.append(storage_options)
 
