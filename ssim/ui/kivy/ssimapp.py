@@ -24,7 +24,7 @@ from kivymd.uix.selectioncontrol import MDCheckbox
 from kivy.core.text import LabelBase
 
 from typing import List
-from ssim.ui import Project, StorageOptions, Configuration
+from ssim.ui import Project, StorageOptions, Configuration, ProjectResults, Results
 
 
 
@@ -292,22 +292,28 @@ class RunSimulationScreen(SSimBaseScreen):
 class ResultsSummaryScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
+        self.project_results = ProjectResults(self.project)     
+        
     def on_enter(self):
         self.draw_canvas()
+        for result in self.project_results.results():
+            print(result.config_dir)
 
     def draw_canvas(self): 
         # sample plot for testing purposes
         # TO DO: develop the backend for creating these plots
-        x_data = [1, 2, 3, 4, 5]
-        y_data = [1, 4, 9, 15, 25]
-        fig, ax = plt.subplots()
-        ax.plot(x_data, y_data)
-        ax.set_xlabel('Configuration #')
-        ax.set_ylabel('Aggregate Metics')
+        # x_data = [1, 2, 3, 4, 5]
+        # y_data = [1, 4, 9, 15, 25]
+        # fig, ax = plt.subplots()
+        # ax.plot(x_data, y_data)
+        # ax.set_xlabel('Configuration #')
+        # ax.set_ylabel('Aggregate Metics')
+
+        accumulated_metric_fig = self.project_results.plot_accumulated_metrics()
 
         # Add Kivy widget to the canvas
-        self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(fig))
+        self.ids.summary_canvas.clear_widgets()
+        self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
 
     def open_results_compare(self):
         self.manager.current = "results-compare"

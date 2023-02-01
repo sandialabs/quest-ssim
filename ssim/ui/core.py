@@ -4,6 +4,7 @@ import itertools
 import json
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
 import tempfile
 from os import path
 from pathlib import Path, PurePosixPath
@@ -458,6 +459,7 @@ class ProjectResults:
             yield Results(self.base_dir / configuration_dir)
 
     def _resulted_configurations(self):
+        # results from each configuration has its own directory
         for item in os.listdir(self.base_dir):
             # check to see if the directory is from a configuration
             if not self._is_configuration_dir(item):
@@ -481,6 +483,21 @@ class ProjectResults:
     def plot_metrics(self):
         for result in self.results():
             col_names, metric_value, df_metrics = result.metrics_log()
+            return col_names, metric_value, df_metrics
+
+    def plot_accumulated_metrics(self):
+        config_count = 0
+        for result in self.results():
+            _, metric_value, _ = result.metrics_log()
+            fig = plt.figure()
+            plt.plot(config_count, metric_value)
+            plt.xlabel('Configuration ID')
+            plt.ylabel('Accumated Metric')
+            plt.title('Comparison of Metric for Different Configurations')
+            config_count += 1
+            return fig
+
+
 
 class Results:
     """Results from simulating a specific configuration."""
