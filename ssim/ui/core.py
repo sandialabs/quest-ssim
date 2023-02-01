@@ -91,7 +91,7 @@ class Project:
 
         Returns
         -------
-        Limit
+        str:
             A TOML formatted string with the properties of this project instance.
         """
         ret = "[Project]\n"
@@ -155,13 +155,6 @@ class Project:
             The key of the metric to add.
         metric : MetricTimeAccumulator
             The metric to add to this project keyed on the supplied category and key.
-
-        Returns
-        -------
-        Success
-            True if a removal took place and false if not.  Removal may fail if the
-            supplied category does not map to an existing metric manager or if key
-            does not map to a metric in the identified manager.
         """
         cat_mgr = self.get_manager(category)
         if cat_mgr is None:
@@ -182,7 +175,7 @@ class Project:
 
         Returns
         -------
-        Success
+        bool:
             True if a removal took place and false if not.  Removal may fail if the
             supplied category does not map to an existing metric manager or if key
             does not map to a metric in the identified manager.
@@ -203,7 +196,7 @@ class Project:
 
         Returns
         -------
-        MetricTimeAccumulator
+        MetricTimeAccumulator:
             The found metric or None.  Retrieval may fail if the supplied category does
             not map to an existing metric manager or if key does not map to a metric
             in the identified manager.
@@ -230,7 +223,7 @@ class Project:
 
         Returns
         -------
-        MetricManager
+        MetricManager:
             The found metric manager or None.  Retrieval may fail if the supplied category
             does not map to an existing metric manager.
         """
@@ -296,7 +289,7 @@ class StorageControl:
 
         Returns
         -------
-        Limit
+        str:
             A TOML formatted string with the properties of this instance.
         """
         ret = f"\n\n[{name}.control-mode]\n"
@@ -384,7 +377,7 @@ class StorageOptions:
 
         Returns
         -------
-        Limit
+        str:
             A TOML formatted string with the properties of this instance.
         """
         tag = "storage-options." + self.name
@@ -407,6 +400,8 @@ class StorageOptions:
 
         Parameters
         -------
+        name: str
+            The name of the storage asset for which this is the option description.
         tomlData
             A TOML formatted dictionary from which to read the properties of this class
             instance.
@@ -440,25 +435,37 @@ class StorageOptions:
         If the supplied power value already exists, then nothing happens.
         Duplicates are not added.
 
+        Parameters
+        -------
+        power: float
+            The power value to add to the list of possible power values for this
+            storage element.
+
         Returns
         -------
-        Success
+        bool:
             True if the power value is successfully added and false otherwise.
         """
         initlen = len(self.power)
         self.power.add(power)
         return initlen != len(self.power)
 
-    def add_duration(self, duration):
+    def add_duration(self, duration: float) -> bool:
         """Adds a new duration value (hours) to the list of allowed duration values
         for this storage configuration.
 
         If the supplied duration value already exists, then nothing happens.
         Duplicates are not added.
 
+        Parameters
+        -------
+        power: float
+            The duration value to add to the list of possible duration values for this
+            storage element.
+
         Returns
         -------
-        Success
+        bool:
             True if the duration value is successfully added and false otherwise.
         """
         initlen = len(self.duration)
@@ -474,7 +481,7 @@ class StorageOptions:
 
         Returns
         -------
-        Success
+        bool:
             True if self.name is a valid name for a storage object and
             False otherwise.
         """
@@ -488,7 +495,7 @@ class StorageOptions:
 
         Returns
         -------
-        Error String
+        str:
             A string indicating any errors in the SOC inputs or None
             if there are no issues.
         """
@@ -523,7 +530,7 @@ class StorageOptions:
 
         Returns
         -------
-        Error String
+        str:
             A string indicating any errors in the name input or None
             if there are no issues.
         """
@@ -544,14 +551,14 @@ class StorageOptions:
 
         Returns
         -------
-        Error String
+        str:
             A string indicating the any error with the supplied power value or None
             if there are no issues.
         """
         return None if value > 0.0 \
             else "Power values cannot be less than or equal to 0 kW."
 
-    def validate_duration_value(self, value) -> str:
+    def validate_duration_value(self, value: float) -> str:
         """Checks to see that the supplied duration value is valid for use in this class.
 
         To be valid, the supplied duration value must be greater than 0.  No check is done
@@ -564,7 +571,7 @@ class StorageOptions:
 
         Returns
         -------
-        Error String
+        str:
             A string indicating the any error with the supplied duration value or None
             if there are no issues.
         """
@@ -579,7 +586,7 @@ class StorageOptions:
 
         Returns
         -------
-        Error String
+        str:
             A string indicating the first error found in the power values or None
             if there are no issues.
         """
@@ -600,7 +607,7 @@ class StorageOptions:
 
         Returns
         -------
-        Error String
+        str:
             A string indicating the first error found in the duration values or None
             if there are no issues.
         """
@@ -620,7 +627,7 @@ class StorageOptions:
 
         Returns
         -------
-        Error String
+        str:
             A string indicating the first error found while checking the bus list
             or None if there are no issues.
         """
@@ -674,6 +681,18 @@ class MetricCongifuration:
     """
 
     def __init__(self, bus, objective, limit):
+        """Constructs a new MetricConfiguration object.
+
+        Parameters
+        ----------
+        bus
+            The bus for which this metric configuration is being defined.
+        objective
+            The objective value for this metric configuration.  This is the target
+            value which if achieved, results in full satisfaction.
+        limit
+            The worst acceptable value for this metric.
+        """
         self.bus = bus
         self.limit = limit
         self.objective = objective

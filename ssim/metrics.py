@@ -23,13 +23,13 @@ class ImprovementType(int, enum.Enum):
 
         Parameters
         ----------
-        str :
+        str : str
             The string to try and parse into a member of the ImprovementType
             enumeration.
 
         Returns
         -------
-        Improvement Type
+        ImprovementType:
             This returns the member of the enumeration that it matches to the
             supplied string.  If one cannot be matched, the return is None.
         """
@@ -60,20 +60,20 @@ class ImprovementType(int, enum.Enum):
 
         return None
 
-def get_default_improvement_type(limit: float, objective: float):
+def get_default_improvement_type(limit: float, objective: float) -> ImprovementType:
     """A utility method to choose an appropriate improvement type based on the
        supplied limit and objective.
 
     Parameters
     ----------
-    limit :
+    limit : float
         The worst acceptable value for the metric.
-    objective :
+    objective : float
         The target value which if obtained, provides full satisfaction.
 
     Returns
     -------
-    ImprovementType
+    ImprovementType:
         This returns ImprovementType.Minimize if the limit is less than the
         objective, ImprovementType.Maximize if the limit is greater than the
         objective, and None if the limit is equal to the objective.
@@ -152,7 +152,7 @@ class Metric:
 
         Returns
         -------
-        Limit
+        float:
             The worst acceptable value for this metric.
         """
         return self._limit
@@ -163,7 +163,7 @@ class Metric:
 
         Returns
         -------
-        Objective
+        float:
             The value that provides full satisfaction for this metric.
         """
         return self._objective
@@ -175,7 +175,7 @@ class Metric:
 
         Returns
         -------
-        Improvement Type
+        ImprovementType:
             The enumeration member that indicates the sense of this metric
             (minimize, maximize, etc.)..
         """
@@ -188,7 +188,7 @@ class Metric:
         
         Parameters
         ----------
-        tomlData
+        tomlData: dict
             The dictionary that contains the metric properties from which to
             create a new metric instance.  The minimum set of keys that must
             be present are "limit", "objective", and "sense".  "sense" must
@@ -197,7 +197,7 @@ class Metric:
 
         Returns
         -------
-        Metric
+        Metric:
             A newly created metric made using the properties in the supplied
             TOML dictionary.
         """
@@ -223,7 +223,7 @@ class Metric:
 
         Returns
         -------
-        Limit
+        str:
             A TOML formatted string with the properties of this instance.
         """
         ret = f"\n\n[metrics.{category}.{key}]\n"
@@ -242,7 +242,7 @@ class Metric:
 
         Returns
         -------
-        NormalizedValue
+        float:
             A normalized value based on the supplied raw value, this metrics
             limit and objective, and the other curve parameters of this metric.
         """
@@ -265,7 +265,7 @@ class Metric:
 
         Returns
         -------
-        NormalizedValue
+        float:
             A normalized value based on the supplied raw value, this metrics
             limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for minimization.
@@ -283,7 +283,7 @@ class Metric:
 
         Returns
         -------
-        NormalizedValue
+        float:
             A normalized value based on the supplied raw value, this metrics
             limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for maximization.
@@ -301,7 +301,7 @@ class Metric:
 
         Returns
         -------
-        NormalizedValue
+        float:
             A normalized value based on the supplied raw value, this metrics
             limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for seek value.
@@ -316,10 +316,9 @@ class Metric:
 
         return self.__do_max_norm__(-value, -use_lim, -self._objective)
 
-    def _violated(self, norm_val: float):
+    def _violated(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
-           that falls in the region of the space below (or worse than) the
-           limit.
+           that falls in the region of the space below (or worse than) the limit.
 
         Parameters
         ----------
@@ -330,7 +329,7 @@ class Metric:
 
         Returns
         -------
-        NormalizedValue
+        float:
             A normalized value based on the supplied pre-normalized value, this
             metrics limit and objective, and the other curve parameters of this
             metric.
@@ -351,7 +350,7 @@ class Metric:
 
         Returns
         -------
-        NormalizedValue
+        float:
             A normalized value based on the supplied pre-normalized value, this
             metrics limit and objective, and the other curve parameters of this
             metric.
@@ -372,7 +371,7 @@ class Metric:
 
         Returns
         -------
-        NormalizedValue
+        float:
             A normalized value based on the supplied pre-normalized value, this
             metrics limit and objective, and the other curve parameters of this
             metric.
@@ -381,26 +380,80 @@ class Metric:
         return self._g * math.sqrt(norm_val + h - 1.0) - self._phi(h) + 1.0
 
     def _d(self) -> float:
-        '''An intermediate value used in several places during normalization.'''
+        '''An intermediate value used in several places during normalization.
+
+        Returns
+        -------
+        float:
+            The "d" value for this metric.
+        '''
         x = 1.0 - 2.0 * self._c + self._c * self._c
         y = self._c + self._b - 1.0
         return math.sqrt(self._b * x / y)
 
     def _f(self, d: float) -> float:
-        '''An intermediate value used in several places during normalization.'''
+        '''An intermediate value used in several places during normalization.
+
+        Parameters
+        ----------
+        d: float
+            The "d" value for this metric, typically computed using the
+            self._d method.
+
+        Returns
+        -------
+        float:
+            The "f" value for this metric.
+        '''
         val = d / (2.0 * self._b)
         return val * val
 
     def _psi(self, d: float) -> float:
-        '''An intermediate value used in several places during normalization.'''
+        '''An intermediate value used in several places during normalization.
+
+        Parameters
+        ----------
+        d: float
+            The "d" value for this metric, typically computed using the
+            self._d method.
+
+        Returns
+        -------
+        float:
+            The "psi" value for this metric.
+        '''
         return (d * d) / (2.0 * self._b)
 
     def _h(self, d: float) -> float:
-        '''An intermediate value used in several places during normalization.'''
+        '''An intermediate value used in several places during normalization.
+
+        Parameters
+        ----------
+        d: float
+            The "d" value for this metric, typically computed using the
+            self._d method.
+
+        Returns
+        -------
+        float:
+            The "h" value for this metric.
+        '''
         return (self._g * self._g * (self._f(d) + 1.0)) / (d * d)
 
     def _phi(self, h: float) -> float:
-        '''An intermediate value used in several places during normalization.'''
+        '''An intermediate value used in several places during normalization.
+
+        Parameters
+        ----------
+        d: float
+            The "h" value for this metric, typically computed using the
+            self._h method.
+
+        Returns
+        -------
+        float:
+            The "phi" value for this metric.
+        '''
         return self._g * math.sqrt(h)
 
     @staticmethod
@@ -427,7 +480,7 @@ class Metric:
 
         Returns
         -------
-        Pre-Normalized Value
+        float:
             The result of pre-normalizing the raw_value.
         """
         return (raw_value - limit) / (objective - limit)
@@ -454,7 +507,7 @@ class Metric:
 
         Returns
         -------
-        Normalized Value
+        float:
             The result of normalizing the value for maximization.
         """
         resp_norm = Metric._do_pre_normalization(value, limit, objective)
@@ -465,7 +518,7 @@ class Metric:
             return self._feasible(resp_norm)
         return self._super_optimal(resp_norm)
 
-    def _validate_inputs(self, do_assert: bool = True):
+    def _validate_inputs(self, do_assert: bool = True) -> str:
         """Tests the validity/usability of the values stored in this metric.
 
         This uses the static validate_metric_values method.  See it for
@@ -479,14 +532,15 @@ class Metric:
 
         Returns
         -------
-        Error String or None
+        str:
             This method either throws an exception or returns a string
             depending on the value of do_assert.  Either way, the message is
-            determined using the conditions laid out in the description.
+            determined using the conditions laid out in the description.  If there
+            are no problems, then the return is None.
             
         Raises
         ------
-        AssertionError
+        AssertionError:
             If any of the conditions listed in the description are present and
             the do_assert parameter is set to true.
         """
@@ -498,7 +552,7 @@ class Metric:
     def validate_metric_values(
         limit: float, objective: float, imp_type: ImprovementType,
         do_assert: bool = False
-        ):
+        ) -> str:
         """Tests the validity/usability of the metric values provided.
 
         This will either return an error string or throw an exception with an
@@ -523,14 +577,14 @@ class Metric:
 
         Returns
         -------
-        Error String or None
+        str:
             This method either throws an exception or returns a string
             depending on the value of do_assert.  Either way, the message is
             determined using the conditions laid out in the description.
             
         Raises
         ------
-        AssertionError
+        AssertionError:
             If any of the conditions listed in the description are present and
             the do_assert parameter is set to true.
         """
@@ -594,7 +648,7 @@ class MetricAccumulator:
             
         Returns
         -------
-        Normalized Value
+        float:
             The result of normalizing the supplied value parameter.
         """
         if d_time == 0.0: return 0.0
@@ -603,7 +657,7 @@ class MetricAccumulator:
         self._accumulated += d_time * met_val
         return met_val
     
-    def write_toml(self, category, key) -> str:
+    def write_toml(self, category: str, key: str) -> str:
         """Writes the properties of this class instance to a string in TOML
            format.
         
@@ -620,7 +674,7 @@ class MetricAccumulator:
 
         Returns
         -------
-        Limit
+        str:
             A TOML formatted string with the properties of this instance.
         """
         return self._metric.write_toml(category, key)
@@ -640,7 +694,7 @@ class MetricAccumulator:
 
         Returns
         -------
-        Metric Accumulator
+        MetricAccumulator:
             A newly created metric accumulator made using the properties in the
             supplied TOML dictionary.
         """
@@ -654,7 +708,7 @@ class MetricAccumulator:
 
         Returns
         -------
-        Accumulated Value
+        float:
             The current time weighted sum of normalized values.
         """
         return self._accumulated
@@ -665,7 +719,7 @@ class MetricAccumulator:
 
         Returns
         -------
-        Total Time
+        float:
             The current sum of all accumulated time.
         """
         return self._total_time
@@ -677,9 +731,8 @@ class MetricAccumulator:
 
         Returns
         -------
-        TotalTime
-            The current total accumulation over the total time accumulated so
-            far.
+        float:
+            The current total accumulation over the total time accumulated so far.
         """
         return self._accumulated / self._total_time
 
@@ -707,11 +760,11 @@ class MetricTimeAccumulator(MetricAccumulator):
     ----------
     m : Metric
         The metric whose value will be accumulated over time.
-    init_time :
+    init_time : float
         The time to be the initial "current time" for this accumulator.
         The default is 0.
     """
-    def __init__(self, m: Metric, init_time=0.0):
+    def __init__(self, m: Metric, init_time: float=0.0):
         MetricAccumulator.__init__(self, m)
         self._curr_time = init_time
             
@@ -730,7 +783,7 @@ class MetricTimeAccumulator(MetricAccumulator):
 
         Returns
         -------
-        Metric Time Accumulator
+        MetricTimeAccumulator:
             A newly created metric time accumulator made using the properties
             in the supplied TOML dictionary.
         """
@@ -752,7 +805,7 @@ class MetricTimeAccumulator(MetricAccumulator):
             
         Returns
         -------
-        Normalized Value
+        float:
             The result of normalizing the supplied value parameter.
         """
         assert curr_time >= self._curr_time, \
@@ -799,6 +852,12 @@ class MetricManager:
         name : str
             The key name that was used to add the accumulator that you now want
             to remove.
+
+        Returns
+        -------
+        bool:
+            True if an accumulator keyed on name is found and removed and false
+            otherwise.
         """
         if name in self._all_metrics:
             del self._all_metrics[name]
@@ -818,7 +877,7 @@ class MetricManager:
             
         Returns
         -------
-        Accumulator
+        MetricTimeAccumulator:
             The metric accumulator associated with the supplied key or None.
         """
         return self._all_metrics.get(name)
@@ -836,7 +895,7 @@ class MetricManager:
 
         Returns
         -------
-        Limit
+        str:
             A TOML formatted string with the properties of this instance.
         """
         ret = ""
@@ -852,8 +911,8 @@ class MetricManager:
         
         Returns
         -------
-        Metric Map
-            The map has string keys (names) mapped to MetricTimeAccumulator
+        dict:
+            The map of all metrics with keys (names) mapped to MetricTimeAccumulator
             instances.
         """
         return self._all_metrics
@@ -865,7 +924,7 @@ class MetricManager:
         
         Returns
         -------
-        Total Accumulation
+        float:
             The sum of all accumulated values of all accumulators in this
             manager.
         """
