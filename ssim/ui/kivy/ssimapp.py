@@ -258,6 +258,22 @@ class StorageConfigurationScreen(SSimBaseScreen):
             on_text_validate=self._check_name
         )
         self.options = None
+        self._editing = None
+
+    @classmethod
+    def edit(cls, der_screen, ess: StorageOptions, project):
+        screen = cls(der_screen, name="configure-storage", project=project)
+        screen._editing = ess
+        for power in ess.power:
+            screen.ids.power_list.add_item(power)
+        for duration in ess.duration:
+            screen.ids.duration_list.add_item(duration)
+        screen.ids.device_name.text = ess.name
+        for bus_list_item in screen.ids.bus_list.children:
+            if bus_list_item.text in ess.busses:
+                bus_list_item.ids.selected.active = True
+        screen.ids.required.active = ess.required
+        return screen
 
     def on_kv_post(self, base_widget):
         self.ids.bus_list.clear_widgets()
@@ -265,8 +281,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
             bus_list_item = BusListItem(bus, self.project.phases(bus))
             self.ids.bus_list.add_widget(bus_list_item)
 
-    def _check_name(self):
-        textfield = self.ids.device_name
+    def _check_name(self, textfield):
         if not textfield.text_valid():
             textfield.helper_text = "invalid name"
             textfield.error = True
@@ -354,6 +369,9 @@ class StorageConfigurationScreen(SSimBaseScreen):
         self.manager.remove_widget(self)
 
     def cancel(self):
+        if self._editing is not None:
+            # Restore the original device
+            self._der_screen.add_ess(self._editing)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
@@ -514,7 +532,7 @@ class DERConfigurationScreen(SSimBaseScreen):
     def add_ess(self, ess):
         self.project.add_storage_option(ess)
         self.ids.ess_list.add_widget(
-            StorageListItem(ess)
+            StorageListItem(ess, self)
         )
 
     def delete_ess(self, button):
@@ -531,12 +549,33 @@ class DERConfigurationScreen(SSimBaseScreen):
             _show_no_grid_popup("ssim", self.manager)
         return super().on_pre_enter(*args)
 
+    def edit_storage(self, ess_list_item):
+        ess = ess_list_item.ess
+        # Remove from the list so it can be re-added after editing
+        self.project.remove_storage_option(ess)
+        self.ids.ess_list.remove_widget(ess_list_item)
+        self.manager.add_widget(
+            StorageConfigurationScreen.edit(self, ess, self.project))
+        self.manager.current = "configure-storage"
 
-class StorageListItem(TwoLineIconListItem):
-    def __init__(self, ess, *args, **kwargs):
+
+class StorageListItem(TwoLineAvatarIconListItem):
+    def __init__(self, ess, der_screen, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.ess = ess
         self.text = ess.name
         self.secondary_text = str(ess.power)
+        self.ids.edit.bind(
+            on_release=self.edit
+        )
+        self._der_screen = der_screen
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
+    def edit(self, icon_widget):
+        self._der_screen.edit_storage(self)
 
 
 class LoadConfigurationScreen(SSimBaseScreen):
