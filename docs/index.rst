@@ -13,6 +13,7 @@ Welcome to storage-sim's documentation!
    api
    ems
    configuration
+   metrics
 
 Running the simulation
 ----------------------

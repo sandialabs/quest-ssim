@@ -1,4 +1,9 @@
-    #:include common.kv
+#:include common.kv
+
+
+#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
+#:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
+#:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
 
 <SSimScreen>:
     name: 'ssim'
@@ -21,6 +26,14 @@
                 text: "unnamed"
                 multiline: False
                 valign: "center"
+
+        Button:
+            text: "save to file"
+            on_press: root.write_toml()
+
+        Button:
+            text: "read from file"
+            on_press: root.read_toml()
 
         Button:
             text: "select grid model"
@@ -48,6 +61,7 @@
 
 <DERConfigurationScreen>:
     name: "der-config"
+    on_enter: root.load_project_data()
 
     BoxLayout:
         orientation: "vertical"
@@ -286,9 +300,41 @@
     BoxLayout:
         orientation: "vertical"
 
+        Label:
+            id: currMetriclabel
+            text: "Defined Metrics"
+            size_hint: 1.0, 0.05
+            color: 0,0,0,1
+
+        ScrollView:
+            MDList:
+                id: metriclist
+
         Button:
             text: "back"
             on_press: root.manager.current = 'ssim'
+
+<MetricListItem>:
+
+    bus: ' '
+
+    IconRightWidget:
+        id: trash_can
+        icon: 'trash-can-outline'
+        listItem: root
+
+    IconLeftWidget:
+        id: left_icon
+        icon: 'chart-line'
+
+<BusListItemWithCheckbox>:
+
+    IconRightWidget:
+        icon: root.icon
+
+    LeftCheckbox:
+        id: check
+        listItem: root
 
 <MetricConfigurationScreen>:
     name: "metric-config"
@@ -296,15 +342,139 @@
     BoxLayout:
         orientation: "vertical"
 
+        BoxLayout:
+            #cols: 3
+            orientation: "horizontal"
+
+            BoxLayout:
+                orientation: "vertical"
+
+                Label:
+                    text: "Class of Metrics to Configure"
+                    size_hint: 1.0, 0.05
+                    color: 0,0,0,1
+
+                ScrollView:
+
+                    MDList:
+                        id: metriclist
+
+                        TwoLineIconListItem:
+                            text: "Voltage"
+                            secondary_text: "set voltage targets by bus"
+                            icon: "plus"
+                            on_release: root.configure_voltage_metrics()
+
+                        TwoLineIconListItem:
+                            text: "Some other metric values"
+                            secondary_text: "set ..."
+                            icon: "plus"
+                            on_release: root.configure_some_other_metrics()
+
+            BoxLayout:
+                orientation: "vertical"
+
+                Label:
+                    id: interlabel
+                    text: "Metric Objects"
+                    size_hint: 1.0, 0.05
+                    color: 0,0,0,1
+
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint: None, None
+                    size: self.parent.width, 10
+
+                    Button:
+                        id: btnSelectAll
+                        text: "Select All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.select_all_metric_objects()
+                        disabled: True
+
+                    Button:
+                        id: btnDeselectAll
+                        text: "Deselect All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.deselect_all_metric_objects()
+                        disabled: True
+
+                ScrollView:
+                    MDList:
+                        id: interlist
+
+            BoxLayout:
+                orientation: "vertical"
+
+                BoxLayout:
+                    id: metricValueBox
+                    orientation: "vertical"
+                    size_hint: None, None
+                    size: self.parent.width, 275
+                    disabled: True
+
+                    Label:
+                        id: metriclabel
+                        text: "Metric Settings"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        color: 0,0,0,1
+
+                    TextFieldMultiFloat:
+                        hint_text: "Limit Value"
+                        id: limitText
+
+                    TextFieldMultiFloat:
+                        hint_text: "Objective Value"
+                        id: objectiveText
+
+                    Label:
+                        id: senselabel
+                        text: "Sense"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        color: 0,0,0,1
+
+                    MDRaisedButton:
+                        id: caller
+                        text: "Sense"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        on_release: root.drop_sense_menu()
+
+                    Button:
+                        id: btnStore
+                        text: "store"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        on_release: root.store_metrics()
+                        disabled: True
+
+                BoxLayout:
+                    orientation: "vertical"
+
+                    Label:
+                        id: currMetriclabel
+                        text: "Defined Metrics"
+                        size_hint: 1.0, 0.05
+                        color: 0,0,0,1
+
+                    ScrollView:
+                        MDList:
+                            id: metriclist
+
         Button:
             text: "back"
+            size_hint: 1.0, 0.05
             on_press: root.manager.current = 'ssim'
 
 <RunSimulationScreen>:
     name: "run-sim"
 
     BoxLayout:
-        orientation: "vertical"   
+        orientation: "vertical"
 
         BoxLayout:
             orientation: "horizontal"
@@ -335,9 +505,9 @@
                     text: "Total number of configurations 256 (128 completed)"
                     size_hint_y: None
                     height: 50
-                Button: 
+                Button:
                     text: "View Saved Results"
-                Button: 
+                Button:
                     text: "Resume"
                 Button:
                     text: "Remove Configuration"
@@ -393,6 +563,69 @@
             Button:
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
+
+<SelectSSIMTOMLDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            path: "."
+            filters: ["*.toml"]
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Load"
+                on_release: root.load(filechooser.path, filechooser.selection)
+
+<NoGridPopupContent>:
+    orientation: "vertical"
+    Label:
+        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to set voltage metrics.'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+
+    Button:
+        id: mainScreenBtn
+        text: 'Return to Main Screen'
+        size_hint: 1, 0.2
+
+<MessagePopupContent>:
+    orientation: "vertical"
+    Label:
+        id: msg_label
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+
+<MissingMetricValuesPopupContent>:
+    orientation: "vertical"
+    Label:
+        text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Limit"" and ""Objective"" and select a ""Sense"".'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+
 
 <NoGridPopupContent>:
     Label:

@@ -6,9 +6,15 @@ import re
 
 from importlib_resources import files, as_file
 
+from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
+
 import kivy
+from kivymd.app import MDApp
+from ssim.ui import Project, StorageOptions, is_valid_opendss_name
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.uix.floatlayout import FloatLayout
+from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, TwoLineAvatarIconListItem, OneLineAvatarIconListItem
+from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.popup import Popup
@@ -16,7 +22,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivy.core.text import LabelBase
 from kivy.clock import Clock
 from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.button import MDFlatButton ,MDRectangleFlatIconButton
+from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.list import OneLineListItem
 
 from kivymd.app import MDApp
@@ -29,6 +35,8 @@ from kivymd.uix.list import (
 )
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.textfield import MDTextField
+
+import tomli
 
 from ssim.ui import Project, StorageOptions, is_valid_opendss_name
 
@@ -72,7 +80,6 @@ class SSimApp(MDApp):
 
         return screen_manager
 
-
 class SSimBaseScreen(Screen):
     """Base class for screens that holds the fundamental ssim data structures.
 
@@ -89,10 +96,8 @@ class SSimBaseScreen(Screen):
         self.project = project
         super().__init__(*args, **kwargs)
 
-
 class LeftCheckBox(ILeftBodyTouch, MDCheckbox):
     pass
-
 
 class BusListItem(TwoLineIconListItem):
 
@@ -112,7 +117,6 @@ class BusListItem(TwoLineIconListItem):
     @property
     def active(self):
         return self.ids.selected.active
-
 
 class TextFieldFloat(MDTextField):
     SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
@@ -138,6 +142,39 @@ class TextFieldFloat(MDTextField):
             self.error = False
             self.helper_text = "Input value and press enter"
 
+class TextFieldMultiFloat(MDTextField):
+    SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper_text_mode = "on_focus"
+        self.helper_text = "Input numeric value"
+
+    def text_valid(self):
+        return TextFieldMultiFloat.SIMPLE_FLOAT.match(self.text) is not None
+
+    def set_text(self, instance, value):
+        if value == "":
+            return
+        self.set_error_message()
+
+    def set_varied_mode(self):
+        self.text = ""
+        self.helper_text = "Multiple varied values"
+        self.error = False
+
+    def set_not_set_mode(self):
+        self.text = ""
+        self.helper_text = "No values set"
+        self.error = False
+
+    def set_error_message(self):
+        if not self.text_valid():
+            self.error = True
+            self.helper_text = "You must enter a number."
+        else:
+            self.error = False
+            self.helper_text = "Input numeric value"
 
 class TextFieldPositiveFloat(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
@@ -158,11 +195,10 @@ class TextFieldPositiveFloat(MDTextField):
     def set_error_message(self):
         if not self.text_valid():
             self.error = True
-            self.helper_text = "You must enter a number."
+            self.helper_text = "You must enter a non-negative number."
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
-
 
 class TextFieldPositivePercentage(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
@@ -200,7 +236,6 @@ class TextFieldPositivePercentage(MDTextField):
     def fraction(self):
         return self.percentage() / 100.0
 
-
 class EditableSetList(MDList):
     options = ObjectProperty(set())
 
@@ -227,7 +262,6 @@ class EditableSetList(MDList):
         # to trigger the _update_display callback throug kivy
         self.options = self.options - set([item])
 
-
 class EditableSetListItem(OneLineRightIconListItem):
     """List item with one line and a delete button"""
 
@@ -240,7 +274,6 @@ class EditableSetListItem(OneLineRightIconListItem):
 
     def _delete_item(self, item):
         self.parent.remove_item(self._value)
-
 
 class TextFieldOpenDSSName(MDTextField):
     """Text field that enforces OpenDSS name requirements."""
@@ -262,7 +295,6 @@ class TextFieldOpenDSSName(MDTextField):
             self.error = True
         else:
             self.error = False
-
 
 class StorageConfigurationScreen(SSimBaseScreen):
     """Configure a single energy storage device."""
@@ -362,14 +394,42 @@ class StorageConfigurationScreen(SSimBaseScreen):
         self.manager.current = "configure-storage-controls"
 
     def _record_option_data(self) -> StorageOptions:
-        self.options = StorageOptions(
-            self.ids.device_name.text,
-            3,
-            self._ess_powers,
-            self._ess_durations,
-            self._selected_busses,
-            required=self.ids.required.active
-        )
+
+        if self.options:
+            self.options.power = self._ess_powers
+            self.options.duration = self._ess_durations
+            self.options.busses = self._selected_busses
+            self.options.required = self.ids.required.active
+            self.options.name = self.ids.device_name.text
+            self.options.phases = 3
+        else:
+            self.options = StorageOptions(
+                self.ids.device_name.text,
+                3,
+                self._ess_powers,
+                self._ess_durations,
+                self._selected_busses,
+                required=self.ids.required.active
+            )
+
+    def __show_invalid_input_values_popup(self, msg):
+        content = MessagePopupContent()
+
+        popup = Popup(
+            title='Invalid Storage Input', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+            )
+        content.ids.msg_label.text = str(msg)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+
+    def show_error(self, msg):
+        if msg:
+            self.__show_invalid_input_values_popup(msg)
+            return True
+
+        return False
 
     def save(self):
         self._record_option_data()
@@ -382,9 +442,12 @@ class StorageConfigurationScreen(SSimBaseScreen):
                 f"durations: {self.options.duration}, "
                 f"busses: {self.options.busses}"
             )
-            return
 
-        mytoml = self.options.write_toml()
+        if self.show_error(self.options.validate_name()): return
+        if self.show_error(self.options.validate_soc_values()): return
+        if self.show_error(self.options.validate_power_values()):  return
+        if self.show_error(self.options.validate_duration_values()): return
+        if self.show_error(self.options.validate_busses()): return
 
         self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
@@ -399,7 +462,6 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
     def on_enter(self, *args):
         return super().on_enter(*args)
-
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
@@ -494,12 +556,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return True
 
     def manage_button_selection_states(self, selbutton):
-        self.ids.droop_mode.md_bg_color = "red" if selbutton is self.ids.droop_mode else self.def_btn_color
-        self.ids.vv_mode.md_bg_color = "red" if selbutton is self.ids.vv_mode else self.def_btn_color
-        self.ids.vw_mode.md_bg_color = "red" if selbutton is self.ids.vw_mode else self.def_btn_color
-        self.ids.var_watt_mode.md_bg_color = "red" if selbutton is self.ids.var_watt_mode else self.def_btn_color
-        self.ids.vv_vw_mode.md_bg_color = "red" if selbutton is self.ids.vv_vw_mode else self.def_btn_color
-        self.ids.const_pf_mode.md_bg_color = "red" if selbutton is self.ids.const_pf_mode else self.def_btn_color
+        self.ids.droop_mode.md_bg_color =\
+            "red" if selbutton is self.ids.droop_mode else self.def_btn_color
+        self.ids.vv_mode.md_bg_color =\
+            "red" if selbutton is self.ids.vv_mode else self.def_btn_color
+        self.ids.vw_mode.md_bg_color =\
+            "red" if selbutton is self.ids.vw_mode else self.def_btn_color
+        self.ids.var_watt_mode.md_bg_color =\
+            "red" if selbutton is self.ids.var_watt_mode else self.def_btn_color
+        self.ids.vv_vw_mode.md_bg_color =\
+            "red" if selbutton is self.ids.vv_vw_mode else self.def_btn_color
+        self.ids.const_pf_mode.md_bg_color =\
+            "red" if selbutton is self.ids.const_pf_mode else self.def_btn_color
 
     def save(self):
         self._options.min_soc = self.ids.min_soc.fraction()
@@ -509,14 +577,14 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self._options.control.params.clear()
 
         for key in self._param_field_map:
-            self._options.control.params[key] = float(self._param_field_map[key].text)
+            self._options.control.params[key] =\
+                float(self._param_field_map[key].text)
 
         self.manager.current = "configure-storage"
 
     def cancel(self):
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
-
 
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""
@@ -532,7 +600,6 @@ class PVConfigurationScreen(SSimBaseScreen):
     def cancel(self):
         self.manager.current = "der-config"
 
-
 class DERConfigurationScreen(SSimBaseScreen):
     """Configure energy storage devices and PV generators."""
 
@@ -542,6 +609,14 @@ class DERConfigurationScreen(SSimBaseScreen):
         self.ids.delete_storage.bind(
             on_release=self.delete_ess
         )
+
+
+    def load_project_data(self):
+        self.ids.ess_list.clear_widgets()
+        for so in self.project.storage_devices:
+            self.ids.ess_list.add_widget(
+                StorageListItem(so, self)
+            )
 
     def new_storage(self):
         self.manager.add_widget(
@@ -599,18 +674,319 @@ class StorageListItem(TwoLineAvatarIconListItem):
     def edit(self, icon_widget):
         self._der_screen.edit_storage(self)
 
-
 class LoadConfigurationScreen(SSimBaseScreen):
     pass
-
 
 class NoGridPopupContent(BoxLayout):
     pass
 
-
-class MetricConfigurationScreen(SSimBaseScreen):
+class NoGridPopupContent(BoxLayout):
     pass
 
+class MissingMetricValuesPopupContent(BoxLayout):
+    pass
+
+class MessagePopupContent(BoxLayout):
+    pass
+
+class BusListItemWithCheckbox(OneLineAvatarIconListItem):
+    '''Custom list item.'''
+    icon = StringProperty("android")
+
+    def __int__(self, bus):
+        self.text = bus
+        self.bus = bus
+
+class MetricListItem(TwoLineAvatarIconListItem):
+    pass
+
+class RightCheckbox(IRightBodyTouch, MDCheckbox):
+    pass
+
+class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
+    pass
+
+class MetricConfigurationScreen(SSimBaseScreen):
+
+    _selBusses = []
+    _currentMetricCategory = "None"
+    _metricIcons = {"Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"}
+
+    def __reset_checked_bus_list(self):
+        self._selBusses.clear()
+        for wid in self.ids.interlist.children:
+            if isinstance(wid, BusListItemWithCheckbox):
+                cb = wid.ids.check
+                if cb.active:
+                    print(wid.text, wid.secondary_text)
+                    self._selBusses.append(cb)
+
+    def on_kv_post(self, base_widget):
+        menu_items = [
+            {
+                "viewclass": "OneLineListItem",
+                "text": "Minimize",
+                "on_release": lambda x="Minimize": self.set_sense(x)
+            },
+            {
+                "viewclass": "OneLineListItem",
+                "text": "Maximize",
+                "on_release": lambda x="Maximize": self.set_sense(x)
+            },
+            {
+                "viewclass": "OneLineListItem",
+                "text": "Seek Value",
+                "on_release": lambda x="Seek Value": self.set_sense(x)
+            }
+        ]
+
+        self.menu = MDDropdownMenu(
+            caller=self.ids.caller, items=menu_items, width_mult=3
+        )
+
+    def drop_sense_menu(self):
+        self.menu.open()
+
+    def set_sense(self, value):
+        self.ids.caller.text = value
+        self.menu.dismiss()
+
+    def manage_store_button_enabled_state(self):
+        self.ids.btnStore.disabled = len(self._selBusses) == 0
+
+    def reload_metric_values(self):
+        metrics = []
+        common_limit = None
+        common_obj = None
+        common_sense = None
+        have_no_metric_busses = False
+
+        self.ids.metricValueBox.disabled = len(self._selBusses) == 0
+
+        ''' Gather up the list of all metrics relevant to the selection'''
+        for b in self._selBusses:
+            m = self.project.get_metric(self._currentMetricCategory, b)
+            if m is None:
+                have_no_metric_busses = True
+            else:
+                metrics.append(m)
+
+        if not have_no_metric_busses:
+            for m in metrics:
+                if common_limit is None:
+                    common_limit = m.metric.limit
+                    common_obj = m.metric.objective
+                    common_sense = m.metric.improvement_type
+                else:
+                    if common_limit != m.metric.limit:
+                        common_limit = None
+                        break
+                    if common_obj != m.metric.objective:
+                        common_obj = None
+                        break
+                    if common_sense != m.metric.improvement_type:
+                        common_sense = None
+                        break
+        else:
+            common_limit = None
+            common_obj = None
+            common_sense = None
+
+        is_varied = len(metrics) > 0
+
+        if common_limit is None:
+            self.ids.limitText.set_varied_mode() if is_varied else\
+                self.ids.limitText.set_not_set_mode()
+        else:
+            self.ids.limitText.text = str(common_limit)
+
+        if common_obj is None:
+            self.ids.objectiveText.set_varied_mode() if is_varied else\
+                self.ids.objectiveText.set_not_set_mode()
+        else:
+            self.ids.objectiveText.text = str(common_obj)
+
+        if common_sense is None:
+            self.ids.caller.text = "None or Varied"
+        else:
+            self.ids.caller.text = str(common_sense.name)
+
+    @staticmethod
+    def __parse_float(strval):
+        try:
+            return float(strval)
+        except ValueError:
+            return None
+
+    def store_metrics(self):
+        limit = MetricConfigurationScreen.__parse_float(self.ids.limitText.text)
+        obj = MetricConfigurationScreen.__parse_float(self.ids.objectiveText.text)
+        sense = ImprovementType.parse(self.ids.caller.text)
+
+        err = Metric.validate_metric_values(limit, obj, sense, False)
+
+        if err:
+            self.__show_invalid_metric_value_popup(err)
+            return
+
+        if limit is None or obj is None or sense is None:
+            self.__show_missing_metric_value_popup()
+        else:
+            for bus in self._selBusses:
+                accum = MetricTimeAccumulator(Metric(limit, obj, sense))
+                self.project.add_metric(self._currentMetricCategory, bus, accum)
+
+        self.reload_metric_list()
+
+    def reset_metric_list_label(self):
+        """Resets the label atop the list of all defined metrics to include, or
+           not, the current metric category.
+        """
+        if self._currentMetricCategory is None:
+            self.ids.currMetriclabel.text = "Defined Metrics"
+
+        elif self._currentMetricCategory == "None":
+            self.ids.currMetriclabel.text = "Defined Metrics"
+
+        else:
+            self.ids.currMetriclabel.text = \
+                "Defined \"" + self._currentMetricCategory + "\" Metrics"
+
+    def manage_selection_buttons_enabled_state(self):
+        numCldrn = len(self.ids.interlist.children) == 0
+        self.ids.btnSelectAll.disabled = numCldrn
+        self.ids.btnDeselectAll.disabled = numCldrn
+
+    def deselect_all_metric_objects(self):
+        for wid in self.ids.interlist.children:
+            if isinstance(wid, BusListItemWithCheckbox):
+                wid.ids.check.active = False
+
+    def select_all_metric_objects(self):
+        self._selBusses.clear()
+        for wid in self.ids.interlist.children:
+            if isinstance(wid, BusListItemWithCheckbox):
+                wid.ids.check.active = True
+                self._selBusses.append(wid.text)
+
+    def reload_metric_list(self):
+        """Reloads the list of all defined metrics.
+
+        This method creates a list item for all metrics previously defined for
+        the current category.
+        """
+        self.ids.metriclist.clear_widgets()
+        self.reset_metric_list_label()
+        manager = self.project.get_manager(self._currentMetricCategory)
+
+        if manager is None: return
+
+        list = self.ids.metriclist
+        list.active = False
+        for key, m in manager.all_metrics.items():
+            txt = self._currentMetricCategory + " Metric for " + key
+            deets = "Limit=" + str(m.metric.limit) + ", " + \
+                "Objective=" + str(m.metric.objective) + ", " + \
+                "Sense=" + m.metric.improvement_type.name
+            bItem = MetricListItem(text=txt, secondary_text=deets)
+            bItem.bus = key
+            bItem.ids.left_icon.icon = self._metricIcons[self._currentMetricCategory]
+            bItem.ids.trash_can.bind(on_release=self.on_delete_metric)
+            list.add_widget(bItem)
+
+        list.active = True
+
+    def on_delete_metric(self, data):
+        bus = data.listItem.bus
+        self.project.remove_metric(self._currentMetricCategory, bus)
+        self.reload_metric_list()
+        self.reload_metric_values()
+
+    def on_item_check_changed(self, ckb, value):
+        bus = ckb.listItem.text
+        if value:
+            self._selBusses.append(bus)
+        else:
+            self._selBusses.remove(bus)
+
+        self.reload_metric_values()
+        self.manage_store_button_enabled_state()
+
+    def configure_voltage_metrics(self):
+        self._currentMetricCategory = "Voltage"
+        self.ids.interlabel.text = "Busses"
+        self.load_bussed_into_list()
+        self.reload_metric_list()
+        self.reload_metric_values()
+        self.manage_selection_buttons_enabled_state()
+
+    def configure_some_other_metrics(self):
+        self._currentMetricCategory = "Unassigned"
+        self._selBusses.clear()
+        self.ids.interlist.clear_widgets()
+        self.ids.interlabel.text = "Metric Objects"
+        self.reload_metric_list()
+        self.reload_metric_values()
+        self.manage_selection_buttons_enabled_state()
+        print("I'm passing on the other issue...")
+
+    def _return_to_main_screen(self, dt):
+        self.manager.current = "ssim"
+
+    def __show_missing_metric_value_popup(self):
+        content = MissingMetricValuesPopupContent()
+
+        popup = Popup(
+            title='Missing Metric Values', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+            )
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+
+    def __show_invalid_metric_value_popup(self, msg):
+        content = MessagePopupContent()
+
+        popup = Popup(
+            title='Invalid Metric Values', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+            )
+        content.ids.msg_label.text = str(msg)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+
+    def __show_no_grid_model_popup(self):
+        content = NoGridPopupContent()
+
+        popup = Popup(
+            title='No Grid Model', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+            )
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        content.ids.mainScreenBtn.bind(on_press=popup.dismiss)
+        content.ids.mainScreenBtn.bind(on_press=self._return_to_main_screen)
+        popup.open()
+        return
+
+    def load_bussed_into_list(self):
+        self._selBusses.clear()
+        list = self.ids.interlist
+        list.clear_widgets()
+        list.text = "Busses"
+
+        if self.project._grid_model is None:
+            self.__show_no_grid_model_popup()
+            return
+
+        busses = self.project._grid_model.bus_names
+        list.active = False
+        for x in busses:
+            bItem = BusListItemWithCheckbox(text=str(x))
+            bItem.ids.check.bind(active=self.on_item_check_changed)
+            list.add_widget(bItem)
+
+        list.active = True
 
 class RunSimulationScreen(SSimBaseScreen):
 
@@ -632,7 +1008,6 @@ class RunSimulationScreen(SSimBaseScreen):
         # TODO: Need to populate the MDlist dynamically
         configs = self.project.configurations
 
-
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, pk=None, **kwargs):
@@ -642,16 +1017,17 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
     def delete_item(self, the_list_item):
         self.parent.remove_widget(the_list_item)
 
-
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     '''Custom left container'''
     pass
-
 
 class SelectGridDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
 
+class SelectSSIMTOMLDialog(FloatLayout):
+    load = ObjectProperty(None)
+    cancel = ObjectProperty(None)
 
 class SSimScreen(SSimBaseScreen):
 
@@ -670,9 +1046,41 @@ class SSimScreen(SSimBaseScreen):
         self.bus_list.text = '\n'.join(self.project.bus_names)
         self.dismiss_popup()
 
+    def load_toml_file(self, path, filename):
+        Logger.debug("loading file %s", filename[0])
+        self.project.clear_metrics()
+        self.project.clear_options()
+
+        with open('c:/temp/written.toml', 'r') as f:
+            toml = f.read()
+
+        tdat = tomli.loads(toml)
+        self.project.read_toml(tdat)
+        self.bus_list.text = '\n'.join(self.project.bus_names)
+        self.dismiss_popup()
+
+
+    def read_toml(self):
+        chooser = SelectSSIMTOMLDialog(
+            load=self.load_toml_file, cancel=self.dismiss_popup)
+
+        self._popup = Popup(title="select SSIM TOML file", content=chooser)
+        self._popup.open()
+
+
+    def write_toml(self):
+        toml = self.project.write_toml()
+        with open('c:/temp/written.toml', 'w') as f:
+            f.write(toml)
+
+        self.project.clear_metrics()
+        tdat = tomli.loads(toml)
+        self.project.read_toml(tdat)
+
     def select_grid_model(self):
         chooser = SelectGridDialog(
             load=self.load_grid, cancel=self.dismiss_popup)
+
         self._popup = Popup(title="select grid model", content=chooser)
         self._popup.open()
 
