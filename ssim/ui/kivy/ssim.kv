@@ -1,4 +1,4 @@
-#:include common.kv
+    #:include common.kv
 
 <SSimScreen>:
     name: 'ssim'
@@ -50,21 +50,241 @@
     name: "der-config"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"
 
-        Button:
-            text: "back"
-            on_press: root.manager.current = 'ssim'
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+            size_hint: (1.0, 0.8)
 
-        Button:
-            text: "save"
-            on_press: root.save_config()
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+
+                ScrollView:
+                    size_hint: (1.0, 0.8)
+                    MDList:
+                        id: ess_list
+
+                Button:
+                    size_hint: (1.0, 0.1)
+                    text: "New Storage"
+                    on_press: root.new_storage()
+
+                Button:
+                    id: delete_storage
+                    size_hint: (1.0, 0.1)
+                    text: "Delete Storage"
+
+            Button:
+                text: "list of PV"
+
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+            spacing: 5
+            size_hint: (1.0, 0.2)
+
+            Button:
+                height: 10
+                text: "back"
+                on_press: root.manager.current = 'ssim'
+
+            Button:
+                height: 10
+                text: "save"
+                # Might need something different here to handle the
+                on_press: root.manager.current = 'ssim'
+
+
+<StorageListitem>:
+    LeftCheckBox:
+        id: selected
+
+    IconRightWidget:
+        id: edit
+        icon: "pencil"
+
+
+<BusListItem>:
+
+    LeftCheckBox:
+        id: selected
+
+<StorageControlConfigurationScreen>:
+    name: "configure-storage-controls"
+    on_enter: self.set_mode_label_text()
+
+    BoxLayout:
+        orientation: "vertical"
+
+        TextFieldPositivePercentage:
+            id: min_soc
+            hint_text: "Minimum State of Charge (%)"
+
+        TextFieldPositivePercentage:
+            id: max_soc
+            hint_text: "Maximum State of Charge (%)"
+
+        TextFieldPositivePercentage:
+            id: init_soc
+            hint_text: "Initial State of Charge (%)"
+
+        Label:
+            id: mode_label
+            markup: True
+            text: "Select a control mode for this storage asset:"
+            color: C(hex_black)
+            size_hint: (1.0, 0.05)
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint: (1.0, 0.2)
+
+            MDRaisedButton:
+                id: droop_mode
+                text: "Droop"
+                md_bg_color: '#005376'
+                on_press: root.set_droop_mode()
+
+            MDRaisedButton:
+                id: vv_mode
+                text: "Volt-Var"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_var_mode()
+
+            MDRaisedButton:
+                id: vw_mode
+                text: "Volt-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_watt_mode()
+
+            MDRaisedButton:
+                id: var_watt_mode
+                text: "Var-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_var_watt_mode()
+
+            MDRaisedButton:
+                id: vv_vw_mode
+                text: "Volt-Var & Volt-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_var_and_volt_watt_mode()
+
+            MDRaisedButton:
+                id: const_pf_mode
+                text: "Constant Power Factor"
+                md_bg_color: '#005376'
+                on_press: root.set_const_power_factor_mode()
+
+        BoxLayout:
+            id: param_box
+            orientation: "vertical"
+            size_hint: (1.0, 0.7)
+
+        BoxLayout:
+            size_hint: (1.0, 0.15)
+            orientation: "horizontal"
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
+
+<StorageConfigurationScreen>:
+    name: "configure-storage"
+
+    BoxLayout:
+        orientation: "vertical"
+
+        BoxLayout:
+            orientation: "horizontal"
+
+            BoxLayout:
+                orientation: "vertical"
+
+                TextFieldOpenDSSName:
+                    id: device_name
+                    hint_text: "Device Name"
+                    helper_text_mode: "on_error"
+                    helper_text: "invalid name"
+
+                BoxLayout:
+                    orientation: "vertical"
+
+                    TextFieldPositiveFloat:
+                        id: power_input
+                        hint_text: "Storage Device Power (kW)"
+
+                    MDScrollView:
+                        EditableSetList:
+                            id: power_list
+
+                BoxLayout:
+                    orientation: "vertical"
+
+                    TextFieldPositiveFloat:
+                        id: duration_input
+                        hint_text: "Storage Device Duration (hours)"
+
+                    MDScrollView:
+                        EditableSetList:
+                            id: duration_list
+
+            BoxLayout:
+                orientation: "vertical"
+                spacing: 10
+                MDLabel:
+                    text: "Select possible busses"
+                    size_hint_y: None
+                    height: 0
+                MDScrollView:
+                    size_hint: (1.0, 1.0)
+                    MDList:
+                        size_hint_y: None
+                        height: 0
+                        id: bus_list
+
+                BoxLayout:
+                    size_hint: (1.0, 0.06)
+                    orientation: "horizontal"
+                    MDLabel:
+                        id: required_label
+                        size_hint_y: None
+                        height: 0
+                        text: "required?"
+                    MDSwitch:
+                        id: required
+                        size_hint_y: None
+                        height: 0
+                        active: False
+
+                Button:
+                    text: "Edit Control Parameters"
+                    size_hint: (1.0, 0.06)
+                    on_press: root.edit_control_params()
+
+        BoxLayout:
+            size_hint: (1.0, 0.15)
+            orientation: "horizontal"
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
 
 <LoadConfigurationScreen>:
     name: "load-config"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"
 
         Button:
             text: "back"
@@ -74,7 +294,7 @@
     name: "metric-config"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"
 
         Button:
             text: "back"
@@ -84,12 +304,74 @@
     name: "run-sim"
 
     BoxLayout:
-        orientation: "vertical"    
+        orientation: "vertical"   
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                Label:
+                    text: "Configurations that will be evaluated:"
+                    size_hint_y: None
+                    height: 50
+                ScrollView:
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+                    MDList:
+                        id: config_list
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                spacing: 5
+                Label:
+                    text: "Total number of configurations 256 (128 completed)"
+                    size_hint_y: None
+                    height: 50
+                Button: 
+                    text: "View Saved Results"
+                Button: 
+                    text: "Resume"
+                Button:
+                    text: "Remove Configuration"
+                Button:
+                    text: "Go"
 
         Button:
             text: "back"
+            size_hint_y: None
+            height: 100
             on_press: root.manager.current = 'ssim'
 
+
+<EditableSetListItem>:
+
+    IconRightWidget:
+        id: delete
+        icon: "trash-can-outline"
+
+
+<ListItemWithCheckbox>:
+    id: the_list_item
+    markup: True
+
+    LeftCheckbox:
+        id: check
+        active: True
+
+    IconRightWidget:
+        icon: 'trash-can-outline'
+        theme_text_color: "Custom"
+        text_color: 1, 0, 0, 1
+        on_release:
+            root.delete_item(the_list_item)
 
 <SelectGridDialog>:
     BoxLayout:
@@ -111,3 +393,14 @@
             Button:
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
+
+<NoGridPopupContent>:
+    Label:
+        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before continuing.'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2

@@ -61,13 +61,24 @@ class Project:
         self.name = name
         self._grid_model_path = None
         self._grid_model = None
-        self._storage_devices = []
+        self.storage_devices = []
         self._pvsystems = []
         self._metrics = []
 
     @property
     def bus_names(self):
         return self._grid_model.bus_names
+
+    @property
+    def storage_names(self):
+        return set(device.name for device in self.storage_devices)
+
+    @property
+    def grid_model(self):
+        return self._grid_model
+
+    def phases(self, bus):
+        return self._grid_model.available_phases(bus)
 
     def set_grid_model(self, model_path):
         self._grid_model_path = model_path
@@ -76,8 +87,11 @@ class Project:
     def add_metric(self, metric):
         self._metrics.append(metric)
 
+    def remove_storage_option(self, storage_options):
+        self.storage_devices.remove(storage_options)
+
     def add_storage_option(self, storage_options):
-        self._storage_devices.append(storage_options)
+        self.storage_devices.append(storage_options)
 
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
@@ -92,14 +106,14 @@ class Project:
     def _storage_configurations(self):
         return itertools.product(
             *(storage_options.configurations()
-              for storage_options in self._storage_devices)
+              for storage_options in self.storage_devices)
         )
 
     def num_configurations(self):
         """Return the total number of configurations in this project."""
         return functools.reduce(
             lambda ess, acc: ess.num_configurations * acc,
-            self._storage_devices,
+            self.storage_devices,
             1
         )
 
@@ -124,6 +138,15 @@ class StorageControl:
         self.mode = mode
         self.params = params
 
+    def write_toml(self, name)->str:
+        ret = "\n\n[" + name + ".control-mode]\n"
+        ret += "mode = " + self.mode + "\n"
+
+        #ret += "\n\n[" + name + ".control-mode.params]\n"
+        for key in self.params:
+            ret += key + " = " + str(self.params[key]) + "\n"
+
+        return ret
 
 class StorageOptions:
     """Set of configuration options available for a specific device.
@@ -169,18 +192,52 @@ class StorageOptions:
                  required=True):
         self.name = name
         self.phases = num_phases
-        self.power = power
-        self.duration = duration
-        self.busses = busses
+        self.power = set(power)
+        self.duration = set(duration)
+        self.busses = set(busses)
         self.min_soc = min_soc
         self.max_soc = max_soc
         self.initial_soc = initial_soc
         self.control = control or StorageControl(
             'droop',
-            {'real_gain': 500, 'reactive_gain': -300}  # completely arbitrary
+            {'p_droop': 500.0, 'q_droop': -300.0}  # completely arbitrary
         )
         self.soc_model = soc_model
-        self.required = False
+        self.required = required
+
+    def write_toml(self)->str:
+        ret = "\n\n[" + self.name + "]\n"
+        ret += "phases = " + str(self.phases) + "\n"
+        ret += "required = " + str(self.required) + "\n"
+        ret += "min_soc = " + str(self.min_soc) + "\n"
+        ret += "max_soc = " + str(self.max_soc) + "\n"
+        ret += "initial_soc = " + str(self.initial_soc) + "\n"
+        ret += "busses = [" + str(", ".join(self.busses)) + "]\n"
+        ret += "power = [" + str(', '.join(map(str, self.power))) + "]\n"
+        ret += "duration = [" + str(', '.join(map(str, self.duration))) + "]\n"
+
+        if self.control: ret += self.control.write_toml(self.name)
+        return ret
+
+    def add_bus(self, bus):
+        self.busses.add(bus)
+
+    def add_power(self, power):
+        self.power.add(power)
+
+    def add_duration(self, duration):
+        self.duration.add(duration)
+
+    @property
+    def name_valid(self):
+        return is_valid_opendss_name(self.name)
+
+    @property
+    def valid(self):
+        return (self.name_valid
+                and len(self.power) > 0
+                and len(self.duration) > 0
+                and len(self.busses) > 0)
 
     @property
     def num_configurations(self):
@@ -392,6 +449,20 @@ def _get_federate_config(federate):
         raise ValueError(f"invalid federate type '{federate}'.")
     return pkg_resources.resource_filename(
         "ssim.federates", f"{federate}.json")
+
+
+_OPENDSS_ILLEGAL_CHARACTERS = "\t\n .="
+
+
+def is_valid_opendss_name(name: str):
+    """Return true if `name` is a valid name in OpenDSS.
+
+    OpenDSS names may not contain whitespace, '.', or '='.
+    """
+    return (
+        len(name) > 0
+        and not any(c in _OPENDSS_ILLEGAL_CHARACTERS for c in name)
+    )
 
 
 class Results:

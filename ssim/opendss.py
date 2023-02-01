@@ -1176,6 +1176,10 @@ class DSSModel:
         for load in dssdirect.Loads.AllNames():
             yield Load(load)
 
+    def available_phases(self, bus):
+        dssdirect.Circuit.SetActiveBus(bus)
+        return dssdirect.Bus.Nodes()
+
     @property
     def bus_names(self):
         return dssdirect.Circuit.AllBusNames()
