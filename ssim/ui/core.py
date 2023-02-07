@@ -505,28 +505,45 @@ class Results:
     def __init__(self, config_dir):
         self.config_dir = config_dir
 
+    def _extract_data(self, csv_file):
+        df_extracted_data = pd.read_csv(self.config_dir / csv_file)
+        # extract column names
+        col_names = list(df_extracted_data.columns)
+        # extract all datapoints as a pandas dataframe
+        num_rows = df_extracted_data.shape[0]
+        data = df_extracted_data.iloc[0:num_rows-1]
+        return col_names, data
+
     def bus_voltages(self):
         """Returns name of columns (bus names) and the time-series bus 
         voltages as a pandas dataframe."""
-        df_bus_voltages = pd.read_csv(self.config_dir / "bus_voltage.csv")
-        # extract column names
-        col_names = list(df_bus_voltages.columns)
-        num_rows = df_bus_voltages.shape[0]
-        # extract all the datapoints as a pandas dataframe
-        data = df_bus_voltages.iloc[0 : num_rows-1]
-
-        return col_names, data
+        bus_names, bus_voltages = self._extract_data("bus_voltage.csv")
+        return bus_names, bus_voltages
     
     def grid_state(self):
-        """Returns name of columns and the time-series log as a pandas 
-        dataframe."""
-        pass
+        """Returns name of columns (grid states) and the time-series data
+        as a pandas dataframe."""
+        states, state_data = self._extract_data("grid_state.csv")
+        return states, state_data
 
     def pde_loading(self):
-        pass
+        """Returns name of the columns (power delivery elements with 
+        the OpenDSS model) and the loading of the power delievery elements
+        as a pandas dataframe."""
+        pde_elements, pde_loading = self._extract_data("pde_loading.csv")
+        return pde_elements, pde_loading
 
     def storage_state(self):
-        pass
+        """Returns name of the columns (states specific to storage devices 
+        in OpendDSS model) and the time-series data as a pandas dataframe."""
+        storage_states, storage_state_data = self._extract_data("storage_power.csv")
+        return storage_states, storage_state_data
+
+    def storage_voltages(self):
+        """Returns name of the columns (buses) where storage is placed and 
+        voltages at those buses as a pandas dataframe"""
+        storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
+        return storage_buses, storage_buses
 
     def metrics_log(self):
         """Returns name of columns of the logged metrics, the accumulated value
