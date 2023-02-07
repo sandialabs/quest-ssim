@@ -505,14 +505,21 @@ class Results:
     def __init__(self, config_dir):
         self.config_dir = config_dir
 
-    # Do we want to design the Results class with a specific set of outputs in
-    # mind or should we design to make it more generic?
     def bus_voltages(self):
-        # read the csv file
-        # return time and other columns in the csv file as dictionary?
-        pass
+        """Returns name of columns (bus names) and the time-series bus 
+        voltages as a pandas dataframe."""
+        df_bus_voltages = pd.read_csv(self.config_dir / "bus_voltage.csv")
+        # extract column names
+        col_names = list(df_bus_voltages.columns)
+        num_rows = df_bus_voltages.shape[0]
+        # extract all the datapoints as a pandas dataframe
+        data = df_bus_voltages.iloc[0 : num_rows-1]
+
+        return col_names, data
     
     def grid_state(self):
+        """Returns name of columns and the time-series log as a pandas 
+        dataframe."""
         pass
 
     def pde_loading(self):
@@ -523,7 +530,7 @@ class Results:
 
     def metrics_log(self):
         """Returns name of columns of the logged metrics, the accumulated value
-        of the metric, and the time-series log as a pandas dataframe"""
+        of the metric, and the time-series log as a pandas dataframe."""
 
         df_metrics = pd.read_csv(self.config_dir / "metric_log.csv")
         # extract column names
