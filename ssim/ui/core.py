@@ -298,7 +298,7 @@ class StorageControl:
 
         #ret += f"\n\n[{name}.control-mode.params]\n"
         for key in self.params:
-            ret += f"{key} = {str(self.params[key])}\n"
+            ret += f"\"{key}\" = {str(self.params[key])}\n"
 
         return ret
 
@@ -381,7 +381,7 @@ class StorageOptions:
         str:
             A TOML formatted string with the properties of this instance.
         """
-        tag = "storage-options." + self.name
+        tag = f"storage-options.\"{self.name}\""
         ret = f"\n\n[{tag}]\n"
         ret += f"phases = {str(self.phases)}\n"
         ret += f"required = {str(self.required).lower()}\n"

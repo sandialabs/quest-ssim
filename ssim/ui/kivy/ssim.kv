@@ -637,7 +637,7 @@
 
             Button:
                 text: "Save"
-                on_release: root.save(filechooser.selection, filenamefield.text)
+                on_release: root.save(filechooser.selection or [filechooser.path], filenamefield.text)
 
 <NoGridPopupContent>:
     orientation: "vertical"
