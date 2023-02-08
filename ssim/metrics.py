@@ -60,6 +60,39 @@ class ImprovementType(int, enum.Enum):
 
         return None
 
+def get_default_improvement_type(lower_limit: float, upper_limit: float, objective: float) -> ImprovementType:
+    """A utility method to choose an appropriate improvement type based on the
+       supplied limits and objective.
+
+    This method can only make a minimization or maximization determination if one of
+    the limits (upper or lower) is None.  If neither is None, the determination is seek value.
+
+    If both limits are None, then no determination can be made.
+
+    Parameters
+    ----------
+    lower_limit : float
+        The lowest acceptable value for the metric.  Can be None.
+    upper_limit : float
+        The highest acceptable value for the metric.  Can be None.
+    objective : float
+        The target value which if obtained, provides full satisfaction. Cannot be None.
+
+    Returns
+    -------
+    ImprovementType:
+        This returns a value depending on the states of the supplied limits.
+        If the lower_limit is None, then it is assumed that the desired sense is
+        to minimize.  If the upper_limit is None, then the return is maximize.
+        If neither is None, then the assumption is for seek value.  Finally, if
+        both limits are none, a determination cannot be made and the return is None.
+    """
+    if lower_limit is None and upper_limit is None: return None
+    if lower_limit is None: return ImprovementType.Minimize
+    if upper_limit is None: return ImprovementType.Maximize
+    return ImprovementType.SeekValue
+
+
 def get_default_improvement_type(limit: float, objective: float) -> ImprovementType:
     """A utility method to choose an appropriate improvement type based on the
        supplied limit and objective.
@@ -93,16 +126,16 @@ class Metric:
 
     Parameters
     ----------
-    limit : float
-        The worst acceptable value for the metric.
+    lower_limit : float
+        The lowest acceptable value for the metric if it is a maximization or seek value type.
+        This value is not used for minimization type metrics.
+    upper_limit : float
+        The highest acceptable value for the metric if it is a minimization or seek value type.
+        This value is not used for maximization type metrics.
     objective : float
         The target value which if obtained, provides full satisfaction.
     imp_type : ImprovementType
         The desired sense of the metric such as Minimize or Maximize.
-
-        This input must be compatible with the limit and objective.  For
-        example, if the imp_type is Minimize, then the limit must be greater
-        than the objective. These relationships are asserted.
 
         If this input is not provided, then a default is determined based on
         the limit and objective.
@@ -123,7 +156,8 @@ class Metric:
     """
     def __init__(
         self,
-        limit: float,
+        lower_limit: float,
+        upper_limit: float,
         objective: float,
         imp_type: ImprovementType = None,
         a: float=5.0,
@@ -131,13 +165,14 @@ class Metric:
         c: float=0.0,
         g: float=0.2
     ):
-        self._limit = limit
+        self._lower_limit = lower_limit
+        self._upper_limit = upper_limit
         self._objective = objective
         self._imp_type = imp_type
 
         if imp_type is None:
             self._imp_type = get_default_improvement_type(
-                self._limit, self._objective
+                self._lower_limit, self._upper_limit, self._objective
                 )
 
         self._a = a
@@ -147,16 +182,27 @@ class Metric:
         self._validate_inputs()
                 
     @property
-    def limit(self) -> float:
-        """Allows access to the supplied limit value for this metric.
+    def lower_limit(self) -> float:
+        """Allows access to the supplied lower limit value for this metric.
 
         Returns
         -------
         float:
-            The worst acceptable value for this metric.
+            The lowest acceptable value for this metric.
         """
-        return self._limit
-    
+        return self._lower_limit
+
+    @property
+    def upper_limit(self) -> float:
+        """Allows access to the supplied upper limit value for this metric.
+
+        Returns
+        -------
+        float:
+            The highest acceptable value for this metric.
+        """
+        return self._upper_limit
+
     @property
     def objective(self) -> float:
         """Allows access to the supplied objective value for this metric.
@@ -201,10 +247,11 @@ class Metric:
             A newly created metric made using the properties in the supplied
             TOML dictionary.
         """
-        limit = tomlData["limit"]
+        lower_limit = None if "lower_limit" not in tomlData else  tomlData["lower_limit"]
+        upper_limit = None if "upper_limit" not in tomlData else  tomlData["upper_limit"]
         objective = tomlData["objective"]
         impType = ImprovementType.parse(tomlData["sense"])
-        return Metric(limit, objective, impType)
+        return Metric(lower_limit, upper_limit, objective, impType)
     
     def write_toml(self, category, key) -> str:
         """Writes the properties of this class instance to a string in TOML
@@ -226,11 +273,21 @@ class Metric:
         str:
             A TOML formatted string with the properties of this instance.
         """
-        ret = f"\n\n[metrics.{category}.{key}]\n"
-        ret += f"limit = {str(self._limit)}\n"
-        ret += f"objective = {str(self._objective)}\n"
-        ret += f"sense = \"{str(self._imp_type.name)}\"\n"
-        return ret
+        #ret = f"\n\n[metrics.{category}.{key}]\n"
+        ret = "{" + f"name=\"{key}\", "
+        if self._lower_limit is not None:
+             ret += f"lower_limit = {str(self._lower_limit)}, "
+
+        if self._upper_limit is not None:
+             ret += f"upper_limit = {str(self._upper_limit)}, "
+
+        if self._objective is not None:
+             ret += f"objective = {str(self._objective)}, "
+
+        if self._imp_type is not None:
+             ret += f"sense = \"{str(self._imp_type.name)}\""
+
+        return ret + "}"
 
     def normalize(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value.
@@ -270,7 +327,7 @@ class Metric:
             limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for minimization.
         """
-        return self.__do_max_norm__(-value, -self._limit, -self._objective)
+        return self.__do_max_norm__(-value, -self._lower_limit, -self._objective)
 
     def _normalize_for_maximization(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value for a
@@ -288,7 +345,7 @@ class Metric:
             limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for maximization.
         """
-        return self.__do_max_norm__(value, self._limit, self._objective)
+        return self.__do_max_norm__(value, self._upper_limit, self._objective)
 
     def _normalize_for_seek_value(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value for a
@@ -303,18 +360,13 @@ class Metric:
         -------
         float:
             A normalized value based on the supplied raw value, this metrics
-            limit and objective, and the other curve parameters of this metric.
-            this does calculations for a metric meant for seek value.
+            limits and objective, and the other curve parameters of this metric.
+            This does calculations for a metric meant for seek value.
         """
-        biz_lim = self._objective - (self._limit - self._objective)
+        if value < self._objective:
+            return self._normalize_for_minimization(value)
 
-        use_lim = min(self._limit, biz_lim) if value <= self._objective else \
-            max(self._limit, biz_lim)
-
-        if value <= self._objective:
-            return self.__do_max_norm__(value, use_lim, self._objective)
-
-        return self.__do_max_norm__(-value, -use_lim, -self._objective)
+        return self._normalize_for_maximization(value)
 
     def _violated(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
@@ -545,28 +597,35 @@ class Metric:
             the do_assert parameter is set to true.
         """
         Metric.validate_metric_values(
-            self._limit, self._objective, self._imp_type, do_assert
+            self._lower_limit, self._upper_limit, self._objective, self._imp_type, do_assert
             )
             
     @staticmethod
     def validate_metric_values(
-        limit: float, objective: float, imp_type: ImprovementType,
+        lower_limit: float, upper_limit: float, objective: float, imp_type: ImprovementType,
         do_assert: bool = False
         ) -> str:
         """Tests the validity/usability of the metric values provided.
 
         This will either return an error string or throw an exception with an
         error message.  Which it does will be determined by the do_assert
-        parameter.  The requirements are that first: none of the parameters can
-        be none.  Second, if the imp_type is minimize, the limit must be
-        greater than the objectve. if the imp_type is maximize, the limit must
-        be less than the objective and no matter the imp_type, the limit cannot
-        equal the objective.
-        
+        parameter.  The requirements are that:
+            The objective cannot be None.
+            The improvement type cannot be None.
+            if the imp_type is minimize, the upper_limit must not be None.
+            If the imp_type is maximize, the lower_limit must not be None.
+            If the imp_type is seek value, then neither limit can be None.
+            If there is a lower_limit, then it must be less than the objective.
+            If there is an upper_limit, then it must be greater than the objective.
+
+        Neither limit can be equal to the objective.
+
         Parameters
         ----------
-        limit : float
-            The worst acceptable value for a metric.
+        lower_limit : float
+            The lowest acceptable value for a metric.
+        upper_limit : float
+            The highest acceptable value for a metric.
         objective : float
             The target value which if obtained, provides full satisfaction.
         imp_type : ImprovementType
@@ -589,9 +648,6 @@ class Metric:
             the do_assert parameter is set to true.
         """
         try:
-            assert limit != None, \
-                "A value must be provided for the limit."
-            
             assert objective != None, \
                 "A value must be provided for the objective."
             
@@ -599,16 +655,26 @@ class Metric:
                 "A value must be provided for the sense."
 
             if imp_type == ImprovementType.Minimize:
-                assert limit > objective, \
-                    "Limit must be greater than objective for minimization"
+                assert upper_limit is not None, \
+                    "The upper limit cannot be None for a minimization metric"
+                assert upper_limit > objective, \
+                    "The upper limit must be greater than objective"
 
             elif imp_type == ImprovementType.Maximize:
-                assert limit < objective, \
-                    "Limit must be less than objective for maximization"
+                assert lower_limit is not None, \
+                    "The lower limit cannot be None for a maximization metric"
+                assert lower_limit < objective, \
+                    "The lower limit must be less than objective"
 
-            else:
-                assert limit != objective, \
-                    "Limit cannot be equal to objective."
+            else: # elif imp_type == ImprovementType.SeekValue:
+                assert upper_limit is not None, \
+                    "The upper limit cannot be None for a seek value metric"
+                assert upper_limit > objective, \
+                    "The upper limit must be greater than objective"
+                assert lower_limit is not None, \
+                    "The lower limit cannot be None for a seek value metric"
+                assert lower_limit < objective, \
+                    "The lower limit must be less than objective"
 
             return None
         except AssertionError as err:
@@ -898,13 +964,29 @@ class MetricManager:
         str:
             A TOML formatted string with the properties of this instance.
         """
-        ret = ""
+        ret = f"\n\n[metrics.{category}]\nvalues=["
         for accKey in self._all_metrics:
             accumulator = self._all_metrics[accKey]
-            ret += accumulator.write_toml(category, accKey)
+            ret += accumulator.write_toml(category, accKey) + ",\n"
 
+        ret += "]"
         return ret
-         
+
+    def read_toml(self, tomlData):
+        """Reads the properties of this class instance from a TOML formated dictionary.
+
+        Parameters
+        -------
+        tomlData
+            A TOML formatted dictionary from which to read the properties of this class
+            instance.
+        """
+        if "values" in tomlData:
+            for mDict in tomlData["values"]:
+                mta = MetricTimeAccumulator.read_toml(mDict)
+                name = mDict["name"]
+                self.add_accumulator(name, mta)
+
     @property
     def all_metrics(self) -> dict:
         """Allows access to the mapping of all metrics in this manager.
@@ -935,5 +1017,5 @@ class MetricManager:
 
 
 # if __name__ == "__main__":
-#    m_ = Metric(1.05, 1.0, ImprovementType.Minimize)
+#    m_ = Metric(None, 1.05, 1.0, ImprovementType.Minimize)
 #    m_.normalize(1.0)
