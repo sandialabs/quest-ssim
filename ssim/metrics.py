@@ -964,7 +964,7 @@ class MetricManager:
         str:
             A TOML formatted string with the properties of this instance.
         """
-        ret = f"\n\n[metrics.{category}]\nvalues=["
+        ret = f"\n\n[metrics.\"{category}\"]\nvalues=["
         for accKey in self._all_metrics:
             accumulator = self._all_metrics[accKey]
             ret += accumulator.write_toml(category, accKey) + ",\n"

@@ -641,7 +641,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
     _selBusses = []
     _currentMetricCategory = "None"
-    _metricIcons = {"Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"}
+    _metricIcons = {"Bus Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"}
 
     _def_btn_color = '#005376'
 
@@ -926,7 +926,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.manage_store_button_enabled_state()
 
     def configure_voltage_metrics(self):
-        self._currentMetricCategory = "Voltage"
+        self._currentMetricCategory = "Bus Voltage"
         self.ids.interlabel.text = "Busses"
         self.load_bussed_into_list()
         self.reload_metric_list()
@@ -1088,6 +1088,10 @@ class SSimScreen(SSimBaseScreen):
 
         if os.path.isdir(fullpath):
             fullpath = os.path.join(fullpath, filename)
+
+        split = os.path.splitext(fullpath)
+        if split[1].lower() != ".toml":
+            fullpath = os.path.join(split[0], ".toml")
 
         Logger.debug("loading file %s", fullpath)
 
