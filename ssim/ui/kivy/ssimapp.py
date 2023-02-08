@@ -58,6 +58,13 @@ _IMAGE_FILES = [
 _KV_FILES = ["common.kv", "ssim.kv"]
 
 
+def parse_float(strval):
+    try:
+        return float(strval)
+    except ValueError:
+        return None
+
+
 class SSimApp(MDApp):
 
     def __init__(self, *args, **kwargs):
@@ -119,7 +126,7 @@ class BusListItem(TwoLineIconListItem):
         return self.ids.selected.active
 
 class TextFieldFloat(MDTextField):
-    SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
+    SIMPLE_FLOAT = re.compile(r"(\+|-)?\d*(\.\d*)?$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -143,7 +150,7 @@ class TextFieldFloat(MDTextField):
             self.helper_text = "Input value and press enter"
 
 class TextFieldMultiFloat(MDTextField):
-    SIMPLE_FLOAT = re.compile(r"(\+|-)?\d+(\.\d*)?$")
+    SIMPLE_FLOAT = re.compile(r"(\+|-)?\d*(\.\d*)?$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -177,7 +184,7 @@ class TextFieldMultiFloat(MDTextField):
             self.helper_text = "Input numeric value"
 
 class TextFieldPositiveFloat(MDTextField):
-    POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
+    POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -201,7 +208,7 @@ class TextFieldPositiveFloat(MDTextField):
             self.helper_text = "Input value and press enter"
 
 class TextFieldPositivePercentage(MDTextField):
-    POSITIVE_FLOAT = re.compile(r"\d+(\.\d*)?$")
+    POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -480,7 +487,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.min_soc), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.init_soc), 0.05)
 
-        self.def_btn_color = '#005376'
+        self._def_btn_color = '#005376'
 
         if not self._options is None:
             if self._options.control.mode == "droop":
@@ -557,17 +564,17 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def manage_button_selection_states(self, selbutton):
         self.ids.droop_mode.md_bg_color =\
-            "red" if selbutton is self.ids.droop_mode else self.def_btn_color
+            "red" if selbutton is self.ids.droop_mode else self._def_btn_color
         self.ids.vv_mode.md_bg_color =\
-            "red" if selbutton is self.ids.vv_mode else self.def_btn_color
+            "red" if selbutton is self.ids.vv_mode else self._def_btn_color
         self.ids.vw_mode.md_bg_color =\
-            "red" if selbutton is self.ids.vw_mode else self.def_btn_color
+            "red" if selbutton is self.ids.vw_mode else self._def_btn_color
         self.ids.var_watt_mode.md_bg_color =\
-            "red" if selbutton is self.ids.var_watt_mode else self.def_btn_color
+            "red" if selbutton is self.ids.var_watt_mode else self._def_btn_color
         self.ids.vv_vw_mode.md_bg_color =\
-            "red" if selbutton is self.ids.vv_vw_mode else self.def_btn_color
+            "red" if selbutton is self.ids.vv_vw_mode else self._def_btn_color
         self.ids.const_pf_mode.md_bg_color =\
-            "red" if selbutton is self.ids.const_pf_mode else self.def_btn_color
+            "red" if selbutton is self.ids.const_pf_mode else self._def_btn_color
 
     def save(self):
         self._options.min_soc = self.ids.min_soc.fraction()
@@ -712,6 +719,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
     _currentMetricCategory = "None"
     _metricIcons = {"Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"}
 
+    _def_btn_color = '#005376'
+
     def __reset_checked_bus_list(self):
         self._selBusses.clear()
         for wid in self.ids.interlist.children:
@@ -740,12 +749,20 @@ class MetricConfigurationScreen(SSimBaseScreen):
             }
         ]
 
-        self.menu = MDDropdownMenu(
-            caller=self.ids.caller, items=menu_items, width_mult=3
-        )
+        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
+        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
+        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.objectiveText), 0.05)
+
+        #self.menu = MDDropdownMenu(
+        #    caller=self.ids.caller, items=menu_items, width_mult=3
+        #)
+
+    def _refocus_field(self, textfield):
+        textfield.focus = True
 
     def drop_sense_menu(self):
-        self.menu.open()
+        pass
+        #self.menu.open()
 
     def set_sense(self, value):
         self.ids.caller.text = value
@@ -756,12 +773,14 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
     def reload_metric_values(self):
         metrics = []
-        common_limit = None
+        common_lower_limit = None
+        common_upper_limit = None
         common_obj = None
         common_sense = None
         have_no_metric_busses = False
 
         self.ids.metricValueBox.disabled = len(self._selBusses) == 0
+        self.ids.metricSenseBox.disabled = len(self._selBusses) == 0
 
         ''' Gather up the list of all metrics relevant to the selection'''
         for b in self._selBusses:
@@ -773,13 +792,17 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
         if not have_no_metric_busses:
             for m in metrics:
-                if common_limit is None:
-                    common_limit = m.metric.limit
+                if common_lower_limit is None:
+                    common_lower_limit = m.metric.lower_limit
+                    common_upper_limit = m.metric.upper_limit
                     common_obj = m.metric.objective
                     common_sense = m.metric.improvement_type
                 else:
-                    if common_limit != m.metric.limit:
-                        common_limit = None
+                    if common_lower_limit != m.metric.lower_limit:
+                        common_lower_limit = None
+                        break
+                    if common_upper_limit != m.metric.upper_limit:
+                        common_upper_limit = None
                         break
                     if common_obj != m.metric.objective:
                         common_obj = None
@@ -788,53 +811,104 @@ class MetricConfigurationScreen(SSimBaseScreen):
                         common_sense = None
                         break
         else:
-            common_limit = None
+            common_lower_limit = None
+            common_upper_limit = None
             common_obj = None
             common_sense = None
 
-        is_varied = len(metrics) > 0
+        is_varied = len(metrics) > 1
 
-        if common_limit is None:
-            self.ids.limitText.set_varied_mode() if is_varied else\
-                self.ids.limitText.set_not_set_mode()
+        if common_lower_limit is None:
+            self.ids.lowerLimitText.set_varied_mode() if is_varied else\
+                self.ids.lowerLimitText.set_not_set_mode()
         else:
-            self.ids.limitText.text = str(common_limit)
+            self.ids.lowerLimitText.text = str(common_lower_limit)
+            Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
+
+        if common_upper_limit is None:
+            self.ids.upperLimitText.set_varied_mode() if is_varied else\
+                self.ids.upperLimitText.set_not_set_mode()
+        else:
+            self.ids.upperLimitText.text = str(common_upper_limit)
+            Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
 
         if common_obj is None:
             self.ids.objectiveText.set_varied_mode() if is_varied else\
                 self.ids.objectiveText.set_not_set_mode()
         else:
             self.ids.objectiveText.text = str(common_obj)
+            Clock.schedule_once(lambda dt: self._refocus_field(self.ids.objectiveText), 0.05)
 
         if common_sense is None:
-            self.ids.caller.text = "None or Varied"
+            self.manage_button_selection_states(None)
         else:
-            self.ids.caller.text = str(common_sense.name)
+            self.__active_sense_button(common_sense)
 
-    @staticmethod
-    def __parse_float(strval):
-        try:
-            return float(strval)
-        except ValueError:
-            return None
+    def __active_sense_button(self, sense: ImprovementType):
+        if sense == ImprovementType.Minimize:
+            self.set_minimize_sense()
+        elif sense == ImprovementType.Maximize:
+            self.set_maximize_sense()
+        else:
+            self.set_seek_value_sense()
+
+    def set_minimize_sense(self):
+        self.manage_button_selection_states(self.ids.min_btn)
+
+    def set_maximize_sense(self):
+        self.manage_button_selection_states(self.ids.max_btn)
+
+    def set_seek_value_sense(self):
+        self.manage_button_selection_states(self.ids.seek_btn)
+
+    def manage_button_selection_states(self, selButton):
+        self.ids.max_btn.selected = False
+        self.ids.min_btn.selected = False
+        self.ids.seek_btn.selected = False
+        self.ids.max_btn.md_bg_color = self._def_btn_color
+        self.ids.min_btn.md_bg_color = self._def_btn_color
+        self.ids.seek_btn.md_bg_color = self._def_btn_color
+
+        if selButton is self.ids.max_btn:
+            self.ids.max_btn.md_bg_color = "red"
+            self.ids.max_btn.selected = True
+            #self.ids.lowerLimitText.disabled = False
+            #self.ids.upperLimitText.disabled = True
+
+        elif selButton is self.ids.min_btn:
+            self.ids.min_btn.md_bg_color = "red"
+            self.ids.min_btn.selected = True
+            #self.ids.lowerLimitText.disabled = True
+            #self.ids.upperLimitText.disabled = False
+
+        elif selButton is self.ids.seek_btn:
+            self.ids.seek_btn.md_bg_color = "red"
+            self.ids.seek_btn.selected = True
+            #self.ids.lowerLimitText.disabled = False
+            #self.ids.upperLimitText.disabled = False
 
     def store_metrics(self):
-        limit = MetricConfigurationScreen.__parse_float(self.ids.limitText.text)
-        obj = MetricConfigurationScreen.__parse_float(self.ids.objectiveText.text)
-        sense = ImprovementType.parse(self.ids.caller.text)
+        lower_limit = parse_float(self.ids.lowerLimitText.text)
+        upper_limit = parse_float(self.ids.upperLimitText.text)
+        obj = parse_float(self.ids.objectiveText.text)
+        sense = None
 
-        err = Metric.validate_metric_values(limit, obj, sense, False)
+        if self.ids.max_btn.selected:
+            sense = ImprovementType.Maximize
+        elif self.ids.min_btn.selected:
+            sense = ImprovementType.Minimize
+        elif self.ids.seek_btn.selected:
+            sense = ImprovementType.SeekValue
+
+        err = Metric.validate_metric_values(lower_limit, upper_limit, obj, sense, False)
 
         if err:
             self.__show_invalid_metric_value_popup(err)
             return
 
-        if limit is None or obj is None or sense is None:
-            self.__show_missing_metric_value_popup()
-        else:
-            for bus in self._selBusses:
-                accum = MetricTimeAccumulator(Metric(limit, obj, sense))
-                self.project.add_metric(self._currentMetricCategory, bus, accum)
+        for bus in self._selBusses:
+            accum = MetricTimeAccumulator(Metric(lower_limit, upper_limit, obj, sense))
+            self.project.add_metric(self._currentMetricCategory, bus, accum)
 
         self.reload_metric_list()
 
@@ -885,9 +959,24 @@ class MetricConfigurationScreen(SSimBaseScreen):
         list.active = False
         for key, m in manager.all_metrics.items():
             txt = self._currentMetricCategory + " Metric for " + key
-            deets = "Limit=" + str(m.metric.limit) + ", " + \
-                "Objective=" + str(m.metric.objective) + ", " + \
-                "Sense=" + m.metric.improvement_type.name
+            deets = ""
+
+            if m.metric.improvement_type == ImprovementType.Minimize:
+                deets = "Upper Limit=" + str(m.metric.upper_limit) + ", " + \
+                    "Objective=" + str(m.metric.objective) + ", " + \
+                    "Sense=Minimize"
+
+            elif m.metric.improvement_type == ImprovementType.Maximize:
+                deets = "Lower Limit=" + str(m.metric.lower_limit) + ", " + \
+                    "Objective=" + str(m.metric.objective) + ", " + \
+                    "Sense=Maximize"
+
+            elif m.metric.improvement_type == ImprovementType.SeekValue:
+                deets = "Lower Limit=" + str(m.metric.lower_limit) + ", " + \
+                    "Upper Limit=" + str(m.metric.upper_limit) + ", " + \
+                    "Objective=" + str(m.metric.objective) + ", " + \
+                    "Sense=Seek Value"
+
             bItem = MetricListItem(text=txt, secondary_text=deets)
             bItem.bus = key
             bItem.ids.left_icon.icon = self._metricIcons[self._currentMetricCategory]
@@ -1025,9 +1114,20 @@ class SelectGridDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
 
-class SelectSSIMTOMLDialog(FloatLayout):
+class LoadSSIMTOMLDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
+
+class SaveSSIMTOMLDialog(FloatLayout):
+    save = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+
+    def manage_filename_field(self):
+        sel = self.ids.filechooser.selection[0]
+        if os.path.isdir(sel):
+            self.ids.filenamefield.text = ""
+        else:
+            self.ids.filenamefield.text = os.path.basename(sel)
 
 class SSimScreen(SSimBaseScreen):
 
@@ -1051,7 +1151,7 @@ class SSimScreen(SSimBaseScreen):
         self.project.clear_metrics()
         self.project.clear_options()
 
-        with open('c:/temp/written.toml', 'r') as f:
+        with open(filename[0], 'r') as f:
             toml = f.read()
 
         tdat = tomli.loads(toml)
@@ -1059,23 +1159,34 @@ class SSimScreen(SSimBaseScreen):
         self.bus_list.text = '\n'.join(self.project.bus_names)
         self.dismiss_popup()
 
+    def save_toml_file(self, selection, filename):
+        fullpath = selection[0]
+
+        if os.path.isdir(fullpath):
+            fullpath = os.path.join(fullpath, filename)
+
+        Logger.debug("loading file %s", fullpath)
+
+        toml = self.project.write_toml()
+
+        with open(fullpath, 'w') as f:
+            f.write(toml)
+
+        self.dismiss_popup()
 
     def read_toml(self):
-        chooser = SelectSSIMTOMLDialog(
+        chooser = LoadSSIMTOMLDialog(
             load=self.load_toml_file, cancel=self.dismiss_popup)
 
         self._popup = Popup(title="select SSIM TOML file", content=chooser)
         self._popup.open()
 
-
     def write_toml(self):
-        toml = self.project.write_toml()
-        with open('c:/temp/written.toml', 'w') as f:
-            f.write(toml)
+        chooser = SaveSSIMTOMLDialog(
+            save=self.save_toml_file, cancel=self.dismiss_popup)
 
-        self.project.clear_metrics()
-        tdat = tomli.loads(toml)
-        self.project.read_toml(tdat)
+        self._popup = Popup(title="select SSIM TOML file", content=chooser)
+        self._popup.open()
 
     def select_grid_model(self):
         chooser = SelectGridDialog(

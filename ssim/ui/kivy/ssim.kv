@@ -422,27 +422,46 @@
                         size: self.parent.width, 25
                         color: 0,0,0,1
 
+                    BoxLayout:
+                        id: metricSenseBox
+                        orientation: "horizontal"
+                        disabled: True
+
+                        MDRaisedButton:
+                            id: min_btn
+                            selected: False
+                            text: "Minimize"
+                            size_hint: 0.33, None
+                            #size: self.parent.width, 25
+                            on_release: root.set_minimize_sense()
+
+                        MDRaisedButton:
+                            id: max_btn
+                            selected: False
+                            text: "Maximize"
+                            size_hint: 0.33, None
+                            #size: self.parent.width, 25
+                            on_release: root.set_maximize_sense()
+
+                        MDRaisedButton:
+                            id: seek_btn
+                            selected: False
+                            text: "Seek Value"
+                            size_hint: 0.33, None
+                            #size: self.parent.width, 25
+                            on_release: root.set_seek_value_sense()
+
                     TextFieldMultiFloat:
-                        hint_text: "Limit Value"
-                        id: limitText
+                        hint_text: "Lower Limit Value"
+                        id: lowerLimitText
 
                     TextFieldMultiFloat:
                         hint_text: "Objective Value"
                         id: objectiveText
 
-                    Label:
-                        id: senselabel
-                        text: "Sense"
-                        size_hint: None, None
-                        size: self.parent.width, 25
-                        color: 0,0,0,1
-
-                    MDRaisedButton:
-                        id: caller
-                        text: "Sense"
-                        size_hint: None, None
-                        size: self.parent.width, 25
-                        on_release: root.drop_sense_menu()
+                    TextFieldMultiFloat:
+                        hint_text: "Upper Limit Value"
+                        id: upperLimitText
 
                     Button:
                         id: btnStore
@@ -564,7 +583,7 @@
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
 
-<SelectSSIMTOMLDialog>:
+<LoadSSIMTOMLDialog>:
     BoxLayout:
         size: root.size
         pos: root.pos
@@ -584,6 +603,41 @@
             Button:
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
+
+<SaveSSIMTOMLDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            path: "."
+            filters: ["*.toml"]
+            dirselect: True
+            on_selection: root.manage_filename_field()
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: "horizontal"
+
+            Label:
+                text: "Filename:"
+                size_hint: 0.1, 1.0
+
+            TextInput:
+                id: filenamefield
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Save"
+                on_release: root.save(filechooser.selection, filenamefield.text)
 
 <NoGridPopupContent>:
     orientation: "vertical"

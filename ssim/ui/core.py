@@ -126,18 +126,16 @@ class Project:
             so.read_toml(sokey, sodict[sokey])
             self.add_storage_option(so)
 
-        for mkey in tomlData:
-            if mkey == "metrics":
-                self.__read_metric_map(tomlData[mkey])
+        if "metrics" in tomlData:
+            self.__read_metric_map(tomlData["metrics"])
 
     def __read_metric_map(self, mdict):
         for ckey in mdict:
-            self.__read_metric_values(mdict[ckey], ckey)
-
-    def __read_metric_values(self, cdict, ckey):
-        for bus in cdict:
-            mta = MetricTimeAccumulator.read_toml(cdict[bus])
-            self.add_metric(ckey, bus, mta)
+            cat_mgr = self.get_manager(ckey)
+            if cat_mgr is None:
+                cat_mgr = MetricManager()
+                self._metricMgrs[ckey] = cat_mgr
+            cat_mgr.read_toml(mdict[ckey])
 
     def add_metric(self, category: str, key: str, metric: MetricTimeAccumulator):
         """Adds the supplied metric identified by the supplied key to an existing or
