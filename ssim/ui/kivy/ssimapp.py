@@ -478,8 +478,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.min_soc), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.init_soc), 0.05)
 
-        self.data_maps = {}
-
         self._def_btn_color = '#005376'
 
         if not self._options is None:
@@ -513,12 +511,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_droop_mode(self):
         self.set_mode("droop", self.ids.droop_mode)
-
-        if "p_droop" not in self._options.control.params:
-            self._options.control.params["p_droop"] = 500
-
-        if "q_droop" not in self._options.control.params:
-            self._options.control.params["q_droop"] = -300
+        self.verify_control_param("p_droop", 500)
+        self.verify_control_param("q_droop", -300)
 
         pfield = TextFieldFloat(
             hint_text="P Droop", text=str(self._options.control.params["p_droop"])
@@ -539,25 +533,15 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_mode(self):
         self.set_mode("voltvar", self.ids.vv_mode)
+        self.verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        if "volt_vals" not in self._options.control.params:
-            self._options.control.params["volt_vals"] = [0.5, 0.95, 1.0, 1.05, 1.5]
-
-        if "var_vals" not in self._options.control.params:
-            self._options.control.params["var_vals"] = [1.0, 1.0, 0.0, -1.0, -1.0]
-
-        headers = XYGridHeader()
-        headers.ids.x_label.text = "Voltage (p.u.)"
-        headers.ids.y_label.text = "Reactive Power (kVAR)"
-
+        headers = self.make_xy_header("Voltage (p.u.)", "Reactive Power (kVAR)")
         vvs = self._options.control.params["volt_vals"]
         var = self._options.control.params["var_vals"]
 
-        view = XYGridView()
+        view = self.make_xy_grid(vvs, var)
         self.ids.voltvargrid = view
-        vvdat = [{'x': vvs[i], 'y': var[i]} for i in range(len(vvs))]
-        self.data_maps["voltvar"] = vvdat
-        view.data = vvdat
         headers.grid = view
 
         self.ids.param_box.add_widget(headers)
@@ -565,25 +549,15 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_watt_mode(self):
         self.set_mode("voltwatt", self.ids.vw_mode)
+        self.verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        if "volt_vals" not in self._options.control.params:
-            self._options.control.params["volt_vals"] = [0.5, 0.95, 1.0, 1.05, 1.5]
-
-        if "watt_vals" not in self._options.control.params:
-            self._options.control.params["watt_vals"] = [1.0, 1.0, 0.0, -1.0, -1.0]
-
-        headers = XYGridHeader()
-        headers.ids.x_label.text = "Voltage (p.u.)"
-        headers.ids.y_label.text = "Watts (kW)"
-
+        headers = self.make_xy_header("Voltage (p.u.)", "Watts (kW)")
         vvs = self._options.control.params["volt_vals"]
         wvs = self._options.control.params["watt_vals"]
 
-        view = XYGridView()
+        view = self.make_xy_grid(vvs, wvs)
         self.ids.voltwattgrid = view
-        vwdat = [{'x': vvs[i], 'y': wvs[i]} for i in range(len(vvs))]
-        self.data_maps["voltwatt"] = vwdat
-        view.data = vwdat
         headers.grid = view
 
         self.ids.param_box.add_widget(headers)
@@ -591,25 +565,15 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_var_watt_mode(self):
         self.set_mode("varwatt", self.ids.var_watt_mode)
+        self.verify_control_param("var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        if "var_vals" not in self._options.control.params:
-            self._options.control.params["var_vals"] = [0.5, 0.95, 1.0, 1.05, 1.5]
-
-        if "watt_vals" not in self._options.control.params:
-            self._options.control.params["watt_vals"] = [1.0, 1.0, 0.0, -1.0, -1.0]
-
-        headers = XYGridHeader()
-        headers.ids.x_label.text = "Reactive Power (kVAR)"
-        headers.ids.y_label.text = "Watts (kW)"
-
+        headers = self.make_xy_header("Reactive Power (kVAR)", "Watts (kW)")
         vvs = self._options.control.params["var_vals"]
         wvs = self._options.control.params["watt_vals"]
 
-        view = XYGridView()
+        view = self.make_xy_grid(vvs, wvs)
         self.ids.varwattgrid = view
-        vwdat = [{'x': vvs[i], 'y': wvs[i]} for i in range(len(vvs))]
-        self.data_maps["varwatt"] = vwdat
-        view.data = vwdat
         headers.grid = view
 
         self.ids.param_box.add_widget(headers)
@@ -617,44 +581,28 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_and_volt_watt_mode(self):
         self.set_mode("vv_vw", self.ids.vv_vw_mode)
-        if "vv_volt_vals" not in self._options.control.params:
-            self._options.control.params["vv_volt_vals"] = [0.5, 0.95, 1.0, 1.05, 1.5]
+        self.verify_control_param("vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.verify_control_param("vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        if "vw_volt_vals" not in self._options.control.params:
-            self._options.control.params["vw_volt_vals"] = [0.5, 0.95, 1.0, 1.05, 1.5]
-
-        if "var_vals" not in self._options.control.params:
-            self._options.control.params["var_vals"] = [1.0, 1.0, 0.0, -1.0, -1.0]
-
-        if "watt_vals" not in self._options.control.params:
-            self._options.control.params["watt_vals"] = [1.0, 1.0, 0.0, -1.0, -1.0]
-
-        vvheaders = XYGridHeader(size_hint=(1.0, 0.07))
-        vvheaders.ids.x_label.text = "Voltage (p.u.)"
-        vvheaders.ids.y_label.text = "Reactive Power (kVAR)"
-
-        vwheaders = XYGridHeader(size_hint=(1.0, 0.07))
-        vwheaders.ids.x_label.text = "Voltage (p.u.)"
-        vwheaders.ids.y_label.text = "Watts (kW)"
+        vvheaders = self.make_xy_header("Voltage (p.u.)", "Reactive Power (kVAR)", (1.0, 0.07))
+        vwheaders = self.make_xy_header("Voltage (p.u.)", "Watts (kW)", (1.0, 0.07))
 
         vvvs = self._options.control.params["vv_volt_vals"]
         vars = self._options.control.params["var_vals"]
         vwvs = self._options.control.params["vw_volt_vals"]
         watts = self._options.control.params["watt_vals"]
 
-        vvview = XYGridView(size_hint=(1.0, 0.95))
+        vvview = self.make_xy_grid(vvvs, vars, (1.0, 0.93))
         self.ids.voltvargrid = vvview
-        vvdat = [{'x': vvvs[i], 'y': vars[i]} for i in range(len(vvvs))]
-        self.data_maps["voltvar"] = vvdat
-        vvview.data = vvdat
         vvheaders.grid = vvview
 
-        vwview = XYGridView(size_hint=(1.0, 0.95))
+        vwview = self.make_xy_grid(vwvs, watts, (1.0, 0.93))
         self.ids.voltwattgrid = vwview
-        vwdat = [{'x': vwvs[i], 'y': watts[i]} for i in range(len(vwvs))]
-        self.data_maps["voltwatt"] = vwdat
-        vwview.data = vwdat
         vwheaders.grid = vwview
+
+        self.vwdata = vwview.data
 
         innerBox = BoxLayout(orientation="horizontal")
         self.ids.param_box.add_widget(innerBox)
@@ -672,8 +620,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vwBox.add_widget(vwview)
 
     def set_const_power_factor_mode(self):
-        if self.set_mode("constantpf", self.ids.const_pf_mode):
-            self._options.control.params["pf_val"] = 0.99
+        self.set_mode("constantpf", self.ids.const_pf_mode)
+        self.verify_control_param("pf_val", 0.99)
 
         pffield = TextFieldPositiveFloat(
             hint_text="Power Factor Value", text=str(self._options.control.params["pf_val"])
@@ -685,6 +633,22 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self._param_field_map["pf_val"] = pffield
 
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pffield), 0.05)
+
+    def verify_control_param(self, label: str, def_val):
+        if label not in self._options.control.params:
+            self._options.control.params[label] = def_val
+
+    def make_xy_grid(self, xs: list, ys: list, size_hint=(0.5, 0.93)) -> XYGridView:
+        view = XYGridView(size_hint=size_hint)
+        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        view.data = dat
+        return view
+
+    def make_xy_header(self, xlabel: str, ylabel: str, size_hint=(0.5, 0.07)) -> XYGridHeader:
+        headers = XYGridHeader(size_hint=size_hint)
+        headers.ids.x_label.text = xlabel
+        headers.ids.y_label.text = ylabel
+        return headers
 
     def set_mode(self, name, button) -> bool:
         self.manage_button_selection_states(button)
@@ -720,12 +684,20 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
                 float(self._param_field_map[key].text)
 
         if self._options.control.mode == "voltvar":
-            self.__make_data_lists(self.data_maps["voltvar"], "volt_vals", "var_vals")
+            self.__make_data_lists(self.ids.voltvargrid.data, "volt_vals", "var_vals")
 
         if self._options.control.mode == "voltwatt":
-            self.__make_data_lists(self.data_maps["voltwatt"], "volt_vals", "watt_vals")
+            self.__make_data_lists(self.ids.voltwattgrid.data, "volt_vals", "watt_vals")
+
+        if self._options.control.mode == "varwatt":
+            self.__make_data_lists(self.ids.varwattgrid.data, "var_vals", "watt_vals")
+
+        if self._options.control.mode == "vv_vw":
+            self.__make_data_lists(self.ids.voltvargrid.data, "vv_volt_vals", "var_vals")
+            self.__make_data_lists(self.ids.voltwattgrid.data, "vw_volt_vals", "watt_vals")
 
         self.manager.current = "configure-storage"
+        self.manager.remove_widget(self)
 
     def cancel(self):
         self.manager.current = "configure-storage"
