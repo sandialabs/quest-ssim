@@ -433,22 +433,31 @@ class StorageConfigurationScreen(SSimBaseScreen):
         return super().on_enter(*args)
 
 class XYGridView(RecycleView):
-    pass
+
+    def extract_x_vals(self) -> list:
+        return [float(child.x_value) for child in self.children[0].children]
+
+    def extract_y_vals(self) -> list:
+        return [float(child.y_value) for child in self.children[0].children]
 
 class XYGridViewLayout(FocusBehavior, RecycleBoxLayout):
     pass
 
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
-    x = NumericProperty()
-    y = NumericProperty()
     index = NumericProperty()
 
+    @property
+    def x_value(self) -> float:
+        return float(self.ids.x_field.text)
+
+    @property
+    def y_value(self) -> float:
+        return float(self.ids.y_field.text)
+
     def refresh_view_attrs(self, rv, index, data):
-        self.x = data['x']
-        self.y = data['y']
         self.index = index
-        self.ids.x_field.text = str(self.x)
-        self.ids.y_field.text = str(self.y)
+        self.ids.x_field.text = str(data['x'])
+        self.ids.y_field.text = str(data['y'])
 
     def on_delete_button(self):
         self.parent.parent.data.pop(self.index)
@@ -640,6 +649,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def make_xy_grid(self, xs: list, ys: list, size_hint=(0.5, 0.93)) -> XYGridView:
         view = XYGridView(size_hint=size_hint)
+        xs, ys = (list(t) for t in zip(*sorted(zip(xs, ys))))
         dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
         view.data = dat
         return view
@@ -684,17 +694,17 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
                 float(self._param_field_map[key].text)
 
         if self._options.control.mode == "voltvar":
-            self.__make_data_lists(self.ids.voltvargrid.data, "volt_vals", "var_vals")
+            self.__extract_data_lists(self.ids.voltvargrid, "volt_vals", "var_vals")
 
         if self._options.control.mode == "voltwatt":
-            self.__make_data_lists(self.ids.voltwattgrid.data, "volt_vals", "watt_vals")
+            self.__extract_data_lists(self.ids.voltwattgrid, "volt_vals", "watt_vals")
 
         if self._options.control.mode == "varwatt":
-            self.__make_data_lists(self.ids.varwattgrid.data, "var_vals", "watt_vals")
+            self.__extract_data_lists(self.ids.varwattgrid, "var_vals", "watt_vals")
 
         if self._options.control.mode == "vv_vw":
-            self.__make_data_lists(self.ids.voltvargrid.data, "vv_volt_vals", "var_vals")
-            self.__make_data_lists(self.ids.voltwattgrid.data, "vw_volt_vals", "watt_vals")
+            self.__extract_data_lists(self.ids.voltvargrid, "vv_volt_vals", "var_vals")
+            self.__extract_data_lists(self.ids.voltwattgrid, "vw_volt_vals", "watt_vals")
 
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
@@ -703,12 +713,14 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
 
-    def __make_data_lists(self, data: dict, l1name: str, l2name: str):
-        l1 = [data[i]['x'] for i in range(len(data))]
-        l2 = [data[i]['y'] for i in range(len(data))]
+    def __extract_data_lists(self, xyc: XYGridView, l1name, l2name):
+        xl = xyc.extract_x_vals()
+        yl = xyc.extract_y_vals()
 
-        self._options.control.params[l1name] = l1
-        self._options.control.params[l2name] = l2
+        xl, yl = (list(t) for t in zip(*sorted(zip(xl, yl))))
+
+        self._options.control.params[l1name] = xl
+        self._options.control.params[l2name] = yl
 
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""
