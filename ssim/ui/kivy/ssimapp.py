@@ -694,7 +694,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         vwview = XYGridView(size_hint=(1.0, 0.95))
         self.ids.voltwattgrid = vwview
-        vwdat = [{'x': vwvs[i], 'y': vwvs[i]} for i in range(len(vwvs))]
+        vwdat = [{'x': vwvs[i], 'y': watts[i]} for i in range(len(vwvs))]
         self.data_maps["voltwatt"] = vwdat
         vwview.data = vwdat
         vwheaders.grid = vwview
