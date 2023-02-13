@@ -326,6 +326,55 @@
         id: check
         listItem: root
 
+<XYGridHeader>
+    orientation: "horizontal"
+    size_hint: 0.5, 0.07
+
+    MDLabel:
+        id: x_label
+        text: "X"
+
+    MDLabel:
+        id: y_label
+        text: "Y"
+
+    Button:
+        id: addbtn
+        text: "+"
+        size_hint_x: 0.1
+        pos_hint_y: 0.9
+        on_release: root.on_add_button()
+
+<XYGridView>
+    viewclass: 'XYGridViewItem'
+    size_hint: 0.5, 0.93
+    RecycleBoxLayout:
+        default_size: None, dp(32)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
+<XYGridViewItem>
+    orientation: 'horizontal'
+    size_hint: 0.5, 0.05
+    padding: 2
+
+    TextInput:
+        id: x_field
+
+    TextInput:
+        id: y_field
+
+    Button:
+        id: deletebtn
+        text: "X"
+        size_hint_x: 0.1
+        pos_hint_y: 0.9
+        on_release: root.on_delete_button()
+
 <MetricConfigurationScreen>:
     name: "metric-config"
 
