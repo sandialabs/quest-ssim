@@ -786,8 +786,7 @@ class Configuration:
         return config
 
     def _configure_metrics(self, config):
-        config["busses_to_measure"] = [metric.to_dict()
-                                       for metric in self.metrics]
+        config["busses_to_measure"] = self.metrics.to_dicts()
         return config
 
     def _federation_config(self):
