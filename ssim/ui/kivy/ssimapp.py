@@ -24,6 +24,7 @@ from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.scrollview import ScrollView
+from kivy.uix.textinput import TextInput
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -39,11 +40,17 @@ from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.menu import MDDropdownMenu
 import tomli
 
-def parse_float(strval):
+def parse_float(strval) -> float:
     try:
         return float(strval)
     except ValueError:
         return None
+
+def parse_float_or_str(strval):
+    if not strval: return None
+    flt = parse_float(strval)
+    return strval if not flt else flt
+
 
 class SSimApp(MDApp):
 
@@ -420,6 +427,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
         if self.show_error(self.options.validate_power_values()):  return
         if self.show_error(self.options.validate_duration_values()): return
         if self.show_error(self.options.validate_busses()): return
+        if self.show_error(self.options.validate_controls()): return
 
         self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
@@ -435,10 +443,10 @@ class StorageConfigurationScreen(SSimBaseScreen):
 class XYGridView(RecycleView):
 
     def extract_x_vals(self) -> list:
-        return [float(child.x_value) for child in self.children[0].children]
+        return [parse_float_or_str(child.x_value) for child in self.children[0].children]
 
     def extract_y_vals(self) -> list:
-        return [float(child.y_value) for child in self.children[0].children]
+        return [parse_float_or_str(child.y_value) for child in self.children[0].children]
 
 class XYGridViewLayout(FocusBehavior, RecycleBoxLayout):
     pass
@@ -447,12 +455,12 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     index = NumericProperty()
 
     @property
-    def x_value(self) -> float:
-        return float(self.ids.x_field.text)
+    def x_value(self):
+        return parse_float_or_str(self.ids.x_field.text)
 
     @property
-    def y_value(self) -> float:
-        return float(self.ids.y_field.text)
+    def y_value(self):
+        return parse_float_or_str(self.ids.y_field.text)
 
     def refresh_view_attrs(self, rv, index, data):
         self.index = index
@@ -462,13 +470,23 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     def on_delete_button(self):
         self.parent.parent.data.pop(self.index)
 
+class XYItemTextField(TextInput):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.def_back_color = self.background_color
+        self.bind(text = self.set_error_message)
+        self.hint_text = "Enter a number."
+
+    def set_error_message(self, instance, text):
+        v = parse_float(text) is not None
+        self.background_color = "red" if not v else self.def_back_color
+
 class XYGridHeader(BoxLayout):
 
     grid = ObjectProperty(None)
 
     def on_add_button(self):
         self.grid.data.append({'x': 1.0, 'y': 1.0})
-
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
@@ -520,8 +538,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_droop_mode(self):
         self.set_mode("droop", self.ids.droop_mode)
-        self.verify_control_param("p_droop", 500)
-        self.verify_control_param("q_droop", -300)
+        self.__verify_control_param("p_droop", 500)
+        self.__verify_control_param("q_droop", -300)
 
         pfield = TextFieldFloat(
             hint_text="P Droop", text=str(self._options.control.params["p_droop"])
@@ -542,8 +560,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_mode(self):
         self.set_mode("voltvar", self.ids.vv_mode)
-        self.verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
         headers = self.make_xy_header("Voltage (p.u.)", "Reactive Power (kVAR)")
         vvs = self._options.control.params["volt_vals"]
@@ -558,8 +576,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_watt_mode(self):
         self.set_mode("voltwatt", self.ids.vw_mode)
-        self.verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
         headers = self.make_xy_header("Voltage (p.u.)", "Watts (kW)")
         vvs = self._options.control.params["volt_vals"]
@@ -574,8 +592,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_var_watt_mode(self):
         self.set_mode("varwatt", self.ids.var_watt_mode)
-        self.verify_control_param("var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.__verify_control_param("var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
         headers = self.make_xy_header("Reactive Power (kVAR)", "Watts (kW)")
         vvs = self._options.control.params["var_vals"]
@@ -590,10 +608,10 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_and_volt_watt_mode(self):
         self.set_mode("vv_vw", self.ids.vv_vw_mode)
-        self.verify_control_param("vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.verify_control_param("vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-        self.verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.__verify_control_param("vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
         vvheaders = self.make_xy_header("Voltage (p.u.)", "Reactive Power (kVAR)", (1.0, 0.07))
         vwheaders = self.make_xy_header("Voltage (p.u.)", "Watts (kW)", (1.0, 0.07))
@@ -630,7 +648,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_const_power_factor_mode(self):
         self.set_mode("constantpf", self.ids.const_pf_mode)
-        self.verify_control_param("pf_val", 0.99)
+        self.__verify_control_param("pf_val", 0.99)
 
         pffield = TextFieldPositiveFloat(
             hint_text="Power Factor Value", text=str(self._options.control.params["pf_val"])
@@ -643,13 +661,20 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pffield), 0.05)
 
-    def verify_control_param(self, label: str, def_val):
+    def __verify_control_param(self, label: str, def_val):
         if label not in self._options.control.params:
             self._options.control.params[label] = def_val
 
+    @staticmethod
+    def __try_sort(xl: list, yl: list) -> (list, list):
+        try:
+            return (list(t) for t in zip(*sorted(zip(xl, yl))))
+        except:
+            return (xl, yl)
+
     def make_xy_grid(self, xs: list, ys: list, size_hint=(0.5, 0.93)) -> XYGridView:
         view = XYGridView(size_hint=size_hint)
-        xs, ys = (list(t) for t in zip(*sorted(zip(xs, ys))))
+        xs, ys = StorageControlConfigurationScreen.__try_sort(xs, ys)
         dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
         view.data = dat
         return view
@@ -717,7 +742,10 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         xl = xyc.extract_x_vals()
         yl = xyc.extract_y_vals()
 
-        xl, yl = (list(t) for t in zip(*sorted(zip(xl, yl))))
+        try:
+            xl, yl = (list(t) for t in zip(*sorted(zip(xl, yl))))
+        except:
+            pass
 
         self._options.control.params[l1name] = xl
         self._options.control.params[l2name] = yl

@@ -357,15 +357,18 @@
         multiselect: False
         touch_multiselect: False
 
+<XYItemTextField>
+    multiline: False
+
 <XYGridViewItem>
     orientation: 'horizontal'
     size_hint: 0.5, 0.05
     padding: 2
 
-    TextInput:
+    XYItemTextField:
         id: x_field
 
-    TextInput:
+    XYItemTextField:
         id: y_field
 
     Button:
