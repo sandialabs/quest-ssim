@@ -317,6 +317,61 @@ class StorageControl:
             else:
                 self.params[key] = float(tomlData[key])
 
+    def __check_curve_generic(self, curvedesc: str, curvename_x: str, curvename_y: str) -> str:
+
+        if curvename_x not in self.params:
+            return f"Unable to find control param list named \"{curvename_x}\".  This is an application error."
+
+        if curvename_y not in self.params:
+            return f"Unable to find control param list named \"{curvename_y}\".  This is an application error."
+
+        xc = self.params[curvename_x]
+        yc = self.params[curvename_y]
+
+        if type(xc) is not list:
+            return f"Expected a list of x-values for \"{curvedesc}\". Found value is not a list."
+
+        if type(yc) is not list:
+            return f"Expected a list of y-values for \"{curvedesc}\". Found value is not a list."
+
+        if len(xc) != len(yc):
+            return f"There is a different number of x values ({len(xc)}) and y values ({len(yc)})."
+
+        if len(xc) < 2:
+            return f"There must be at least 2 points defined for a \"{curvedesc}\" control curve."
+
+        # There can be no null values in either list.
+        for item in xc:
+            if item is None:
+                return f"There is at least 1 null x value in the \"{curvedesc}\" control curve.  There can be none."
+
+        for item in yc:
+            if item is None:
+                return f"There is at least 1 null y value in the \"{curvedesc}\" control curve.  There can be none."
+
+        if len(set(xc)) != len(xc):
+            return f"There are duplicate x values in the \"{curvedesc}\" control curve.  They must be unique"
+
+        return None
+
+    def validate(self) -> str:
+        if self.mode == "droop":
+            pass
+        elif self.mode == "voltvar":
+            return self.__check_curve_generic("Volt-Var", "volt_vals", "var_vals")
+        elif self.mode == "voltwatt":
+            return self.__check_curve_generic("Volt-Watt", "volt_vals", "watt_vals")
+        elif self.mode == "varwatt":
+            return self.__check_curve_generic("Var-Watt", "var_vals", "watt_vals")
+        elif self.mode == "vv_vw":
+            vvarmsg = self.__check_curve_generic("Volt-Var + Var-Watt", "vv_volt_vals", "var_vals")
+            if vvarmsg: return vvarmsg
+            return self.__check_curve_generic("Volt-Var + Var-Watt", "vw_volt_vals", "watt_vals")
+        if self.mode == "constantpf":
+            pass
+
+        return None
+
 class StorageOptions:
     """Set of configuration options available for a specific device.
 
@@ -620,6 +675,9 @@ class StorageOptions:
             if vv: return vv
 
         return None
+
+    def validate_controls(self) -> str:
+        return self.control.validate()
 
     def validate_busses(self) -> str:
         """Checks to see that the list of busses stored in this class is valid.
