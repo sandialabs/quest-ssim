@@ -259,6 +259,72 @@
             height: 100
             on_press: root.manager.current = 'ssim'
 
+<ResultsDetailScreen>:
+    name: "results-detail"
+    BoxLayout:
+        orientation: "vertical"
+        
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+
+            BoxLayout:
+                id: compare_canvas
+                size_hint_x: 1.5
+                orientation: "vertical"
+                padding: 5
+                spacing: 5
+                Label:
+                    text: "Comparison Plot Displayed Here!"
+                    color: 0, 0, 0, 1
+
+            BoxLayout:
+                orientation: "vertical"
+                Label:
+                    size_hint_y: 0.1
+                    text: "Select Configuration:"
+                    color: 0,0,0,1
+
+                ScrollView:
+                    size_hint_y: 0.8
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+                    MDList:
+                        id: config_list_detail
+
+                Label:
+                    size_hint_y: 0.1
+                    text: "Select Variable:"
+                    color: 0,0,0,1
+
+                ScrollView:
+                    size_hint_y: 0.8
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+                    MDList:
+                        id: variable_list_detail
+                
+                Button:
+                    size_hint_y: 0.1
+                    text: "Save Figure"
+                
+                Button:
+                    size_hint_y: 0.1
+                    text: "Download CSV"
+
+        Button:
+            text: "back"
+            size_hint_y: None
+            on_press: root.manager.current = 'results-summary'
+
 <ResultsSummaryScreen>:
     name: "results-summary"
 
@@ -336,6 +402,7 @@
                     spacing: 5
                     Button:
                         text: "View Details"
+                        on_press: root.open_results_detail()
                     Button:
                         text: "Compare"
                         on_press: root.open_results_compare()

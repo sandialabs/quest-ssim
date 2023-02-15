@@ -49,7 +49,9 @@ class SSimApp(MDApp):
         screen_manager.add_widget(
             ResultsSummaryScreen(self.project, name="results-summary"))
         screen_manager.add_widget(
-            ResultsCompareScreen(self.project, name="results-compare"))    
+            ResultsCompareScreen(self.project, name="results-compare"))
+        screen_manager.add_widget(
+            ResultsDetailScreen(self.project, name="results-detail"))    
         screen_manager.current = "ssim"
 
         return screen_manager
@@ -318,8 +320,16 @@ class ResultsSummaryScreen(SSimBaseScreen):
     def open_results_compare(self):
         self.manager.current = "results-compare"
 
+    def open_results_detail(self):
+        self.manager.current = "results-detail"
+
 
 class ResultsCompareScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class ResultsDetailScreen(SSimBaseScreen):
     pass
         
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):

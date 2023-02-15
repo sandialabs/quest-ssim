@@ -548,7 +548,6 @@ class Results:
     def metrics_log(self):
         """Returns name of columns of the logged metrics, the accumulated value
         of the metric, and the time-series log as a pandas dataframe."""
-
         df_metrics = pd.read_csv(self.config_dir / "metric_log.csv")
         # extract column names
         col_names = list(df_metrics.columns)
@@ -557,11 +556,4 @@ class Results:
         accumulated_metric = df_metrics.iloc[-1:].loc[num_rows - 1,'time']
         # extract all the datapoints as a pandas dataframe
         data = df_metrics.iloc[0 : num_rows-1]
-
         return col_names, accumulated_metric, data
-
-
- 
-    
-
-    # TO DO: All the csv files should be processed within this class
