@@ -3,6 +3,8 @@ from contextlib import ExitStack
 import itertools
 import os
 import re
+from threading import Thread
+from typing import List
 
 from importlib_resources import files, as_file
 
@@ -38,7 +40,13 @@ from kivymd.uix.textfield import MDTextField
 
 import tomli
 
-from ssim.ui import Project, StorageOptions, is_valid_opendss_name
+from ssim.ui import (
+    Configuration,
+    Project,
+    StorageOptions,
+    is_valid_opendss_name
+)
+
 
 _FONT_FILES = {
     "exo_regular": "Exo2-Regular.ttf",
@@ -990,23 +998,76 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
 class RunSimulationScreen(SSimBaseScreen):
 
-    def on_enter(self):
-        self.populate_confgurations()
-        for i in range(20):
-            # self.ids.config_list.add_widget(
-            #     TwoLineIconListItem(text=f"Single-line item {i}",
-            #                         secondary_text="Details")
-            # )
-            self.ids.config_list.add_widget(
-                ListItemWithCheckbox(pk="pk",
-                                     text=f"Single-line item {i}",
-                                     secondary_text="Details")
-            )
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.configurations: List[Configuration] = []
+        self.selected_configurations: List[Configuration] = []
+        self.storage_options: List[StorageOptions] = []
+        self._run_thread = None
 
-    def populate_confgurations(self):
-        # item_list = self.ids.interlist
-        # TODO: Need to populate the MDlist dynamically
-        configs = self.project.configurations
+    def on_enter(self):
+        # # clear the MDList every time the RunSimulationScreen is opened
+        # # TO DO: Keep track of selected configs
+        self.ids.config_list.clear_widgets()
+        self.configurations: List[Configuration] = []
+        self.populate_configurations()
+
+    def populate_configurations(self):
+        # store all the project configurations into a list
+        for config in self.project.configurations():
+            self.configurations.append(config)
+            print(config._id)
+
+        # populate the UI with the list of configurations
+        ctr = 1
+        for config in self.configurations:
+            secondary_detail_text = []
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+
+            for storage in config.storage:
+                if storage is not None:
+                    # print(storage)
+                    secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
+                    tertiary_detail_text.append(f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+                else:
+                    secondary_detail_text.append('no storage')
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
+
+            self.ids.config_list.add_widget(
+                    ListItemWithCheckbox(pk="pk",
+                                         text=f"Configuration {ctr}",
+                                         secondary_text=final_secondary_text,
+                                         tertiary_text=final_tertiary_text)
+            )
+            ctr += 1
+
+    def _evaluate(self):
+        # step 1: check the configurations that are currently selected
+        mdlist = self.ids.config_list # get reference to the configuration list
+        self.selected_configurations = []
+        print('selected configurations are:')
+        no_of_configurations = len(self.configurations)
+        ctr = no_of_configurations - 1
+        for wid in mdlist.children:
+            if wid.ids.check.active:
+                print('*' * 20)
+                print(wid.text)
+                print('*' * 20)
+                # extract a subset of selected configurations
+                self.selected_configurations.append(self.configurations[ctr])
+            ctr = ctr - 1
+        # run all the configurations
+        for config in self.selected_configurations:
+            print(config)
+            config.evaluate()
+            config.wait()
+
+    def run_configurations(self):
+        self._run_thread = Thread(target=self._evaluate)
+        self._run_thread.start()
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
@@ -1015,11 +1076,23 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
         self.pk = pk
 
     def delete_item(self, the_list_item):
+        print("Delete icon was button was pressed")
+        print(the_list_item)
         self.parent.remove_widget(the_list_item)
 
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     '''Custom left container'''
-    pass
+
+    def __init__(self, pk=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pk = pk
+
+    def toggle_configuration_check(self, check):
+        # print(check)
+        # if check.active:
+        #     print('Configuration checked')
+        # print("selection made")
+        pass
 
 class SelectGridDialog(FloatLayout):
     load = ObjectProperty(None)
