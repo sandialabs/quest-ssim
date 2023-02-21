@@ -7,6 +7,7 @@ from os import path
 from pathlib import Path
 import pkg_resources
 import subprocess
+import tomli
 
 from ssim import grid
 from ssim.opendss import DSSModel
@@ -62,9 +63,21 @@ class Project:
         self.name = name
         self._grid_model_path = None
         self._grid_model = None
+        self._input_file_path = None
         self.storage_devices = []
         self._pvsystems = []
         self._metricMgrs = {}
+
+    def load_toml_file(self, filename: str):
+        self._input_file_path = filename
+        self.clear_metrics()
+        self.clear_options()
+
+        with open(filename, 'r') as f:
+            toml = f.read()
+
+        tdat = tomli.loads(toml)
+        self.read_toml(tdat)
 
     @property
     def bus_names(self):
@@ -315,7 +328,7 @@ class StorageControl:
             if key == "mode":
                 self.mode = tomlData[key]
             else:
-                self.params[key] = float(tomlData[key])
+                self.params[key] = tomlData[key]
 
     def __check_curve_generic(self, curvedesc: str, curvename_x: str, curvename_y: str) -> str:
 

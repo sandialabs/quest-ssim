@@ -42,8 +42,6 @@ from kivymd.uix.list import (
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.textfield import MDTextField
 
-import tomli
-
 from ssim.ui import Project, StorageOptions, is_valid_opendss_name
 
 _FONT_FILES = {
@@ -317,8 +315,8 @@ class TextFieldOpenDSSName(MDTextField):
 class StorageConfigurationScreen(SSimBaseScreen):
     """Configure a single energy storage device."""
 
-    def __init__(self, der_screen, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, der_screen, ess: StorageOptions, *args, **kwargs):
+        super().__init__(der_screen.project, *args, **kwargs)
         self._der_screen = der_screen
         self.ids.power_input.bind(
             on_text_validate=self._add_device_power
@@ -329,23 +327,27 @@ class StorageConfigurationScreen(SSimBaseScreen):
         self.ids.device_name.bind(
             on_text_validate=self._check_name
         )
-        self.options = None
-        self._editing = None
+        self.options = ess
+        self.initialize_widgets()
 
-    @classmethod
-    def edit(cls, der_screen, ess: StorageOptions, project):
-        screen = cls(der_screen, name="configure-storage", project=project)
-        screen._editing = ess
-        for power in ess.power:
-            screen.ids.power_list.add_item(power)
-        for duration in ess.duration:
-            screen.ids.duration_list.add_item(duration)
-        screen.ids.device_name.text = ess.name
-        for bus_list_item in screen.ids.bus_list.children:
-            if bus_list_item.text in ess.busses:
+    def initialize_widgets(self):
+        if self.options is None: return
+
+        for power in self.options.power:
+            self.ids.power_list.add_item(power)
+
+        for duration in self.options.duration:
+            self.ids.duration_list.add_item(duration)
+
+        self.ids.device_name.text = self.options.name
+
+        for bus_list_item in self.ids.bus_list.children:
+            if bus_list_item.text in self.options.busses:
                 bus_list_item.ids.selected.active = True
-        screen.ids.required.active = ess.required
-        return screen
+
+        self.ids.required.active = self.options.required
+
+        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.device_name), 0.05)
 
     def on_kv_post(self, base_widget):
         self.ids.bus_list.clear_widgets()
@@ -468,14 +470,14 @@ class StorageConfigurationScreen(SSimBaseScreen):
         if self.show_error(self.options.validate_busses()): return
         if self.show_error(self.options.validate_controls()): return
 
-        self._der_screen.add_ess(self.options)
+        #self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
     def cancel(self):
-        if self._editing is not None:
+        #if self._editing is not None:
             # Restore the original device
-            self._der_screen.add_ess(self._editing)
+        #    self._der_screen.add_ess(self._editing)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
@@ -816,7 +818,6 @@ class DERConfigurationScreen(SSimBaseScreen):
             on_release=self.delete_ess
         )
 
-
     def load_project_data(self):
         self.ids.ess_list.clear_widgets()
         for so in self.project.storage_devices:
@@ -825,9 +826,13 @@ class DERConfigurationScreen(SSimBaseScreen):
             )
 
     def new_storage(self):
+        ess = StorageOptions("NewBESS", 3, [], [], [])
+
+        self.add_ess(ess)
+
         self.manager.add_widget(
             StorageConfigurationScreen(
-                self, self.project, name="configure-storage")
+                self, ess, name="configure-storage")
         )
 
         self.manager.current = "configure-storage"
@@ -855,10 +860,10 @@ class DERConfigurationScreen(SSimBaseScreen):
     def edit_storage(self, ess_list_item):
         ess = ess_list_item.ess
         # Remove from the list so it can be re-added after editing
-        self.project.remove_storage_option(ess)
-        self.ids.ess_list.remove_widget(ess_list_item)
+        #self.project.remove_storage_option(ess)
+        #self.ids.ess_list.remove_widget(ess_list_item)
         self.manager.add_widget(
-            StorageConfigurationScreen.edit(self, ess, self.project))
+            StorageConfigurationScreen(self, ess, name="configure-storage"))
         self.manager.current = "configure-storage"
 
 
@@ -1347,29 +1352,31 @@ class SSimScreen(SSimBaseScreen):
 
     def load_toml_file(self, path, filename):
         Logger.debug("loading file %s", filename[0])
-        self.project.clear_metrics()
-        self.project.clear_options()
-
-        with open(filename[0], 'r') as f:
-            toml = f.read()
-
-        tdat = tomli.loads(toml)
-        self.project.read_toml(tdat)
+        self.project.load_toml_file(filename[0])
         self.bus_list.text = '\n'.join(self.project.bus_names)
+        self.set_current_input_file(filename[0])
         self.dismiss_popup()
+
+    def set_current_input_file(self, fullpath):
+        self.project._input_file_path = fullpath
+        app = MDApp.get_running_app()
+        app.title = "SSim: " + fullpath
 
     def save_toml_file(self, selection, filename):
         fullpath = selection[0]
 
+        split = os.path.splitext(filename)
+        if split[1].lower() != ".toml":
+            filename = filename + ".toml"
+
         if os.path.isdir(fullpath):
             fullpath = os.path.join(fullpath, filename)
-
-        split = os.path.splitext(fullpath)
-        if split[1].lower() != ".toml":
-            fullpath = os.path.join(split[0], ".toml")
+        else:
+            fullpath = os.path.join(os.path.dirname(fullpath), filename)
 
         Logger.debug("loading file %s", fullpath)
 
+        self.set_current_input_file(fullpath)
         toml = self.project.write_toml()
 
         with open(fullpath, 'w') as f:
@@ -1384,7 +1391,17 @@ class SSimScreen(SSimBaseScreen):
         self._popup = Popup(title="select SSIM TOML file", content=chooser)
         self._popup.open()
 
-    def write_toml(self):
+    def write_to_toml(self):
+        if not self.project._input_file_path:
+            self.write_as_toml()
+            return
+
+        fname = os.path.basename(self.project._input_file_path)
+        dname = [os.path.dirname(self.project._input_file_path)]
+
+        self.save_toml_file(dname, fname)
+
+    def write_as_toml(self):
         chooser = SaveSSIMTOMLDialog(
             save=self.save_toml_file, cancel=self.dismiss_popup)
 
