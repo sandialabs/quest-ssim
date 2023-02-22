@@ -87,8 +87,13 @@
                 orientation: "vertical"
                 padding: 5
 
+                Label:
+                    text: "List of Defined Storage Assets"
+                    size_hint: (1.0, 0.05)
+                    color: 0,0,0,1
+
                 ScrollView:
-                    size_hint: (1.0, 0.8)
+                    size_hint: (1.0, 0.75)
                     MDList:
                         id: ess_list
 
@@ -470,20 +475,22 @@
                 BoxLayout:
                     id: metricValueBox
                     orientation: "vertical"
-                    size_hint: None, None
-                    size: self.parent.width, 275
+                    size_hint_y: None
+                    height: 320
                     disabled: True
 
                     Label:
                         id: metriclabel
                         text: "Metric Settings"
-                        size_hint: None, None
-                        size: self.parent.width, 25
+                        size_hint_y: None
+                        height: 25
                         color: 0,0,0,1
 
                     BoxLayout:
                         id: metricSenseBox
                         orientation: "horizontal"
+                        size_hint_y: None
+                        height: 35
                         disabled: True
 
                         MDRaisedButton:
@@ -512,26 +519,33 @@
 
                     TextFieldMultiFloat:
                         hint_text: "Lower Limit Value"
+                        size_hint_y: None
+                        height: 25
                         id: lowerLimitText
 
                     TextFieldMultiFloat:
                         hint_text: "Objective Value"
+                        size_hint_y: None
+                        height: 25
                         id: objectiveText
 
                     TextFieldMultiFloat:
                         hint_text: "Upper Limit Value"
+                        size_hint_y: None
+                        height: 25
                         id: upperLimitText
 
                     Button:
                         id: btnStore
                         text: "store"
-                        size_hint: None, None
-                        size: self.parent.width, 25
+                        size_hint_y: None
+                        height: 25
                         on_release: root.store_metrics()
                         disabled: True
 
                 BoxLayout:
                     orientation: "vertical"
+                    size_hint_y: 40
 
                     Label:
                         id: currMetriclabel
