@@ -13,6 +13,7 @@ import subprocess
 
 from ssim import grid
 from ssim.opendss import DSSModel
+from ssim.metrics import MetricManager, MetricTimeAccumulator
 
 # To Do
 #
@@ -66,7 +67,11 @@ class Project:
         self._grid_model = None
         self.storage_devices = []
         self._pvsystems = []
-        self._metrics = []
+        self._metricMgrs = {}
+
+    @property
+    def base_dir(self):
+        return Path(os.path.abspath(self.name))
 
     @property
     def base_dir(self):
@@ -76,6 +81,14 @@ class Project:
     def bus_names(self):
         return self._grid_model.bus_names
 
+    @property
+    def storage_names(self):
+        return set(device.name for device in self.storage_devices)
+
+    @property
+    def grid_model(self):
+        return self._grid_model
+
     def phases(self, bus):
         return self._grid_model.available_phases(bus)
 
@@ -83,8 +96,152 @@ class Project:
         self._grid_model_path = model_path
         self._grid_model = DSSModel(model_path)
 
-    def add_metric(self, metric):
-        self._metrics.append(metric)
+    def write_toml(self) -> str:
+        """Writes the properties of this class instance to a string in TOML
+           format.
+
+        Returns
+        -------
+        str:
+            A TOML formatted string with the properties of this project instance.
+        """
+        ret = "[Project]\n"
+        ret += f"name = \'{self.name}\'\n"
+        ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
+
+        for so in self.storage_devices:
+            ret += so.write_toml()
+
+        for mgrKey in self._metricMgrs:
+            mgr = self._metricMgrs[mgrKey]
+            ret += mgr.write_toml(mgrKey)
+
+        return ret
+
+    def read_toml(self, tomlData):
+        """Reads the properties of this class instance from a TOML formated dictionary.
+
+        Parameters
+        -------
+        tomlData
+            A TOML formatted dictionary from which to read the properties of this class
+            instance.
+        """
+        projdict = tomlData["Project"]
+        self.name = projdict["name"]
+        self.set_grid_model(projdict["grid_model_path"])
+
+        sodict = tomlData["storage-options"]
+        for sokey in sodict:
+            so = StorageOptions(sokey, 3, [], [], [])
+            so.read_toml(sokey, sodict[sokey])
+            self.add_storage_option(so)
+
+        for mkey in tomlData:
+            if mkey == "metrics":
+                self.__read_metric_map(tomlData[mkey])
+
+    def __read_metric_map(self, mdict):
+        for ckey in mdict:
+            self.__read_metric_values(mdict[ckey], ckey)
+
+    def __read_metric_values(self, cdict, ckey):
+        for bus in cdict:
+            mta = MetricTimeAccumulator.read_toml(cdict[bus])
+            self.add_metric(ckey, bus, mta)
+
+    def add_metric(self, category: str, key: str, metric: MetricTimeAccumulator):
+        """Adds the supplied metric identified by the supplied key to an existing or
+         new metric manager with the supplied category.
+
+        If there is already a metric associated with the category and key, it is
+        replaced by the supplied one.  If the supplied metric is None, then any
+        existing metric keyed on category and key is removed.
+
+        Parameters
+        ----------
+        category : str
+            The category of the metric manager to which a metric is to be added.
+        key : str
+            The key of the metric to add.
+        metric : MetricTimeAccumulator
+            The metric to add to this project keyed on the supplied category and key.
+        """
+        cat_mgr = self.get_manager(category)
+        if cat_mgr is None:
+            cat_mgr= MetricManager()
+            self._metricMgrs[category] = cat_mgr
+             
+        cat_mgr.add_accumulator(key, metric)
+        
+    def remove_metric(self, category: str, key: str) -> bool:
+        """Removes the metric identified by the supplied key in the supplied category.
+
+        Parameters
+        ----------
+        category : str
+            The category of the metric manager from which a metric is to be removed.
+        key : str
+            The key of the metric to remove.
+
+        Returns
+        -------
+        bool:
+            True if a removal took place and false if not.  Removal may fail if the
+            supplied category does not map to an existing metric manager or if key
+            does not map to a metric in the identified manager.
+        """
+        cat_mgr = self.get_manager(category)
+        if cat_mgr is None: return False
+        return cat_mgr.remove_accumulator(key)
+
+    def get_metric(self, category: str, key: str) -> MetricTimeAccumulator:
+        """Retrieves the metric identified by the supplied key in the supplied category.
+
+        Parameters
+        ----------
+        category : str
+            The category of the metric manager from which a metric is to be retrieved.
+        key : str
+            The key of the metric to retrieve.
+
+        Returns
+        -------
+        MetricTimeAccumulator:
+            The found metric or None.  Retrieval may fail if the supplied category does
+            not map to an existing metric manager or if key does not map to a metric
+            in the identified manager.
+        """
+        cat_mgr = self.get_manager(category)
+        if cat_mgr is None: return None
+        return cat_mgr.get_accumulator(key)
+    
+    def clear_metrics(self):
+        """Removes all metrics from all managers and removes all managers."""
+        self._metricMgrs.clear();
+
+    def clear_options(self):
+        """Removes all storage options from this project."""
+        self.storage_devices.clear();
+
+    def get_manager(self, category: str) -> MetricManager:
+        """Retrieves the metric manager identified by the supplied category.
+
+        Parameters
+        ----------
+        category : str
+            The category of the metric manager to be retrieved.
+
+        Returns
+        -------
+        MetricManager:
+            The found metric manager or None.  Retrieval may fail if the supplied category
+            does not map to an existing metric manager.
+        """
+        return self._metricMgrs.get(category)
+
+    def remove_storage_option(self, storage_options):
+        self.storage_devices.remove(storage_options)
 
     def add_storage_option(self, storage_options):
         self.storage_devices.append(storage_options)
@@ -94,7 +251,7 @@ class Project:
         for storage_configuration in self._storage_configurations():
             yield Configuration(
                 self._grid_model_path,
-                self._metrics,
+                self._metricMgrs,
                 self._pvsystems,
                 storage_configuration
             )
@@ -134,6 +291,44 @@ class StorageControl:
         self.mode = mode
         self.params = params
 
+    def write_toml(self, name: str)->str:
+        """Writes the properties of this class instance to a string in TOML
+           format.
+
+        Parameters
+        ----------
+        name : str
+            The name of the storage asset for which this is the control
+            configuration.
+
+        Returns
+        -------
+        str:
+            A TOML formatted string with the properties of this instance.
+        """
+        ret = f"\n\n[{name}.control-mode]\n"
+        ret += f"mode = \'{self.mode}\'\n"
+
+        #ret += f"\n\n[{name}.control-mode.params]\n"
+        for key in self.params:
+            ret += f"{key} = {str(self.params[key])}\n"
+
+        return ret
+
+    def read_toml(self, tomlData):
+        """Reads the properties of this class instance from a TOML formated dictionary.
+
+        Parameters
+        -------
+        tomlData
+            A TOML formatted dictionary from which to read the properties of this class
+            instance.
+        """
+        for key in tomlData:
+            if key == "mode":
+                self.mode = tomlData[key]
+            else:
+                self.params[key] = float(tomlData[key])
 
 class StorageOptions:
     """Set of configuration options available for a specific device.
@@ -167,7 +362,6 @@ class StorageOptions:
         If True the device will be included in every configuration.
         Otherwise, the configurations without this device will be
         evaluated.
-
     """
 
     def __init__(self, name, num_phases, power, duration, busses,
@@ -187,25 +381,284 @@ class StorageOptions:
         self.initial_soc = initial_soc
         self.control = control or StorageControl(
             'droop',
-            {'p_droop': 500, 'q_droop': -300}  # completely arbitrary
+            {'p_droop': 500.0, 'q_droop': -300.0}  # completely arbitrary
         )
         self.soc_model = soc_model
-        self.required = False
+        self.required = required
 
-    def add_bus(self, bus):
+    def write_toml(self)->str:
+        """Writes the properties of this class instance to a string in TOML format.
+
+        Returns
+        -------
+        str:
+            A TOML formatted string with the properties of this instance.
+        """
+        tag = "storage-options." + self.name
+        ret = f"\n\n[{tag}]\n"
+        ret += f"phases = {str(self.phases)}\n"
+        ret += f"required = {str(self.required).lower()}\n"
+        ret += f"min_soc = {str(self.min_soc)}\n"
+        ret += f"max_soc = {str(self.max_soc)}\n"
+        ret += f"initial_soc = {str(self.initial_soc)}\n"
+        buslst = "'" + "','".join(self.busses) + "'"
+        ret += f"busses = [{str(buslst)}]\n"
+        ret += f"power = [{str(', '.join(map(str, self.power)))}]\n"
+        ret += f"duration = [{str(', '.join(map(str, self.duration)))}]\n"
+
+        if self.control: ret += self.control.write_toml(tag)
+        return ret
+
+    def read_toml(self, name: str, tomlData):
+        """Reads the properties of this class instance from a TOML formated dictionary.
+
+        Parameters
+        -------
+        name: str
+            The name of the storage asset for which this is the option description.
+        tomlData
+            A TOML formatted dictionary from which to read the properties of this class
+            instance.
+        """
+        self.phases = tomlData["phases"]
+        self.required = tomlData["required"]
+        self.min_soc = tomlData["min_soc"]
+        self.max_soc = tomlData["max_soc"]
+        self.initial_soc = tomlData["initial_soc"]
+        self.busses = set(tomlData["busses"])
+        self.power = set(tomlData["power"])
+        self.duration = set(tomlData["duration"])
+
+        if "control-mode" in tomlData:
+            self.control.read_toml(tomlData["control-mode"])
+
+    def add_bus(self, bus: str):
+        """Adds the supplied bus name to the list of bus names in this storage option.
+
+        Parameters
+        ----------
+        bus
+            The name of the bus to add to this storage options bus list.
+        """
         self.busses.add(bus)
 
-    def add_power(self, power):
-        self.power.add(power)
+    def add_power(self, power: float) -> bool:
+        """Adds a new power value (kW) to the list of allowed power values
+        for this storage configuration.
 
-    def add_duration(self, duration):
+        If the supplied power value already exists, then nothing happens.
+        Duplicates are not added.
+
+        Parameters
+        -------
+        power: float
+            The power value to add to the list of possible power values for this
+            storage element.
+
+        Returns
+        -------
+        bool:
+            True if the power value is successfully added and false otherwise.
+        """
+        initlen = len(self.power)
+        self.power.add(power)
+        return initlen != len(self.power)
+
+    def add_duration(self, duration: float) -> bool:
+        """Adds a new duration value (hours) to the list of allowed duration values
+        for this storage configuration.
+
+        If the supplied duration value already exists, then nothing happens.
+        Duplicates are not added.
+
+        Parameters
+        -------
+        power: float
+            The duration value to add to the list of possible duration values for this
+            storage element.
+
+        Returns
+        -------
+        bool:
+            True if the duration value is successfully added and false otherwise.
+        """
+        initlen = len(self.duration)
         self.duration.add(duration)
+        return initlen != len(self.duration)
+
+    @property
+    def name_valid(self) -> bool:
+        """Tests to see if the name stored in this class is valid.
+
+        To be valid, the name must be a vaild OpenDSS name.  See the
+        is_valid_opendss_name function for more details.
+
+        Returns
+        -------
+        bool:
+            True if self.name is a valid name for a storage object and
+            False otherwise.
+        """
+        return is_valid_opendss_name(self.name)
+
+    def validate_soc_values(self) -> str:
+        """Checks to see that the SOC values stored in this class are valid values.
+
+        To be valid, the min SOC must be less than the max and all values
+        (min, max, and initial) must be in the range [0, 1].
+
+        Returns
+        -------
+        str:
+            A string indicating any errors in the SOC inputs or None
+            if there are no issues.
+        """
+        if self.min_soc >= self.max_soc:
+            return "The minimum SOC must be less than the maximum."
+
+        if self.initial_soc > 1.0:
+            return "The initial SOC must be less than 100%."
+
+        if self.initial_soc < 0.0:
+            return "The initial SOC must be greater than 0%."
+
+        if self.max_soc > 1.0:
+            return "The maximum SOC must be less than 100%."
+
+        if self.max_soc < 0.0:
+            return "The maximum SOC must be greater than 0%."
+
+        if self.min_soc > 1.0:
+            return "The minimum SOC must be less than 100%."
+
+        if self.min_soc < 0.0:
+            return "The minimum SOC must be greater than 0%."
+
+        return None
+
+    def validate_name(self) -> str:
+        """Checks to see that the name stored in this class is valid.
+
+        To be valid, the name must be a vaild OpenDSS name.  See the
+        name_valid property for more details.
+
+        Returns
+        -------
+        str:
+            A string indicating any errors in the name input or None
+            if there are no issues.
+        """
+        return None if self.name_valid else \
+            "Storage asset name is invalid.  The name can contain no spaces, " + \
+            "newlines, periods, tabs, or equal signs.  It also cannot be empty."
+
+    def validate_power_value(self, value: float) -> str:
+        """Checks to see that the supplied power value is valid for use in this class.
+
+        To be valid, the supplied power value must be greater than 0.  No check is done
+        here to be sure that the supplied value is not already in the list.
+
+        Parameters
+        ----------
+        value: float
+            The value to test for usability as a power value for this class.
+
+        Returns
+        -------
+        str:
+            A string indicating the any error with the supplied power value or None
+            if there are no issues.
+        """
+        return None if value > 0.0 \
+            else "Power values cannot be less than or equal to 0 kW."
+
+    def validate_duration_value(self, value: float) -> str:
+        """Checks to see that the supplied duration value is valid for use in this class.
+
+        To be valid, the supplied duration value must be greater than 0.  No check is done
+        here to be sure that the supplied value is not already in the list.
+
+        Parameters
+        ----------
+        value: float
+            The value to test for usability as a duration value for this class.
+
+        Returns
+        -------
+        str:
+            A string indicating the any error with the supplied duration value or None
+            if there are no issues.
+        """
+        return None if value > 0.0 \
+            else "Duration values cannot be less than or equal to 0 hours."
+
+    def validate_power_values(self) -> str:
+        """Checks to see that the power values stored in this class are valid.
+
+        To be valid, there must be at least 1 power value and all power values must
+        pass the test in validate_power_value.
+
+        Returns
+        -------
+        str:
+            A string indicating the first error found in the power values or None
+            if there are no issues.
+        """
+        if len(self.power) == 0:
+            return "No power values provided."
+
+        for val in self.power:
+            vv = self.validate_power_value(val)
+            if vv: return vv
+
+        return None
+
+    def validate_duration_values(self) -> str:
+        """Checks to see that the duration values stored in this class are valid.
+
+        To be valid, there must be at least 1 duration value and all duration values must
+        pass the test in validate_duration_value.
+
+        Returns
+        -------
+        str:
+            A string indicating the first error found in the duration values or None
+            if there are no issues.
+        """
+        if len(self.duration) == 0:
+            return "No duration values provided."
+
+        for val in self.duration:
+            vv = self.validate_duration_value(val)
+            if vv: return vv
+
+        return None
+
+    def validate_busses(self) -> str:
+        """Checks to see that the list of busses stored in this class is valid.
+
+        To be valid, there must be at least 1 bus.
+
+        Returns
+        -------
+        str:
+            A string indicating the first error found while checking the bus list
+            or None if there are no issues.
+        """
+        if len(self.busses) == 0:
+            return "No busses selected"
+
+        # Don't have access to the master bus list here (I don't think)
+        # but it would be good to check them all against that list.
+
+        return None
 
     @property
     def valid(self):
-        return (len(self.power) > 0
-                and len(self.duration) > 0
-                and len(self.busses) > 0)
+        return (self.name_valid
+                and self.validate_duration_values() is None
+                and self.validate_power_values() is None
+                and self.validate_busses() is None)
 
     @property
     def num_configurations(self):
@@ -242,6 +695,18 @@ class MetricCongifuration:
     """
 
     def __init__(self, bus, objective, limit):
+        """Constructs a new MetricConfiguration object.
+
+        Parameters
+        ----------
+        bus
+            The bus for which this metric configuration is being defined.
+        objective
+            The objective value for this metric configuration.  This is the target
+            value which if achieved, results in full satisfaction.
+        limit
+            The worst acceptable value for this metric.
+        """
         self.bus = bus
         self.limit = limit
         self.objective = objective
@@ -351,8 +816,9 @@ class Configuration:
         return config
 
     def _configure_metrics(self, config):
-        config["busses_to_measure"] = [metric.to_dict()
-                                       for metric in self.metrics]
+        voltage_metrics = self.metrics.get("Voltage")
+        if voltage_metrics is not None:
+            config["busses_to_measure"] = voltage_metrics.to_dicts()
         return config
 
     def _federation_config(self):
@@ -497,6 +963,18 @@ class ProjectResults:
             config_count += 1
             return fig
 
+_OPENDSS_ILLEGAL_CHARACTERS = "\t\n .="
+
+
+def is_valid_opendss_name(name: str) -> bool:
+    """Return true if `name` is a valid name in OpenDSS.
+
+    OpenDSS names may not contain whitespace, '.', or '='.
+    """
+    return (
+        len(name) > 0
+        and not any(c in _OPENDSS_ILLEGAL_CHARACTERS for c in name)
+    )
 
 
 class Results:

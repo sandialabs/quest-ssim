@@ -1,5 +1,10 @@
 #:include common.kv
 
+
+#:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
+#:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
+#:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
+
 <SSimScreen>:
     name: 'ssim'
     bus_list: bus_list
@@ -21,6 +26,14 @@
                 text: "unnamed"
                 multiline: False
                 valign: "center"
+
+        Button:
+            text: "save to file"
+            on_press: root.write_toml()
+
+        Button:
+            text: "read from file"
+            on_press: root.read_toml()
 
         Button:
             text: "select grid model"
@@ -48,6 +61,7 @@
 
 <DERConfigurationScreen>:
     name: "der-config"
+    on_enter: root.load_project_data()
 
     BoxLayout:
         orientation: "vertical"
@@ -55,12 +69,11 @@
         BoxLayout:
             orientation: "horizontal"
             padding: 5
-            height: 1.0
+            size_hint: (1.0, 0.8)
 
             BoxLayout:
                 orientation: "vertical"
                 padding: 5
-                height: 0.95
 
                 ScrollView:
                     size_hint: (1.0, 0.8)
@@ -73,6 +86,7 @@
                     on_press: root.new_storage()
 
                 Button:
+                    id: delete_storage
                     size_hint: (1.0, 0.1)
                     text: "Delete Storage"
 
@@ -84,6 +98,7 @@
             orientation: "horizontal"
             padding: 5
             spacing: 5
+            size_hint: (1.0, 0.2)
 
             Button:
                 height: 10
@@ -97,10 +112,101 @@
                 on_press: root.manager.current = 'ssim'
 
 
-<BusListitem>:
+<StorageListitem>:
+    LeftCheckBox:
+        id: selected
+
+    IconRightWidget:
+        id: edit
+        icon: "pencil"
+
+
+<BusListItem>:
 
     LeftCheckBox:
         id: selected
+
+<StorageControlConfigurationScreen>:
+    name: "configure-storage-controls"
+    on_enter: self.set_mode_label_text()
+
+    BoxLayout:
+        orientation: "vertical"
+
+        TextFieldPositivePercentage:
+            id: min_soc
+            hint_text: "Minimum State of Charge (%)"
+
+        TextFieldPositivePercentage:
+            id: max_soc
+            hint_text: "Maximum State of Charge (%)"
+
+        TextFieldPositivePercentage:
+            id: init_soc
+            hint_text: "Initial State of Charge (%)"
+
+        Label:
+            id: mode_label
+            markup: True
+            text: "Select a control mode for this storage asset:"
+            color: C(hex_black)
+            size_hint: (1.0, 0.05)
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint: (1.0, 0.2)
+
+            MDRaisedButton:
+                id: droop_mode
+                text: "Droop"
+                md_bg_color: '#005376'
+                on_press: root.set_droop_mode()
+
+            MDRaisedButton:
+                id: vv_mode
+                text: "Volt-Var"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_var_mode()
+
+            MDRaisedButton:
+                id: vw_mode
+                text: "Volt-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_watt_mode()
+
+            MDRaisedButton:
+                id: var_watt_mode
+                text: "Var-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_var_watt_mode()
+
+            MDRaisedButton:
+                id: vv_vw_mode
+                text: "Volt-Var & Volt-Watt"
+                md_bg_color: '#005376'
+                on_press: root.set_volt_var_and_volt_watt_mode()
+
+            MDRaisedButton:
+                id: const_pf_mode
+                text: "Constant Power Factor"
+                md_bg_color: '#005376'
+                on_press: root.set_const_power_factor_mode()
+
+        BoxLayout:
+            id: param_box
+            orientation: "vertical"
+            size_hint: (1.0, 0.7)
+
+        BoxLayout:
+            size_hint: (1.0, 0.15)
+            orientation: "horizontal"
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
 
 
 <StorageConfigurationScreen>:
@@ -115,65 +221,69 @@
             BoxLayout:
                 orientation: "vertical"
 
-                Label:
-                    text: "device name"
-                    color: "black"
-
-                TextInput:
-                    text: root.ess.name
-                    on_text: root.ess.name = self.text
-                    multiline: False
-
-                Label:
-                    text: "device power (kW)"
-                    color: "black"
+                TextFieldOpenDSSName:
+                    id: device_name
+                    hint_text: "Device Name"
+                    helper_text_mode: "on_error"
+                    helper_text: "invalid name"
 
                 BoxLayout:
-                    orientation: "horizontal"
+                    orientation: "vertical"
 
-                    ScrollView:
-                        MDList:
+                    TextFieldPositiveFloat:
+                        id: power_input
+                        hint_text: "Storage Device Power (kW)"
+
+                    MDScrollView:
+                        EditableSetList:
                             id: power_list
 
-                    BoxLayout:
-                        orientation: "vertical"
-
-                        TextInput:
-                            id: power_input
-                            text: ""
-
-                        Button:
-                            text: "add power option"
-                            on_release: root.add_power(float(power_input.text))
-
-                Label:
-                    text: "duration (hours)"
-                    color: "black"
-
                 BoxLayout:
-                    orientation: "horizontal"
+                    orientation: "vertical"
 
-                    ScrollView:
-                        MDList:
+                    TextFieldPositiveFloat:
+                        id: duration_input
+                        hint_text: "Storage Device Duration (hours)"
+
+                    MDScrollView:
+                        EditableSetList:
                             id: duration_list
 
-                    BoxLayout:
-                        orientation: "vertical"
+            BoxLayout:
+                orientation: "vertical"
+                spacing: 10
+                MDLabel:
+                    text: "Select possible busses"
+                    size_hint_y: None
+                    height: 0
+                MDScrollView:
+                    size_hint: (1.0, 1.0)
+                    MDList:
+                        size_hint_y: None
+                        height: 0
+                        id: bus_list
 
-                        TextInput:
-                            id: duration_input
-                            text: ""
+                BoxLayout:
+                    size_hint: (1.0, 0.06)
+                    orientation: "horizontal"
+                    MDLabel:
+                        id: required_label
+                        size_hint_y: None
+                        height: 0
+                        text: "required?"
+                    MDSwitch:
+                        id: required
+                        size_hint_y: None
+                        height: 0
+                        active: False
 
-                        Button:
-                            text: "add duration option"
-                            on_release: root.add_duration(float(duration_input.text))
-
-            ScrollView:
-                MDList:
-                    id: bus_list
+                Button:
+                    text: "Edit Control Parameters"
+                    size_hint: (1.0, 0.06)
+                    on_press: root.edit_control_params()
 
         BoxLayout:
-            size_hint: (1.0, 0.05)
+            size_hint: (1.0, 0.15)
             orientation: "horizontal"
             Button:
                 text: "back"
@@ -190,9 +300,41 @@
     BoxLayout:
         orientation: "vertical"
 
+        Label:
+            id: currMetriclabel
+            text: "Defined Metrics"
+            size_hint: 1.0, 0.05
+            color: 0,0,0,1
+
+        ScrollView:
+            MDList:
+                id: metriclist
+
         Button:
             text: "back"
             on_press: root.manager.current = 'ssim'
+
+<MetricListItem>:
+
+    bus: ' '
+
+    IconRightWidget:
+        id: trash_can
+        icon: 'trash-can-outline'
+        listItem: root
+
+    IconLeftWidget:
+        id: left_icon
+        icon: 'chart-line'
+
+<BusListItemWithCheckbox>:
+
+    IconRightWidget:
+        icon: root.icon
+
+    LeftCheckbox:
+        id: check
+        listItem: root
 
 <MetricConfigurationScreen>:
     name: "metric-config"
@@ -200,15 +342,139 @@
     BoxLayout:
         orientation: "vertical"
 
+        BoxLayout:
+            #cols: 3
+            orientation: "horizontal"
+
+            BoxLayout:
+                orientation: "vertical"
+
+                Label:
+                    text: "Class of Metrics to Configure"
+                    size_hint: 1.0, 0.05
+                    color: 0,0,0,1
+
+                ScrollView:
+
+                    MDList:
+                        id: metriclist
+
+                        TwoLineIconListItem:
+                            text: "Voltage"
+                            secondary_text: "set voltage targets by bus"
+                            icon: "plus"
+                            on_release: root.configure_voltage_metrics()
+
+                        TwoLineIconListItem:
+                            text: "Some other metric values"
+                            secondary_text: "set ..."
+                            icon: "plus"
+                            on_release: root.configure_some_other_metrics()
+
+            BoxLayout:
+                orientation: "vertical"
+
+                Label:
+                    id: interlabel
+                    text: "Metric Objects"
+                    size_hint: 1.0, 0.05
+                    color: 0,0,0,1
+
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint: None, None
+                    size: self.parent.width, 10
+
+                    Button:
+                        id: btnSelectAll
+                        text: "Select All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.select_all_metric_objects()
+                        disabled: True
+
+                    Button:
+                        id: btnDeselectAll
+                        text: "Deselect All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.deselect_all_metric_objects()
+                        disabled: True
+
+                ScrollView:
+                    MDList:
+                        id: interlist
+
+            BoxLayout:
+                orientation: "vertical"
+
+                BoxLayout:
+                    id: metricValueBox
+                    orientation: "vertical"
+                    size_hint: None, None
+                    size: self.parent.width, 275
+                    disabled: True
+
+                    Label:
+                        id: metriclabel
+                        text: "Metric Settings"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        color: 0,0,0,1
+
+                    TextFieldMultiFloat:
+                        hint_text: "Limit Value"
+                        id: limitText
+
+                    TextFieldMultiFloat:
+                        hint_text: "Objective Value"
+                        id: objectiveText
+
+                    Label:
+                        id: senselabel
+                        text: "Sense"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        color: 0,0,0,1
+
+                    MDRaisedButton:
+                        id: caller
+                        text: "Sense"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        on_release: root.drop_sense_menu()
+
+                    Button:
+                        id: btnStore
+                        text: "store"
+                        size_hint: None, None
+                        size: self.parent.width, 25
+                        on_release: root.store_metrics()
+                        disabled: True
+
+                BoxLayout:
+                    orientation: "vertical"
+
+                    Label:
+                        id: currMetriclabel
+                        text: "Defined Metrics"
+                        size_hint: 1.0, 0.05
+                        color: 0,0,0,1
+
+                    ScrollView:
+                        MDList:
+                            id: metriclist
+
         Button:
             text: "back"
+            size_hint: 1.0, 0.05
             on_press: root.manager.current = 'ssim'
 
 <RunSimulationScreen>:
     name: "run-sim"
 
     BoxLayout:
-        orientation: "vertical"   
+        orientation: "vertical"
 
         BoxLayout:
             orientation: "horizontal"
@@ -460,6 +726,14 @@
             size_hint_y: None
             on_press: root.manager.current = 'results-summary'
 
+
+<EditableSetListItem>:
+
+    IconRightWidget:
+        id: delete
+        icon: "trash-can-outline"
+
+
 <ListItemWithCheckbox>:
     id: the_list_item
     markup: True
@@ -498,9 +772,72 @@
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
 
+<SelectSSIMTOMLDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            path: "."
+            filters: ["*.toml"]
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Load"
+                on_release: root.load(filechooser.path, filechooser.selection)
+
+<NoGridPopupContent>:
+    orientation: "vertical"
+    Label:
+        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to set voltage metrics.'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+
+    Button:
+        id: mainScreenBtn
+        text: 'Return to Main Screen'
+        size_hint: 1, 0.2
+
+<MessagePopupContent>:
+    orientation: "vertical"
+    Label:
+        id: msg_label
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+
+<MissingMetricValuesPopupContent>:
+    orientation: "vertical"
+    Label:
+        text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Limit"" and ""Objective"" and select a ""Sense"".'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+
+
 <NoGridPopupContent>:
     Label:
-        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to run an analysis.'
+        text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before continuing.'
         text_size: self.width, None
         height: self.texture_size[1]
 

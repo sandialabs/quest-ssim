@@ -72,6 +72,9 @@ class StorageSpecification:
     #: Type of the controller for this device.
     controller: str
 
+    #: Additional parameters to be passed to the controller constructor.
+    controller_params: dict = field(default_factory=dict)
+
     #: Number of phases to which the device is connected.
     phases: int = 3
 
@@ -83,9 +86,6 @@ class StorageSpecification:
 
     #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
     inverter_efficiency: Optional[Curve] = None
-
-    #: Additional parameters to be passed to the controller constructor.
-    controller_params: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, params: dict):
@@ -102,16 +102,19 @@ class StorageSpecification:
         # copy the dict so we can modify it with impunity
         params = params.copy()
         # pop the keys off so we are left with only the extra OpenDSS params.
+        controller_params = params.pop("controller_params", dict())
+        print(f"controller_params = {controller_params}")
+        print(f"params = {params}")
         return cls(
-            params.pop("name"),
-            params.pop("bus"),
-            params.pop("kwhrated"),
-            params.pop("kwrated"),
-            params.pop("controller"),
-            params.pop("phases", 3),
-            params.pop("%stored", 50) / 100,
+            name=params.pop("name"),
+            bus=params.pop("bus"),
+            kwh_rated=params.pop("kwhrated"),
+            kw_rated=params.pop("kwrated"),
+            controller=params.pop("controller"),
+            phases=params.pop("phases", 3),
+            soc=params.pop("%stored", 50) / 100,
             inverter_efficiency=_get_curve("inverter_efficiency", params),
-            controller_params=params.pop("controller_params", dict()),
+            controller_params=controller_params,
             params=params
         )
 
