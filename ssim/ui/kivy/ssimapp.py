@@ -1374,7 +1374,7 @@ class SSimScreen(SSimBaseScreen):
         else:
             fullpath = os.path.join(os.path.dirname(fullpath), filename)
 
-        Logger.debug("loading file %s", fullpath)
+        Logger.debug("saving file %s", fullpath)
 
         self.set_current_input_file(fullpath)
         toml = self.project.write_toml()
