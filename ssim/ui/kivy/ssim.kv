@@ -51,6 +51,12 @@
             text: "select grid model"
             on_press: root.select_grid_model()
 
+        MDLabel
+            id: grid_model_label
+            size_hint_y: None
+            height: 25
+            text: "Current Grid Model:"
+
         Button:
             text: "select storage"
             on_press: root.open_der_configuration()
@@ -107,9 +113,19 @@
                     size_hint: (1.0, 0.1)
                     text: "Delete Storage"
 
-            Button:
-                text: "list of PV"
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
 
+                Label:
+                    text: "List of Defined PV Assets"
+                    size_hint: (1.0, 0.05)
+                    color: 0,0,0,1
+
+                ScrollView:
+                    size_hint: (1.0, 0.75)
+                    MDList:
+                        id: pv_list
 
         BoxLayout:
             orientation: "horizontal"
@@ -133,6 +149,8 @@
     IconRightWidget:
         id: edit
         icon: "pencil"
+
+<PVListitem>:
 
 
 <BusListItem>:

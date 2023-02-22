@@ -825,6 +825,11 @@ class DERConfigurationScreen(SSimBaseScreen):
                 StorageListItem(so, self)
             )
 
+        for pv in self.project.pvsystems:
+            self.ids.pv_list.add_widget(
+                PVListItem(pv)
+            )
+
     def new_storage(self):
         ess = StorageOptions("NewBESS", 3, [], [], [])
 
@@ -885,17 +890,31 @@ class StorageListItem(TwoLineAvatarIconListItem):
     def edit(self, icon_widget):
         self._der_screen.edit_storage(self)
 
+
+class PVListItem(TwoLineAvatarIconListItem):
+    def __init__(self, pv, der_screen, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.pv = pv
+        self.text = pv.name
+        self.secondary_text = str(pv.bus)
+        self._der_screen = der_screen
+
+
 class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
-class NoGridPopupContent(BoxLayout):
-    pass
 
 class NoGridPopupContent(BoxLayout):
     pass
+
+
+class NoGridPopupContent(BoxLayout):
+    pass
+
 
 class MissingMetricValuesPopupContent(BoxLayout):
     pass
+
 
 class MessagePopupContent(BoxLayout):
     pass
@@ -908,14 +927,18 @@ class BusListItemWithCheckbox(OneLineAvatarIconListItem):
         self.text = bus
         self.bus = bus
 
+
 class MetricListItem(TwoLineAvatarIconListItem):
     pass
+
 
 class RightCheckbox(IRightBodyTouch, MDCheckbox):
     pass
 
+
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     pass
+
 
 class MetricConfigurationScreen(SSimBaseScreen):
 
@@ -1281,6 +1304,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
         list.active = True
 
+
 class RunSimulationScreen(SSimBaseScreen):
 
     def on_enter(self):
@@ -1301,6 +1325,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # TODO: Need to populate the MDlist dynamically
         configs = self.project.configurations
 
+
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, pk=None, **kwargs):
@@ -1310,17 +1335,21 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
     def delete_item(self, the_list_item):
         self.parent.remove_widget(the_list_item)
 
+
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     '''Custom left container'''
     pass
+
 
 class SelectGridDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
 
+
 class LoadSSIMTOMLDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
+
 
 class SaveSSIMTOMLDialog(FloatLayout):
     save = ObjectProperty(None)
@@ -1332,6 +1361,7 @@ class SaveSSIMTOMLDialog(FloatLayout):
             self.ids.filenamefield.text = ""
         else:
             self.ids.filenamefield.text = os.path.basename(sel)
+
 
 class SSimScreen(SSimBaseScreen):
 
@@ -1348,13 +1378,18 @@ class SSimScreen(SSimBaseScreen):
         Logger.debug("loading file %s", filename[0])
         self.project.set_grid_model(filename[0])
         self.bus_list.text = '\n'.join(self.project.bus_names)
+        self.reset_grid_model_label()
         self.dismiss_popup()
+
+    def reset_grid_model_label(self):
+        self.ids.grid_model_label.text = "Current Grid Model: " + self.project._grid_model_path
 
     def load_toml_file(self, path, filename):
         Logger.debug("loading file %s", filename[0])
         self.project.load_toml_file(filename[0])
         self.bus_list.text = '\n'.join(self.project.bus_names)
         self.set_current_input_file(filename[0])
+        self.reset_grid_model_label()
         self.dismiss_popup()
 
     def set_current_input_file(self, fullpath):

@@ -65,13 +65,21 @@ class Project:
         self._grid_model = None
         self._input_file_path = None
         self.storage_devices = []
-        self._pvsystems = []
+        self.pvsystems = []
         self._metricMgrs = {}
 
     def load_toml_file(self, filename: str):
+        """Reads data for this Project from the supplied TOML file.
+
+        Parameters
+        ----------
+        filename: str
+            The full path to the TOML file from which input is to be loaded.
+        """
         self._input_file_path = filename
         self.clear_metrics()
         self.clear_options()
+        self.clear_pv()
 
         with open(filename, 'r') as f:
             toml = f.read()
@@ -81,7 +89,14 @@ class Project:
 
     @property
     def bus_names(self):
-        return self._grid_model.bus_names
+        """Returns a collection of all bus names stored in the current DSS model.
+
+        Returns
+        ----------
+        list:
+            The collection of all bus names contained in the current grid model.
+        """
+        return [] if self._grid_model is None else self._grid_model.bus_names
 
     @property
     def storage_names(self):
@@ -224,6 +239,10 @@ class Project:
         """Removes all storage options from this project."""
         self.storage_devices.clear();
 
+    def clear_pv(self):
+        """Removes all storage options from this project."""
+        self.pvsystems.clear();
+
     def get_manager(self, category: str) -> MetricManager:
         """Retrieves the metric manager identified by the supplied category.
 
@@ -252,7 +271,7 @@ class Project:
             yield Configuration(
                 self._grid_model_path,
                 self._metrics,
-                self._pvsystems,
+                self.pvsystems,
                 storage_configuration
             )
 
