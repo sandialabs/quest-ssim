@@ -4,6 +4,12 @@ import itertools
 import os
 import re
 
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
+
+
 from importlib_resources import files, as_file
 
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
@@ -111,6 +117,11 @@ class SSimBaseScreen(Screen):
     def __init__(self, project, *args, **kwargs):
         self.project = project
         super().__init__(*args, **kwargs)
+
+class DiagramPlot(BoxLayout):
+
+    def on_kv_post(self, base_widget):
+        self.add_widget(FigureCanvasKivyAgg(plt.gcf()))
 
 class LeftCheckBox(ILeftBodyTouch, MDCheckbox):
     pass
@@ -1363,6 +1374,13 @@ class SaveSSIMTOMLDialog(FloatLayout):
             self.ids.filenamefield.text = os.path.basename(sel)
 
 
+x = [1, 2, 3, 4, 5]
+y = [4, 67, 21, 4, 7]
+
+plt.plot(x, y)
+plt.xlabel("X Stuff")
+plt.ylabel("Y Stuff")
+
 class SSimScreen(SSimBaseScreen):
 
     grid_path = ObjectProperty(None)
@@ -1382,7 +1400,7 @@ class SSimScreen(SSimBaseScreen):
         self.dismiss_popup()
 
     def reset_grid_model_label(self):
-        self.ids.grid_model_label.text = "Current Grid Model: " + self.project._grid_model_path
+        self.ids.grid_model_label.text = "Grid Model: " + self.project._grid_model_path
 
     def load_toml_file(self, path, filename):
         Logger.debug("loading file %s", filename[0])
