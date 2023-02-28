@@ -99,11 +99,22 @@ class Project:
         return [] if self._grid_model is None else self._grid_model.bus_names
 
     @property
+    def line_names(self):
+        """Returns a collection of all line names stored in the current DSS model.
+
+        Returns
+        ----------
+        list:
+            The collection of all line names contained in the current grid model.
+        """
+        return [] if self._grid_model is None else self._grid_model.line_names
+
+    @property
     def storage_names(self):
         return set(device.name for device in self.storage_devices)
 
     @property
-    def grid_model(self):
+    def grid_model(self) -> DSSModel:
         return self._grid_model
 
     def phases(self, bus):

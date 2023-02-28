@@ -4,17 +4,24 @@ import itertools
 import os
 import re
 
+import numpy as np
+
+from math import cos, hypot
+
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
+from matplotlib.collections import LineCollection
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 
 
+import opendssdirect as dssdirect
 from importlib_resources import files, as_file
 
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 
 import kivy
+import functools
 from kivymd.app import MDApp
 from ssim.ui import Project, StorageOptions, is_valid_opendss_name
 from kivy.logger import Logger, LOG_LEVELS
@@ -47,6 +54,7 @@ from kivymd.uix.list import (
 )
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.textfield import MDTextField
+from kivymd.uix.label import MDLabel
 
 from ssim.ui import Project, StorageOptions, is_valid_opendss_name
 
@@ -67,12 +75,20 @@ _IMAGE_FILES = [
 
 _KV_FILES = ["common.kv", "ssim.kv"]
 
+#x = [1, 2, 3, 4, 5]
+#y = [4, 67, 21, 4, 7]
+
+#plt.plot(x, y)
+#plt.xlabel("X Stuff")
+#plt.ylabel("Y Stuff")
+
 
 def parse_float(strval) -> float:
     try:
         return float(strval)
     except ValueError:
         return None
+
 
 def parse_float_or_str(strval):
     if not strval: return None
@@ -102,6 +118,7 @@ class SSimApp(MDApp):
 
         return screen_manager
 
+
 class SSimBaseScreen(Screen):
     """Base class for screens that holds the fundamental ssim data structures.
 
@@ -118,13 +135,20 @@ class SSimBaseScreen(Screen):
         self.project = project
         super().__init__(*args, **kwargs)
 
+
 class DiagramPlot(BoxLayout):
 
-    def on_kv_post(self, base_widget):
+    def reset_plot(self):
+        self.clear_widgets()
         self.add_widget(FigureCanvasKivyAgg(plt.gcf()))
+
+    def display_plot_error(self, msg):
+        self.clear_widgets()
+        self.add_widget(MDLabel(text=msg))
 
 class LeftCheckBox(ILeftBodyTouch, MDCheckbox):
     pass
+
 
 class BusListItem(TwoLineIconListItem):
 
@@ -144,6 +168,7 @@ class BusListItem(TwoLineIconListItem):
     @property
     def active(self):
         return self.ids.selected.active
+
 
 class TextFieldFloat(MDTextField):
     SIMPLE_FLOAT = re.compile(r"(\+|-)?\d*(\.\d*)?$")
@@ -168,6 +193,7 @@ class TextFieldFloat(MDTextField):
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
+
 
 class TextFieldMultiFloat(MDTextField):
     SIMPLE_FLOAT = re.compile(r"(\+|-)?\d*(\.\d*)?$")
@@ -203,6 +229,7 @@ class TextFieldMultiFloat(MDTextField):
             self.error = False
             self.helper_text = "Input numeric value"
 
+
 class TextFieldPositiveFloat(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
 
@@ -226,6 +253,7 @@ class TextFieldPositiveFloat(MDTextField):
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
+
 
 class TextFieldPositivePercentage(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
@@ -263,6 +291,7 @@ class TextFieldPositivePercentage(MDTextField):
     def fraction(self):
         return self.percentage() / 100.0
 
+
 class EditableSetList(MDList):
     options = ObjectProperty(set())
 
@@ -289,6 +318,7 @@ class EditableSetList(MDList):
         # to trigger the _update_display callback throug kivy
         self.options = self.options - set([item])
 
+
 class EditableSetListItem(OneLineRightIconListItem):
     """List item with one line and a delete button"""
 
@@ -301,6 +331,7 @@ class EditableSetListItem(OneLineRightIconListItem):
 
     def _delete_item(self, item):
         self.parent.remove_item(self._value)
+
 
 class TextFieldOpenDSSName(MDTextField):
     """Text field that enforces OpenDSS name requirements."""
@@ -322,6 +353,7 @@ class TextFieldOpenDSSName(MDTextField):
             self.error = True
         else:
             self.error = False
+
 
 class StorageConfigurationScreen(SSimBaseScreen):
     """Configure a single energy storage device."""
@@ -495,6 +527,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
     def on_enter(self, *args):
         return super().on_enter(*args)
 
+
 class XYGridView(RecycleView):
 
     def extract_x_vals(self) -> list:
@@ -503,8 +536,10 @@ class XYGridView(RecycleView):
     def extract_y_vals(self) -> list:
         return [parse_float_or_str(child.y_value) for child in self.children[0].children]
 
+
 class XYGridViewLayout(FocusBehavior, RecycleBoxLayout):
     pass
+
 
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     index = NumericProperty()
@@ -525,6 +560,7 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     def on_delete_button(self):
         self.parent.parent.data.pop(self.index)
 
+
 class XYItemTextField(TextInput):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -536,12 +572,14 @@ class XYItemTextField(TextInput):
         v = parse_float(text) is not None
         self.background_color = "red" if not v else self.def_back_color
 
+
 class XYGridHeader(BoxLayout):
 
     grid = ObjectProperty(None)
 
     def on_add_button(self):
         self.grid.data.append({'x': 1.0, 'y': 1.0})
+
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
@@ -805,6 +843,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self._options.control.params[l1name] = xl
         self._options.control.params[l2name] = yl
 
+
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""
 
@@ -818,6 +857,7 @@ class PVConfigurationScreen(SSimBaseScreen):
 
     def cancel(self):
         self.manager.current = "der-config"
+
 
 class DERConfigurationScreen(SSimBaseScreen):
     """Configure energy storage devices and PV generators."""
@@ -929,6 +969,7 @@ class MissingMetricValuesPopupContent(BoxLayout):
 
 class MessagePopupContent(BoxLayout):
     pass
+
 
 class BusListItemWithCheckbox(OneLineAvatarIconListItem):
     '''Custom list item.'''
@@ -1374,17 +1415,12 @@ class SaveSSIMTOMLDialog(FloatLayout):
             self.ids.filenamefield.text = os.path.basename(sel)
 
 
-x = [1, 2, 3, 4, 5]
-y = [4, 67, 21, 4, 7]
-
-plt.plot(x, y)
-plt.xlabel("X Stuff")
-plt.ylabel("Y Stuff")
-
 class SSimScreen(SSimBaseScreen):
 
     grid_path = ObjectProperty(None)
-    bus_list = ObjectProperty(None)
+
+    def on_kv_post(self, base_widget):
+        self.refresh_grid_plot()
 
     def report(self, message):
         Logger.debug("button pressed: %s", message)
@@ -1395,19 +1431,23 @@ class SSimScreen(SSimBaseScreen):
     def load_grid(self, path, filename):
         Logger.debug("loading file %s", filename[0])
         self.project.set_grid_model(filename[0])
-        self.bus_list.text = '\n'.join(self.project.bus_names)
         self.reset_grid_model_label()
+        self.refresh_grid_plot()
         self.dismiss_popup()
 
     def reset_grid_model_label(self):
         self.ids.grid_model_label.text = "Grid Model: " + self.project._grid_model_path
 
+    def reset_project_name_field(self):
+        self.ids.project_name.text = self.project.name
+
     def load_toml_file(self, path, filename):
         Logger.debug("loading file %s", filename[0])
         self.project.load_toml_file(filename[0])
-        self.bus_list.text = '\n'.join(self.project.bus_names)
         self.set_current_input_file(filename[0])
         self.reset_grid_model_label()
+        self.reset_project_name_field()
+        self.refresh_grid_plot()
         self.dismiss_popup()
 
     def set_current_input_file(self, fullpath):
@@ -1483,6 +1523,167 @@ class SSimScreen(SSimBaseScreen):
             _show_no_grid_popup("ssim", self.manager)
             return
 
+    def num_phases(self, line):
+        dssdirect.Lines.Name(line)
+        return dssdirect.Lines.Phases()
+
+    def get_raw_bus_name(self, bus: str):
+        return bus.split(".", 1)[0]
+
+    def bus_coords(self, bus):
+        dssdirect.Circuit.SetActiveBus(bus)
+        return dssdirect.Bus.X(), dssdirect.Bus.Y()
+
+    def line_coords(self, line):
+        bus1, bus2 = self.line_busses(line)
+        return [self.bus_coords(bus1), self.bus_coords(bus2)]
+
+    def line_busses(self, line):
+        dssdirect.Lines.Name(line)
+        return [dssdirect.Lines.Bus1(), dssdirect.Lines.Bus2()]
+
+    #def plot_line(self, line):
+    #    x, y = zip(*line_coords(line))
+    #    if (0 in x) and (0 in y):
+    #        return
+    #    plt.plot(x, y, color='gray', solid_capstyle='round')
+
+    def _distance_meters(self, latitude1, longitude1, latitude2, longitude2):
+        """Return distance between two points in meters"""
+        # Use the mean latitude to get a reasonable approximation
+        latitude = (latitude1 + latitude2) / 2
+        m_per_degree_lat = 111132.92 - 559.82 * cos(2 * latitude) \
+                           + 1.175 * cos(4 * latitude) \
+                           - 0.0023 * cos(6 * latitude)
+        m_per_degree_lon = 111412.84 * cos(latitude) \
+                           - 93.5 * cos(3 * latitude) \
+                           + 0.118 * cos(5 * latitude)
+        y = (latitude1 - latitude2) * m_per_degree_lat
+        x = (longitude1 - longitude2) * m_per_degree_lon
+        return hypot(x, y)
+
+    def _get_substation_location(self):
+        """Return gps coordinates of the substation.
+
+        Returns
+        -------
+        latitude : float
+        longitude : float
+        """
+        if not dssdirect.Solution.Converged():
+            dssdirect.Solution.Solve()
+        busses = dssdirect.Circuit.AllBusNames()
+        distances = dssdirect.Circuit.AllBusDistances()
+        substation = sorted(zip(busses, distances), key=lambda x: x[1])[0][0]
+        dssdirect.Circuit.SetActiveBus(substation)
+        return dssdirect.Bus.Y(), dssdirect.Bus.X()
+
+    def group(self, x):
+        if x < 0.33:
+            return 1
+        if x < 0.66:
+            return 2
+        return 3
+
+    def refresh_grid_plot(self):
+        gm = self.project.grid_model
+        plt.clf()
+
+        if gm is None:
+            self.ids.grid_diagram.display_plot_error(
+                "There is no current grid model."
+            )
+            return
+
+        lines = gm.line_names
+        busses = gm.bus_names
+
+        if len(lines) == 0 and len(busses) == 0:
+            self.ids.grid_diagram.display_plot_error(
+                "There are no lines and no busses in the current grid model."
+            )
+            return
+
+        # Start by plotting the lines if there are any.  Note that if there are lines,
+        # there must be busses but the opposite may not be true.
+        plotlines = len(lines) > 0
+
+        seg_busses = {}
+
+        if plotlines > 0:
+            seg_lines = [line for line in lines
+                         if (0., 0.) not in self.line_coords(line)]
+
+            for line in seg_lines:
+                bus1, bus2 = self.line_busses(line)
+                bc1 = self.bus_coords(bus1)
+                bc2 = self.bus_coords(bus2)
+                seg_busses[self.get_raw_bus_name(bus1)] = bc1
+                seg_busses[self.get_raw_bus_name(bus2)] = bc2
+
+
+            line_segments = [self.line_coords(line)  for line in seg_lines]
+
+            if len(line_segments) == 0:
+                self.ids.grid_diagram.display_plot_error(
+                    "There are lines but their bus locations are not known so no meaningful plot can be produced."
+                )
+                return
+
+            #line_widths = [num_phases(line) for line in lines[:-1]]
+
+            substation_lat, substation_lon = self._get_substation_location()
+            distance = functools.partial(self._distance_meters, substation_lat, substation_lon)
+
+            distances = [min(distance(b1[1], b1[0]), distance(b2[1], b2[0]))  # / 2.0
+                         for b1, b2 in line_segments]
+
+            groups = [self.group(dist / max(distances)) for dist in distances]
+
+            lc = LineCollection(
+                line_segments, norm=plt.Normalize(1, 3), cmap='tab10'
+                )  # , linewidths=line_widths)
+
+            lc.set_capstyle('round')
+            lc.set_array(np.array(groups))
+
+            fig, ax = plt.subplots()
+
+            ax.add_collection(lc)
+
+            xs, ys = zip(*[(x, y) for seg in line_segments for x, y in seg])
+            min_x = min(xs)
+            max_x = max(xs)
+            min_y = min(ys)
+            max_y = max(ys)
+
+        else:
+            for bus in busses:
+                bc = self.bus_coords(bus)
+                seg_busses[self.get_raw_bus_name(bus)] = bc
+
+            xs, ys = zip(*[(x, y) for seg in seg_busses for x, y in seg_busses[seg]])
+            min_x = min(xs)
+            max_x = max(xs)
+            min_y = min(ys)
+            max_y = max(ys)
+
+        x = [seg_busses[bus][0] for bus in seg_busses]
+        y = [seg_busses[bus][1] for bus in seg_busses]
+
+        ax.scatter(x, y)
+
+        for bus in seg_busses:
+            loc = seg_busses[bus]
+            ax.annotate(bus, (loc[0], loc[1]))
+
+        plt.title("Grid Layout")
+
+        ax.set_xlim(min(xs) - 0.05 * (max_x - min_x), max(xs) + 0.05 * (max_x - min_x))
+        ax.set_ylim(min(ys) - 0.05 * (max_y - min_y), max(ys) + 0.05 * (max_y - min_y))
+
+        dg = self.ids.grid_diagram
+        dg.reset_plot()
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):
     """Show a popup dialog warning that no grid model is selected.

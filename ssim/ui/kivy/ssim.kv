@@ -10,7 +10,6 @@
 
 <SSimScreen>:
     name: 'ssim'
-    bus_list: bus_list
 
     BoxLayout:
         orientation: "vertical"
@@ -25,9 +24,11 @@
                 size_hint: (0.25, 1.0)
 
             TextInput:
+                id: project_name
                 text: "unnamed"
                 multiline: False
                 valign: "center"
+                on_text: root.project.name = project_name.text
 
         BoxLayout:
             orientation: "horizontal"
@@ -76,10 +77,6 @@
                 Button:
                     text: "Run"
                     on_press: root.do_run_simulation()
-
-                TextInput:
-                    id: bus_list
-                    multiline: True
 
             BoxLayout:
                 orientation: "vertical"
