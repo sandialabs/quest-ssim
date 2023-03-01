@@ -658,23 +658,23 @@ class Metric:
                 assert upper_limit is not None, \
                     "The upper limit cannot be None for a minimization metric"
                 assert upper_limit > objective, \
-                    "The upper limit must be greater than objective"
+                    "The upper limit must be greater than the objective"
 
             elif imp_type == ImprovementType.Maximize:
                 assert lower_limit is not None, \
                     "The lower limit cannot be None for a maximization metric"
                 assert lower_limit < objective, \
-                    "The lower limit must be less than objective"
+                    "The lower limit must be less than the objective"
 
             else: # elif imp_type == ImprovementType.SeekValue:
                 assert upper_limit is not None, \
                     "The upper limit cannot be None for a seek value metric"
                 assert upper_limit > objective, \
-                    "The upper limit must be greater than objective"
+                    "The upper limit must be greater than the objective"
                 assert lower_limit is not None, \
                     "The lower limit cannot be None for a seek value metric"
                 assert lower_limit < objective, \
-                    "The lower limit must be less than objective"
+                    "The lower limit must be less than the objective"
 
             return None
         except AssertionError as err:

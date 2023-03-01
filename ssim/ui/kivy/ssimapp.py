@@ -949,7 +949,7 @@ class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
 
-class NoGridPopupContent(BoxLayout):
+class MetricsNoGridPopupContent(BoxLayout):
     pass
 
 
@@ -1319,7 +1319,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         return
 
     def __show_no_grid_model_popup(self):
-        content = NoGridPopupContent()
+        content = MetricsNoGridPopupContent()
 
         popup = Popup(
             title='No Grid Model', content=content, auto_dismiss=False,
@@ -1676,7 +1676,7 @@ class SSimScreen(SSimBaseScreen):
                 loc = seg_busses[bus]
                 ax.annotate(bus, (loc[0], loc[1]))
 
-        plt.title("Grid Layout")
+        #plt.title("Grid Layout")
 
         #xlocs, xlabels = plt.xticks()
         #ylocs, ylabels = plt.yticks()
