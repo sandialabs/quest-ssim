@@ -3,6 +3,7 @@ from contextlib import ExitStack
 import itertools
 import os
 import re
+import pandas as pd
 from threading import Thread
 import matplotlib.pyplot as plt
 from typing import List
@@ -40,12 +41,14 @@ from kivymd.uix.list import (
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.textfield import MDTextField
 
-import tomli, ProjectResults, Results
+import tomli
 
 from ssim.ui import (
     Configuration,
     Project,
     StorageOptions,
+    ProjectResults,
+    Results,
     is_valid_opendss_name
 )
 
@@ -110,6 +113,7 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
+        self.project_results = ProjectResults(self.project)
         super().__init__(*args, **kwargs)
 
 class LeftCheckBox(ILeftBodyTouch, MDCheckbox):
@@ -690,6 +694,16 @@ class StorageListItem(TwoLineAvatarIconListItem):
     def edit(self, icon_widget):
         self._der_screen.edit_storage(self)
 
+
+class VariableListItem(TwoLineAvatarIconListItem):
+    def __init__(self, pk=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pk = pk
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
 class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
@@ -720,7 +734,11 @@ class RightCheckbox(IRightBodyTouch, MDCheckbox):
     pass
 
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
-    pass
+    def toggle_configuration_check(self, check):
+        print(check)
+        if check.active:
+            print('Configuration checked')
+        print("selection made")
 
 class MetricConfigurationScreen(SSimBaseScreen):
 
@@ -1119,8 +1137,95 @@ class ResultsCompareScreen(SSimBaseScreen):
         super().__init__(*args, **kwargs)
 
 
-class ResultsDetailScreen(SSimBaseScreen):
-    pass
+class ResultsDetailScreen(SSimBaseScreen):   
+
+    def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.configurations: List[Configuration] = []
+            self.selected_variables: List[str] = []
+            self.x_data = []
+            self.list_items = []
+            self.variable_data = pd.DataFrame()
+
+    def update_figure(self):
+        print("Figure update command issued from GUI")
+        print(self.x_data)
+
+        mdlist = self.ids.variable_list_detail
+        self.selected_variables = []
+        for wid in mdlist.children:
+            if wid.ids.check.active:
+                self.selected_variables.append(wid.text)
+
+        print(self.selected_variables)
+
+        self.ids.detail_plot_canvas.clear_widgets()
+        fig = plt.figure()
+        for y_var in self.selected_variables:
+            plt.plot(self.x_data, self.variable_data.loc[:, y_var])
+        plt.xlabel('x-label')
+        plt.ylabel('y-label')
+        plt.legend()
+        plt.title('Detail Plots')
+        self.ids.detail_plot_canvas.add_widget(
+            FigureCanvasKivyAgg(fig)
+        )
+
+    def drop_config_menu(self):
+        for config in self.project.configurations():
+            self.configurations.append(config)
+
+        # Replace with evaluated configurations
+        num_configs = len(list(self.project.configurations()))
+
+        menu_items = []
+        for ctr in range(num_configs):
+            display_text = "Configuration " + str(ctr+1)
+            menu_items.append({
+                "viewclass": "OneLineListItem",
+                "text" : display_text,
+                "on_release": lambda x=display_text: self.set_config(x)
+            })
+
+        self.menu = MDDropdownMenu(
+            caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+        )
+        self.menu.open()
+
+    def set_config(self, value):
+        # read the current selected configuration
+        self.ids.config_list_detail.text = value
+        # extract all the results from all the configutations
+        project_results = self.project_results.results()
+        # obtain the index for the current selected configuration
+        # TODO: setup a proper mapping system between Results and Configuration
+        current_result_index = int(value[-1]) - 1
+        # extract the `current_result` based on selection from drop down menu
+        current_result = next(itertools.islice(project_results, current_result_index, None))
+        
+        # extract `x_data` for the `current_result`
+
+        # extract the data 
+        self.list_items, self.variable_data = current_result.storage_state()
+        print(self.list_items)
+        print(self.variable_data)
+
+        self.x_data = list(self.variable_data.loc[:, 'time'])
+
+        self.ids.variable_list_detail.clear_widgets()
+        # add the list of variables in the selected configuration
+        # into the MDList
+        for item in self.list_items:
+            # do not add 'time' to the variable list
+            if item == 'time':
+                continue
+            else:
+                self.ids.variable_list_detail.add_widget(
+                    ListItemWithCheckbox(pk = "pk", text = item)
+                )
+        
+        # close the drop-down menu
+        self.menu.dismiss()
         
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 

@@ -1014,15 +1014,23 @@ class Results:
     def storage_state(self):
         """Returns name of the columns (states specific to storage devices 
         in OpendDSS model) and the time-series data as a pandas dataframe."""
-        storage_states, storage_state_data = self._extract_data("storage_power.csv")
+        storage_state_file = Path(self.config_dir / "storage_power.csv")
+        if storage_state_file.is_file():
+            storage_states, storage_state_data = self._extract_data("storage_power.csv")
+        else:
+            storage_states, storage_state_data = [], []
         return storage_states, storage_state_data
 
     def storage_voltages(self):
         """Returns name of the columns (buses) where storage is placed and 
         voltages at those buses as a pandas dataframe"""
-        storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
-        return storage_buses, storage_buses
-
+        storage_voltages_file = Path(self.config_dir / "storage_voltages.csv")
+        if storage_voltages_file.is_file():
+            storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
+        else:
+            storage_buses, storage_voltages = [], []
+        return storage_buses, storage_voltages
+    
     def metrics_log(self):
         """Returns name of columns of the logged metrics, the accumulated value
         of the metric, and the time-series log as a pandas dataframe."""
