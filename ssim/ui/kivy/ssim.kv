@@ -363,29 +363,42 @@
     helper_text_mode: "on_error"
 
 
-<GeneratorReliabilityParams@BoxLayout>:
-    orientation: "vertical"
-
-    GridLayout:
-        cols: 4
+<GeneratorReliabilityParams@FloatLayout>:
+    MDGridLayout:
+        cols: 5
         rows: 3
-        spacing: 50
-        size_hint_y: None
-        height: self.minimum_height
+        adaptive_height: True
+        spacing: 25
+        padding: 12
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
         MDLabel:
+            font_style: "H6"
             text: "Failure Mode"
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+            halign: "center"
         MDLabel:
+            font_style: "H6"
+            text: "Active"
+            halign: "center"
+        MDLabel:
+            font_style: "H6"
             text: "MTBF (hours)"
+            halign: "center"
         MDLabel:
+            font_style: "H6"
             text: "Min. Repair Time (hours)"
+            halign: "center"
         MDLabel:
+            font_style: "H6"
             text: "Max. Repair Time (hours)"
+            halign: "center"
 
         MDLabel:
             text: "Aging"
             pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        MDCheckbox:
+            id: aging_active
+            active: False
         ReliabilityParam:
             id: aging_mtbf
             pos_hint: {"center_x": 0.5, "center_y": 0.5}
@@ -399,6 +412,9 @@
         MDLabel:
             text: "Wearout"
             pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        MDCheckbox:
+            id: wearout_active
+            active: False
         ReliabilityParam:
             id: wearout_mtbf
             pos_hint: {"center_x": 0.5, "center_y": 0.5}

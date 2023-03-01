@@ -1845,7 +1845,7 @@ class SSimScreen(SSimBaseScreen):
         dg.reset_plot()
 
 
-class ReliabilityModelTab(BoxLayout, MDTabsBase):
+class ReliabilityModelTab(FloatLayout, MDTabsBase):
     pass
 
 
