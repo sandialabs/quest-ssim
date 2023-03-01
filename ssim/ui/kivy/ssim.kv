@@ -16,7 +16,8 @@
 
         BoxLayout:
             orientation: "horizontal"
-            size_hint_y: 0.05
+            size_hint_y: None
+            height: 30
 
             Label:
                 text: "Project Name:"
@@ -92,6 +93,24 @@
                 DiagramPlot:
                     id: grid_diagram
 
+                BoxLayout:
+                    id: plt_controls
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: 30
+
+                    MDLabel
+                        id: show_bus_label
+                        size_hint_x: None
+                        width: 135
+                        text: "Show Bus Labels"
+
+                    CheckBox:
+                        id: show_bus_labels
+                        size_hint_x: None
+                        width: 30
+                        active: True
+                        on_active: root.changed_show_bus_labels(self.active)
 
 <DERConfigurationScreen>:
     name: "der-config"

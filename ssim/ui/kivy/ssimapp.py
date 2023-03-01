@@ -75,13 +75,6 @@ _IMAGE_FILES = [
 
 _KV_FILES = ["common.kv", "ssim.kv"]
 
-#x = [1, 2, 3, 4, 5]
-#y = [4, 67, 21, 4, 7]
-
-#plt.plot(x, y)
-#plt.xlabel("X Stuff")
-#plt.ylabel("Y Stuff")
-
 
 def parse_float(strval) -> float:
     try:
@@ -145,6 +138,7 @@ class DiagramPlot(BoxLayout):
     def display_plot_error(self, msg):
         self.clear_widgets()
         self.add_widget(MDLabel(text=msg))
+
 
 class LeftCheckBox(ILeftBodyTouch, MDCheckbox):
     pass
@@ -1534,7 +1528,7 @@ class SSimScreen(SSimBaseScreen):
         dssdirect.Circuit.SetActiveBus(bus)
         return dssdirect.Bus.X(), dssdirect.Bus.Y()
 
-    def line_coords(self, line):
+    def line_bus_coords(self, line):
         bus1, bus2 = self.line_busses(line)
         return [self.bus_coords(bus1), self.bus_coords(bus2)]
 
@@ -1543,7 +1537,7 @@ class SSimScreen(SSimBaseScreen):
         return [dssdirect.Lines.Bus1(), dssdirect.Lines.Bus2()]
 
     #def plot_line(self, line):
-    #    x, y = zip(*line_coords(line))
+    #    x, y = zip(*line_bus_coords(line))
     #    if (0 in x) and (0 in y):
     #        return
     #    plt.plot(x, y, color='gray', solid_capstyle='round')
@@ -1585,6 +1579,9 @@ class SSimScreen(SSimBaseScreen):
             return 2
         return 3
 
+    def changed_show_bus_labels(self, active_state):
+        self.refresh_grid_plot()
+
     def refresh_grid_plot(self):
         gm = self.project.grid_model
         plt.clf()
@@ -1612,7 +1609,7 @@ class SSimScreen(SSimBaseScreen):
 
         if plotlines > 0:
             seg_lines = [line for line in lines
-                         if (0., 0.) not in self.line_coords(line)]
+                         if (0., 0.) not in self.line_bus_coords(line)]
 
             for line in seg_lines:
                 bus1, bus2 = self.line_busses(line)
@@ -1622,7 +1619,7 @@ class SSimScreen(SSimBaseScreen):
                 seg_busses[self.get_raw_bus_name(bus2)] = bc2
 
 
-            line_segments = [self.line_coords(line)  for line in seg_lines]
+            line_segments = [self.line_bus_coords(line)  for line in seg_lines]
 
             if len(line_segments) == 0:
                 self.ids.grid_diagram.display_plot_error(
@@ -1638,16 +1635,17 @@ class SSimScreen(SSimBaseScreen):
             distances = [min(distance(b1[1], b1[0]), distance(b2[1], b2[0]))  # / 2.0
                          for b1, b2 in line_segments]
 
-            groups = [self.group(dist / max(distances)) for dist in distances]
+            #groups = [self.group(dist / max(distances)) for dist in distances]
 
             lc = LineCollection(
                 line_segments, norm=plt.Normalize(1, 3), cmap='tab10'
                 )  # , linewidths=line_widths)
 
             lc.set_capstyle('round')
-            lc.set_array(np.array(groups))
+            #lc.set_array(np.array(groups))
 
             fig, ax = plt.subplots()
+            fig.tight_layout()
 
             ax.add_collection(lc)
 
@@ -1673,17 +1671,27 @@ class SSimScreen(SSimBaseScreen):
 
         ax.scatter(x, y)
 
-        for bus in seg_busses:
-            loc = seg_busses[bus]
-            ax.annotate(bus, (loc[0], loc[1]))
+        if self.ids.show_bus_labels.active:
+            for bus in seg_busses:
+                loc = seg_busses[bus]
+                ax.annotate(bus, (loc[0], loc[1]))
 
         plt.title("Grid Layout")
+
+        #xlocs, xlabels = plt.xticks()
+        #ylocs, ylabels = plt.yticks()
+        #plt.xticks(ticks=xlocs, labels=[])
+        #plt.yticks(ticks=ylocs, labels=[])
+        #plt.grid()
+        plt.xticks([])
+        plt.yticks([])
 
         ax.set_xlim(min(xs) - 0.05 * (max_x - min_x), max(xs) + 0.05 * (max_x - min_x))
         ax.set_ylim(min(ys) - 0.05 * (max_y - min_y), max(ys) + 0.05 * (max_y - min_y))
 
         dg = self.ids.grid_diagram
         dg.reset_plot()
+
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):
     """Show a popup dialog warning that no grid model is selected.
