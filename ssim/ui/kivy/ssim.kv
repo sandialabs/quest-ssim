@@ -68,8 +68,8 @@
                     on_press: root.open_der_configuration()
 
                 Button:
-                    text: "configure loads"
-                    on_press: root.open_load_configuration()
+                    text: "configure reliability"
+                    on_press: root.open_reliability_configuration()
 
                 Button:
                     text: "configure metrics"
@@ -357,6 +357,90 @@
             Button:
                 text: "save"
                 on_press: root.save()
+
+
+<ReliabilityParam@TextFieldPositiveFloat>:
+    helper_text_mode: "on_error"
+
+
+<GeneratorReliabilityParams@BoxLayout>:
+    orientation: "vertical"
+
+    GridLayout:
+        cols: 4
+        rows: 3
+        spacing: 50
+        size_hint_y: None
+        height: self.minimum_height
+
+        MDLabel:
+            text: "Failure Mode"
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        MDLabel:
+            text: "MTBF (hours)"
+        MDLabel:
+            text: "Min. Repair Time (hours)"
+        MDLabel:
+            text: "Max. Repair Time (hours)"
+
+        MDLabel:
+            text: "Aging"
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        ReliabilityParam:
+            id: aging_mtbf
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        ReliabilityParam:
+            id: aging_repair_min
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        ReliabilityParam:
+            id: aging_repair_max
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+        MDLabel:
+            text: "Wearout"
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        ReliabilityParam:
+            id: wearout_mtbf
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        ReliabilityParam:
+            id: wearout_repair_min
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+        ReliabilityParam:
+            id: wearout_repair_max
+            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+
+
+<ReliabilityConfigurationScreen>:
+    name: "reliability-config"
+
+    BoxLayout:
+        orientation: "vertical"
+
+        # TODO Add seed.
+
+        MDTabs:
+            id: reliability_models
+
+            ReliabilityModelTab:
+                id: generator_reliability
+                title: "Generators"
+
+                GeneratorReliabilityParams:
+                    id: generator_params
+
+            ReliabilityModelTab:
+                id: line_reliability
+                title: "Lines"
+
+            ReliabilityModelTab:
+                id: switch_reliability
+                title: "Switches"
+
+        Button:
+            text: "back"
+            on_press: root.manager.current = "ssim"
+            size_hint_y: None
 
 
 <LoadConfigurationScreen>:

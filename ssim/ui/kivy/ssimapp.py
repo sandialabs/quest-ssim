@@ -45,6 +45,7 @@ from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
+from kivymd.uix.tab import MDTabsBase
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -147,6 +148,8 @@ class SSimApp(MDApp):
             LoadConfigurationScreen(self.project, name="load-config"))
         screen_manager.add_widget(
             MetricConfigurationScreen(self.project, name="metric-config"))
+        screen_manager.add_widget(
+            ReliabilityConfigurationScreen(self.project, name="reliability-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
         screen_manager.current = "ssim"
@@ -1467,6 +1470,13 @@ class RunSimulationScreen(SSimBaseScreen):
         self._run_thread.start()
 
 
+class ReliabilityConfigurationScreen(SSimBaseScreen):
+    """Screen for configuring the reliability model."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, pk=None, **kwargs):
@@ -1617,6 +1627,9 @@ class SSimScreen(SSimBaseScreen):
 
     def open_metric_configuration(self):
         self.manager.current = "metric-config"
+
+    def open_reliability_configuration(self):
+        self.manager.current = "reliability-config"
 
     def do_run_simulation(self):
         self.manager.current = "run-sim"
@@ -1798,6 +1811,10 @@ class SSimScreen(SSimBaseScreen):
 
         dg = self.ids.grid_diagram
         dg.reset_plot()
+
+
+class ReliabilityModelTab(BoxLayout, MDTabsBase):
+    pass
 
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):
