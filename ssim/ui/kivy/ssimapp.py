@@ -1,6 +1,7 @@
 """Storage Sizing and Placement Kivy application"""
 from contextlib import ExitStack
 import itertools
+import math
 import os
 import re
 from threading import Thread
@@ -270,25 +271,56 @@ class TextFieldMultiFloat(MDTextField):
 
 
 class TextFieldPositiveFloat(MDTextField):
+    """An input field that only accepts positive floating point numbers.
+
+    Parameters
+    ----------
+    minimum : float, default 0.0
+        Impose a lower limit (inclusive) on the acceptable values.
+    maximum : float, default inf
+        Impose an upper limit (inclusive) on the acceptable values.
+    kwargs
+        Additional arguments for initializing the text field. See
+        :py:class:`MDTextField` for allowed parameters
+    """
+
     POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, minimum=0.0, maximum=math.inf, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper_text_mode = "on_focus"
         self.helper_text = "Input value and press enter"
+        if (minimum < 0.0) or (maximum < minimum):
+            raise ValueError(
+                "minimum and maximum must be non-negative "
+                "numbers with `minimum` <= `maximum`"
+            )
+        self.minimum = minimum
+        self.maximum = maximum
 
     def text_valid(self):
-        return TextFieldPositiveFloat.POSITIVE_FLOAT.match(self.text) is not None
+        if TextFieldPositiveFloat.POSITIVE_FLOAT.match(self.text) is None:
+            return False
+        value = float(self.text)
+        return self.minimum <= value <= self.maximum
 
     def set_text(self, instance, value):
         if value == "":
             return
         self.set_error_message()
 
+    @property
+    def _error_message(self):
+        if self.minimum == 0.0 and self.maximum == math.inf:
+            return "You must enter a non-negative number."
+        if self.maximum == math.inf:
+            return f"You must enter a number greater than {self.minimum}"
+        return f"You must enter a number between {self.minimum} and {self.maximum}"
+
     def set_error_message(self):
         if not self.text_valid():
             self.error = True
-            self.helper_text = "You must enter a non-negative number."
+            self.helper_text = self._error_message
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
