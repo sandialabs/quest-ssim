@@ -694,6 +694,16 @@ class StorageListItem(TwoLineAvatarIconListItem):
     def edit(self, icon_widget):
         self._der_screen.edit_storage(self)
 
+class ResultsVariableListItem(TwoLineAvatarIconListItem):
+    def __init__(self, variable_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # self.config = config
+        self.text = variable_name
+    
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
 
 class VariableListItem(TwoLineAvatarIconListItem):
     def __init__(self, pk=None, **kwargs):
@@ -1140,36 +1150,44 @@ class ResultsCompareScreen(SSimBaseScreen):
 class ResultsDetailScreen(SSimBaseScreen):   
 
     def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.configurations: List[Configuration] = []
-            self.selected_variables: List[str] = []
-            self.x_data = []
-            self.list_items = []
-            self.variable_data = pd.DataFrame()
+        super().__init__(*args, **kwargs)
+        self.configurations: List[Configuration] = []
+        self.selected_variables= {}
+        self.x_data = {}
+        self.selected_data = {}
+        self.variables = {}
+        self.list_items = []
+        self.variable_data = pd.DataFrame()
 
+    def on_enter(self):
+         # extract all results from all the configutations
+        project_results = self.project_results.results()
+
+        # extract `x_data` and `selected_variables`
+        config_ctr = 1
+        for result in project_results:
+            headers, data = result.storage_state()
+            self.x_data['Configuration ' + str(config_ctr)] = list(data.loc[:, 'time'])
+            self.variables['Configuration ' + str(config_ctr)] = headers
+            config_ctr += 1
+
+   
     def update_figure(self):
         print("Figure update command issued from GUI")
         print(self.x_data)
 
-        mdlist = self.ids.variable_list_detail
-        self.selected_variables = []
-        for wid in mdlist.children:
-            if wid.ids.check.active:
-                self.selected_variables.append(wid.text)
-
-        print(self.selected_variables)
-
         self.ids.detail_plot_canvas.clear_widgets()
-        fig = plt.figure()
-        for y_var in self.selected_variables:
-            plt.plot(self.x_data, self.variable_data.loc[:, y_var])
-        plt.xlabel('x-label')
-        plt.ylabel('y-label')
-        plt.legend()
-        plt.title('Detail Plots')
-        self.ids.detail_plot_canvas.add_widget(
-            FigureCanvasKivyAgg(fig)
-        )
+        # fig = plt.figure()
+        # # loop for each configuration
+        # for y_var in self.selected_variables:
+        #     plt.plot(self.x_data, self.variable_data.loc[:, y_var])
+        # plt.xlabel('time')
+        # plt.ylabel('y-label')
+        # plt.legend()
+        # plt.title('Detail Plots')
+        # self.ids.detail_plot_canvas.add_widget(
+        #     FigureCanvasKivyAgg(fig)
+        # )
 
     def drop_config_menu(self):
         for config in self.project.configurations():
@@ -1192,10 +1210,29 @@ class ResultsDetailScreen(SSimBaseScreen):
         )
         self.menu.open()
 
-    def set_config(self, value):
+    def update_selected_variables(self, value):
+
+        print('Update selected variables called!')
+
         # read the current selected configuration
         self.ids.config_list_detail.text = value
-        # extract all the results from all the configutations
+
+        # now once the list is displayed, update the selected_variables
+        selected_items = []
+        for variable in self.ids.variable_list_detail.children:
+            if variable.selected:
+                self.selected_items.append(variable.text)
+        self.selected_variables[value] = selected_items
+
+        print(self.selected_variables)
+
+    def set_config(self, value):
+
+        print(self.selected_variables)
+        # read the current selected configuration
+        self.ids.config_list_detail.text = value
+
+        # extract all results from all the configutations
         project_results = self.project_results.results()
         # obtain the index for the current selected configuration
         # TODO: setup a proper mapping system between Results and Configuration
@@ -1203,8 +1240,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         # extract the `current_result` based on selection from drop down menu
         current_result = next(itertools.islice(project_results, current_result_index, None))
         
-        # extract `x_data` for the `current_result`
-
         # extract the data 
         self.list_items, self.variable_data = current_result.storage_state()
         print(self.list_items)
@@ -1221,9 +1256,9 @@ class ResultsDetailScreen(SSimBaseScreen):
                 continue
             else:
                 self.ids.variable_list_detail.add_widget(
-                    ListItemWithCheckbox(pk = "pk", text = item)
+                    ResultsVariableListItem(variable_name = item)
                 )
-        
+
         # close the drop-down menu
         self.menu.dismiss()
         
