@@ -658,6 +658,7 @@
                     text: "Remove Configuration"
                 Button:
                     text: "Go"
+                    on_press: root.run_configurations()
 
         Button:
             text: "back"
@@ -680,6 +681,8 @@
     LeftCheckbox:
         id: check
         active: True
+        on_release:
+            self.toggle_configuration_check(check)
 
     IconRightWidget:
         icon: 'trash-can-outline'

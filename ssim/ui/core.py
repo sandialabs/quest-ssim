@@ -4,7 +4,7 @@ import itertools
 import json
 import tempfile
 from os import path
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import pkg_resources
 import subprocess
 import tomli
@@ -877,22 +877,30 @@ class Configuration:
         self._id = None
         self._grid_path = None
         self._federation_path = None
+        self._proc = None
         self._workdir = Path(".")
 
     def evaluate(self, basepath=None):
         """Run the simulator for this configuration"""
         self._workdir = Path(tempfile.mkdtemp(dir=basepath))
         self._id = path.basename(self._workdir)
-        self._grid_path = self._workdir / "grid.json"
+        self._grid_path = PurePosixPath(self._workdir / "grid.json")
         self._federation_path = self._workdir / "federation.json"
         self._write_configuration()
         self._run()
         return self._load_results()
 
+    def wait(self):
+        if self._proc is None:
+            raise RuntimeError(
+                "Tried to wait on evaluation, but no evaluation running"
+            )
+        return self._proc.wait()
+
     def _write_configuration(self):
-        with open(self._grid_path) as grid_file:
+        with open(self._grid_path, 'w') as grid_file:
             json.dump(self._grid_config(), grid_file)
-        with open(self._federation_path) as federation_file:
+        with open(self._federation_path, 'w') as federation_file:
             json.dump(self._federation_config(), federation_file)
 
     def _run(self):
@@ -912,6 +920,7 @@ class Configuration:
         self._configure_grid_model(config)
         self._configure_storage(config)
         self._configure_pv(config)
+        self._configure_inverters(config)
         self._configure_reliability(config)
         self._configure_metrics(config)
         return config
@@ -934,14 +943,19 @@ class Configuration:
         )
         return config
 
+    def _configure_inverters(self, config):
+        config["invcontrol"] = []
+        return config
+
     def _configure_reliability(self, config):
         # TODO user specified reliability params
         config["reliability"] = _DEFAULT_RELIABILITY
         return config
 
     def _configure_metrics(self, config):
-        config["busses_to_measure"] = [metric.to_dict()
-                                       for metric in self.metrics]
+        voltage_metrics = self.metrics.get("Voltage")
+        if voltage_metrics is not None:
+            config["busses_to_measure"] = voltage_metrics.to_dicts()
         return config
 
     def _federation_config(self):
@@ -962,13 +976,14 @@ class Configuration:
         config["federates"] = [
             _federate_spec(
                 "metrics",
-                f"metrics-federate --hours {self.sim_duration}"
+                f"metrics-federate"
                 f" {self._grid_path}"
                 f" {_get_federate_config('metrics')}"
             ),
             _federate_spec(
                 "logger",
                 f"logger-federate --hours {self.sim_duration}"
+                f" {self._grid_path}"
                 f" {_get_federate_config('logger')}"
             ),
             _federate_spec(
@@ -1023,8 +1038,10 @@ def _get_federate_config(federate):
     if federate not in {'metrics', 'storage', 'reliability',
                         'logger', 'grid', 'ems'}:
         raise ValueError(f"invalid federate type '{federate}'.")
-    return pkg_resources.resource_filename(
-        "ssim.federates", f"{federate}.json")
+    return PurePosixPath(
+        Path(pkg_resources.resource_filename(
+            "ssim.federates", f"{federate}.json"))
+    )
 
 
 _OPENDSS_ILLEGAL_CHARACTERS = "\t\n .="

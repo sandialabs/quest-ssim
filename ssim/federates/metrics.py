@@ -93,7 +93,7 @@ class MetricsFederate:
         while self.endpoint.has_message():
             message = self.endpoint.get_message()
             bv_msg: BusVoltageStatus = StatusMessage.from_json(message.data)  # noqa
-            curr_metric: MetricTimeAccumulator = self._metricMgr[bv_msg.name]
+            curr_metric: MetricTimeAccumulator = self._metricMgr.get_accumulator(bv_msg.name)
             met_val = curr_metric.accumulate(bv_msg.voltage, bv_msg.time)
             index = self.csv_fields.index(bv_msg.name)
             values[index] = met_val

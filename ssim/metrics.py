@@ -289,6 +289,13 @@ class Metric:
 
         return ret + "}"
 
+    def to_dict(self, key: str) -> dict:
+        return {
+            "name": key,
+            "limit": self._limit,
+            "objective": self._objective
+        }
+
     def normalize(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value.
 
@@ -723,6 +730,25 @@ class MetricAccumulator:
         self._accumulated += d_time * met_val
         return met_val
     
+    def to_dict(self, key: str) -> dict:
+        """Return a dictionary representation of the metric being accumulated.
+        
+        Parameters
+        ----------
+
+        key : str
+            The key to which this metric accumulator is mapped by a metric
+            owner.
+
+        Returns
+        -------
+
+        dict
+            A dictionary representation of the metric. Include keys "name",
+            "objective", and "limit".
+        """
+        return self._metric.to_dict(key)
+    
     def write_toml(self, category: str, key: str) -> str:
         """Writes the properties of this class instance to a string in TOML
            format.
@@ -947,6 +973,12 @@ class MetricManager:
             The metric accumulator associated with the supplied key or None.
         """
         return self._all_metrics.get(name)
+
+    def to_dicts(self) -> list[dict]:
+        return [
+            accumulator.to_dict(name)
+            for name, accumulator in self._all_metrics.items()
+        ]
 
     def write_toml(self, category) -> str:
         """Writes the properties of this class instance to a string in TOML
