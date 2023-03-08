@@ -77,6 +77,22 @@ _KV_FILES = ["common.kv", "ssim.kv"]
 
 
 def parse_float(strval) -> float:
+    """A utility method to parse a string into a floating point value.
+
+    This differs from a raw cast (float(strval)) in that it swallows
+    exceptions.
+
+    Parameters
+    ----------
+    strval
+        The string to try and parse into a floating point number.
+
+    Returns
+    -------
+    float:
+        The value that resulted from parsing the supplied string to a float
+        or None if the cast attempt caused an exception.
+    """
     try:
         return float(strval)
     except ValueError:
@@ -84,6 +100,24 @@ def parse_float(strval) -> float:
 
 
 def parse_float_or_str(strval):
+    """A utility method to parse a string into a floating point value or
+     leave it as is if the cast fails.
+
+    This used parse_float and if that fails, this returns the supplied input string.
+
+    Parameters
+    ----------
+    strval
+        The string to try and parse into a floating point number.
+
+    Returns
+    -------
+    float or str:
+        This returns None if the supplied input string is None.  Otherwise, it
+        tries to cast the input string to a float.   If that succeeds, then the
+        float is returned.  If it doesn't, then the supplied string is returned
+        unaltered.
+    """
     if not strval: return None
     flt = parse_float(strval)
     return strval if not flt else flt
