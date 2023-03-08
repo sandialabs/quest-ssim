@@ -131,18 +131,6 @@ def parse_float_or_str(strval):
     return strval if not flt else flt
 
 
-def parse_float(strval) -> float:
-    try:
-        return float(strval)
-    except ValueError:
-        return None
-
-def parse_float_or_str(strval):
-    if not strval: return None
-    flt = parse_float(strval)
-    return strval if not flt else flt
-
-
 class SSimApp(MDApp):
 
     def __init__(self, *args, **kwargs):
