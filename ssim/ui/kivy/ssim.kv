@@ -585,30 +585,6 @@
         id: check
         listItem: root
 
-<XYGridHeader>
-    orientation: "horizontal"
-    #size_hint: None, None
-    #size: (root.width, root.height)
-    #width: self.parent.width
-
-    MDLabel:
-        id: x_label
-        #size_hint: 1.0, 1.0
-        text: self.parent.x_label
-
-    MDLabel:
-        id: y_label
-        #size_hint: 1.0, 1.0
-        text: self.parent.y_label
-
-#    Button:
-#        id: addbtn
-#        text: "+"
-#        size_hint_x: None
-#        width: 25
-#        pos_hint_y: 0.9
-#        on_release: root.on_add_button()
-
 <XYGridView>
     viewclass: 'XYGridViewItem'
     #size_hint: 0.5, 0.93

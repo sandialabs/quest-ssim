@@ -577,10 +577,6 @@ class XYGridView(RecycleView):
         return [parse_float_or_str(child.y_value) for child in self.children[0].children]
 
 
-class XYGridViewLayout(FocusBehavior, RecycleBoxLayout):
-    pass
-
-
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     index = NumericProperty()
 
@@ -611,27 +607,6 @@ class XYItemTextField(TextInput):
     def set_error_message(self, instance, text):
         v = parse_float(text) is not None
         self.background_color = "red" if not v else self.def_back_color
-
-
-class XYGridHeader(BoxLayout):
-
-    grid = ObjectProperty(None)
-    x_label = StringProperty("X")
-    y_label = StringProperty("Y")
-
-    def __init__(self, **kwargs):
-        super(BoxLayout, self).__init__(**kwargs)
-        self.bind(x_label=self.set_x_label)
-        self.bind(y_label=self.set_y_label)
-
-    def set_x_label(self, instance, value):
-        self.ids.x_label = value
-
-    def set_y_label(self, instance, value):
-        self.ids.y_label = value
-
-    def on_add_button(self):
-        self.grid.data.append({'x': 1.0, 'y': 1.0})
 
 
 class VoltVarTabContent(BoxLayout):
@@ -750,9 +725,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vvs = self._options.control.params["volt_vals"]
         var = self._options.control.params["var_vals"]
 
-        xs, ys = StorageControlConfigurationScreen.__try_sort(vvs, var)
-        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
-        self.ids.vv_tab_content.ids.grid.data = dat
+        self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
 
     def set_volt_watt_mode(self):
         self.set_mode("voltwatt", self.ids.vw_tab)
@@ -762,9 +735,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vvs = self._options.control.params["volt_vals"]
         wvs = self._options.control.params["watt_vals"]
 
-        xs, ys = StorageControlConfigurationScreen.__try_sort(vvs, wvs)
-        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
-        self.ids.vw_tab_content.ids.grid.data = dat
+        self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
 
     def set_var_watt_mode(self):
         self.set_mode("varwatt", self.ids.var_watt_tab)
@@ -774,9 +745,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vvs = self._options.control.params["var_vals"]
         wvs = self._options.control.params["watt_vals"]
 
-        xs, ys = StorageControlConfigurationScreen.__try_sort(vvs, wvs)
-        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
-        self.ids.var_watt_tab_content.ids.grid.data = dat
+        self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
 
     def set_volt_var_and_volt_watt_mode(self):
         self.set_mode("vv_vw", self.ids.vv_vw_tab)
@@ -790,14 +759,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vwvs = self._options.control.params["vw_volt_vals"]
         watts = self._options.control.params["watt_vals"]
 
-        xs, ys = StorageControlConfigurationScreen.__try_sort(vvvs, vars)
-        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
-        self.ids.vv_vw_tab_content.ids.vv_grid.data = dat
-
-        xs, ys = StorageControlConfigurationScreen.__try_sort(vwvs, watts)
-        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
-        self.ids.vv_vw_tab_content.ids.vw_grid.data = dat
-
+        self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
+        self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
 
     def set_const_power_factor_mode(self):
         self.set_mode("constantpf", self.ids.const_pf_tab)
@@ -815,6 +778,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         if label not in self._options.control.params:
             self._options.control.params[label] = def_val
 
+    def __set_xy_grid_data(self, grid, xdat, ydat):
+        xs, ys = StorageControlConfigurationScreen.__try_sort(xdat, ydat)
+        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        grid.data = dat
+
     @staticmethod
     def __try_sort(xl: list, yl: list) -> (list, list):
         try:
@@ -822,22 +790,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         except:
             return (xl, yl)
 
-    def make_xy_grid(self, xs: list, ys: list, size_hint=(0.5, 0.93)) -> XYGridView:
-        view = XYGridView(size_hint=size_hint)
-        xs, ys = StorageControlConfigurationScreen.__try_sort(xs, ys)
-        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
-        view.data = dat
-        return view
-
-    def make_xy_header(self, xlabel: str, ylabel: str, size_hint=(0.5, 0.07)) -> XYGridHeader:
-        headers = XYGridHeader(size_hint=size_hint)
-        headers.ids.x_label.text = xlabel
-        headers.ids.y_label.text = ylabel
-        return headers
-
     def set_mode(self, name, tab) -> bool:
-        #self.manage_button_selection_states(button)
-        #tab.clear_widgets()
         if self.ids.control_tabs.get_current_tab() is not tab:
             self.ids.control_tabs.switch_tab(tab.tab_label_text)
 
@@ -845,20 +798,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self._options.control.mode = name
         self._options.control.params.clear()
         return True
-
-    #def manage_button_selection_states(self, selbutton):
-    #    self.ids.droop_mode.md_bg_color =\
-    #        "red" if selbutton is self.ids.droop_mode else self._def_btn_color
-    #    self.ids.vv_mode.md_bg_color =\
-    #        "red" if selbutton is self.ids.vv_mode else self._def_btn_color
-    #    self.ids.vw_mode.md_bg_color =\
-    #        "red" if selbutton is self.ids.vw_mode else self._def_btn_color
-    #    self.ids.var_watt_mode.md_bg_color =\
-    #        "red" if selbutton is self.ids.var_watt_mode else self._def_btn_color
-    #    self.ids.vv_vw_mode.md_bg_color =\
-    #        "red" if selbutton is self.ids.vv_vw_mode else self._def_btn_color
-    #    self.ids.const_pf_mode.md_bg_color =\
-    #        "red" if selbutton is self.ids.const_pf_mode else self._def_btn_color
 
     def save(self):
         self._options.min_soc = self.ids.min_soc.fraction()
