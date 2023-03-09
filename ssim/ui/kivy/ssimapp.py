@@ -40,6 +40,7 @@ from kivy.uix.behaviors import FocusBehavior
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.list import OneLineListItem
+from kivymd.uix.tab import MDTabsBase
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
@@ -290,6 +291,9 @@ class TextFieldPositiveFloat(MDTextField):
             self.error = False
             self.helper_text = "Input value and press enter"
 
+
+class StorageControlModelTab(FloatLayout, MDTabsBase):
+    pass
 
 class TextFieldPositivePercentage(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
@@ -612,13 +616,52 @@ class XYItemTextField(TextInput):
 class XYGridHeader(BoxLayout):
 
     grid = ObjectProperty(None)
+    x_label = StringProperty("X")
+    y_label = StringProperty("Y")
+
+    def __init__(self, **kwargs):
+        super(BoxLayout, self).__init__(**kwargs)
+        self.bind(x_label=self.set_x_label)
+        self.bind(y_label=self.set_y_label)
+
+    def set_x_label(self, instance, value):
+        self.ids.x_label = value
+
+    def set_y_label(self, instance, value):
+        self.ids.y_label = value
 
     def on_add_button(self):
         self.grid.data.append({'x': 1.0, 'y': 1.0})
 
 
+class VoltVarTabContent(BoxLayout):
+
+    def on_add_button(self):
+        self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
+
+
+class VoltWattTabContent(BoxLayout):
+
+    def on_add_button(self):
+        self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
+
+
+class VarWattTabContent(BoxLayout):
+
+    def on_add_button(self):
+        self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
+
+class VoltVarVarWattTabContent(BoxLayout):
+
+    def on_add_vv_button(self):
+        self.ids.vv_grid.data.append({'x': 1.0, 'y': 1.0})
+
+    def on_add_vw_button(self):
+        self.ids.vw_grid.data.append({'x': 1.0, 'y': 1.0})
+
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
+
     def __init__(self, der_screen, config, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._der_screen = der_screen
@@ -636,7 +679,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         self._def_btn_color = '#005376'
 
-        if not self._options is None:
+        if self._options is not None:
             if self._options.control.mode == "droop":
                 self.set_droop_mode()
             elif self._options.control.mode == "voltvar":
@@ -665,20 +708,32 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
     def device_name(self):
         return "" if self._options is None else self._options.name
 
+    def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
+        if tab_text == "Droop":
+            self.set_droop_mode()
+        elif tab_text == "Volt-Var":
+            self.set_volt_var_mode()
+        elif tab_text == "Volt-Watt":
+            self.set_volt_watt_mode()
+        elif tab_text == "Var-Watt":
+            self.set_var_watt_mode()
+        elif tab_text == "Volt-Var & Volt-Watt":
+            self.set_volt_var_and_volt_watt_mode()
+        elif tab_text == "Constant Power Factor":
+            self.set_const_power_factor_mode()
+        else:
+            self.set_droop_mode()
+
     def set_droop_mode(self):
-        self.set_mode("droop", self.ids.droop_mode)
+        self.set_mode("droop", self.ids.droop_tab)
         self.__verify_control_param("p_droop", 500)
         self.__verify_control_param("q_droop", -300)
 
-        pfield = TextFieldFloat(
-            hint_text="P Droop", text=str(self._options.control.params["p_droop"])
-            )
-        qfield = TextFieldFloat(
-            hint_text="Q Droop", text=str(self._options.control.params["q_droop"])
-            )
-        self.ids.param_box.add_widget(pfield)
-        self.ids.param_box.add_widget(qfield)
-        self.ids.param_box.add_widget(BoxLayout(size_hint=(1.0, 0.8)))
+        pfield = self.ids.droop_tab_content.ids.p_value
+        qfield = self.ids.droop_tab_content.ids.q_value
+
+        pfield.text = str(self._options.control.params["p_droop"])
+        qfield.text = str(self._options.control.params["q_droop"])
 
         self._param_field_map.clear()
         self._param_field_map["p_droop"] = pfield
@@ -688,102 +743,68 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(qfield), 0.05)
 
     def set_volt_var_mode(self):
-        self.set_mode("voltvar", self.ids.vv_mode)
+        self.set_mode("voltvar", self.ids.vv_tab)
         self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        headers = self.make_xy_header("Voltage (p.u.)", "Reactive Power (kVAR)")
         vvs = self._options.control.params["volt_vals"]
         var = self._options.control.params["var_vals"]
 
-        view = self.make_xy_grid(vvs, var)
-        self.ids.voltvargrid = view
-        headers.grid = view
-
-        self.ids.param_box.add_widget(headers)
-        self.ids.param_box.add_widget(view)
+        xs, ys = StorageControlConfigurationScreen.__try_sort(vvs, var)
+        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.vv_tab_content.ids.grid.data = dat
 
     def set_volt_watt_mode(self):
-        self.set_mode("voltwatt", self.ids.vw_mode)
+        self.set_mode("voltwatt", self.ids.vw_tab)
         self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        headers = self.make_xy_header("Voltage (p.u.)", "Watts (kW)")
         vvs = self._options.control.params["volt_vals"]
         wvs = self._options.control.params["watt_vals"]
 
-        view = self.make_xy_grid(vvs, wvs)
-        self.ids.voltwattgrid = view
-        headers.grid = view
-
-        self.ids.param_box.add_widget(headers)
-        self.ids.param_box.add_widget(view)
+        xs, ys = StorageControlConfigurationScreen.__try_sort(vvs, wvs)
+        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.vw_tab_content.ids.grid.data = dat
 
     def set_var_watt_mode(self):
-        self.set_mode("varwatt", self.ids.var_watt_mode)
+        self.set_mode("varwatt", self.ids.var_watt_tab)
         self.__verify_control_param("var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        headers = self.make_xy_header("Reactive Power (kVAR)", "Watts (kW)")
         vvs = self._options.control.params["var_vals"]
         wvs = self._options.control.params["watt_vals"]
 
-        view = self.make_xy_grid(vvs, wvs)
-        self.ids.varwattgrid = view
-        headers.grid = view
-
-        self.ids.param_box.add_widget(headers)
-        self.ids.param_box.add_widget(view)
+        xs, ys = StorageControlConfigurationScreen.__try_sort(vvs, wvs)
+        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.var_watt_tab_content.ids.grid.data = dat
 
     def set_volt_var_and_volt_watt_mode(self):
-        self.set_mode("vv_vw", self.ids.vv_vw_mode)
+        self.set_mode("vv_vw", self.ids.vv_vw_tab)
         self.__verify_control_param("vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
         self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-
-        vvheaders = self.make_xy_header("Voltage (p.u.)", "Reactive Power (kVAR)", (1.0, 0.07))
-        vwheaders = self.make_xy_header("Voltage (p.u.)", "Watts (kW)", (1.0, 0.07))
 
         vvvs = self._options.control.params["vv_volt_vals"]
         vars = self._options.control.params["var_vals"]
         vwvs = self._options.control.params["vw_volt_vals"]
         watts = self._options.control.params["watt_vals"]
 
-        vvview = self.make_xy_grid(vvvs, vars, (1.0, 0.93))
-        self.ids.voltvargrid = vvview
-        vvheaders.grid = vvview
+        xs, ys = StorageControlConfigurationScreen.__try_sort(vvvs, vars)
+        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.vv_vw_tab_content.ids.vv_grid.data = dat
 
-        vwview = self.make_xy_grid(vwvs, watts, (1.0, 0.93))
-        self.ids.voltwattgrid = vwview
-        vwheaders.grid = vwview
+        xs, ys = StorageControlConfigurationScreen.__try_sort(vwvs, watts)
+        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.vv_vw_tab_content.ids.vw_grid.data = dat
 
-        self.vwdata = vwview.data
-
-        innerBox = BoxLayout(orientation="horizontal")
-        self.ids.param_box.add_widget(innerBox)
-
-        vvBox = BoxLayout(orientation="vertical")
-        vwBox = BoxLayout(orientation="vertical")
-
-        innerBox.add_widget(vvBox)
-        innerBox.add_widget(vwBox)
-
-        vvBox.add_widget(vvheaders)
-        vvBox.add_widget(vvview)
-
-        vwBox.add_widget(vwheaders)
-        vwBox.add_widget(vwview)
 
     def set_const_power_factor_mode(self):
-        self.set_mode("constantpf", self.ids.const_pf_mode)
+        self.set_mode("constantpf", self.ids.const_pf_tab)
         self.__verify_control_param("pf_val", 0.99)
 
-        pffield = TextFieldPositiveFloat(
-            hint_text="Power Factor Value", text=str(self._options.control.params["pf_val"])
-            )
-        self.ids.param_box.add_widget(pffield)
-        self.ids.param_box.add_widget(BoxLayout(size_hint=(1.0, 0.8)))
+        pffield = self.ids.const_pf_tab_content.ids.pf_value
+        pffield.text = str(self._options.control.params["pf_val"])
 
         self._param_field_map.clear()
         self._param_field_map["pf_val"] = pffield
@@ -814,27 +835,30 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         headers.ids.y_label.text = ylabel
         return headers
 
-    def set_mode(self, name, button) -> bool:
-        self.manage_button_selection_states(button)
-        self.ids.param_box.clear_widgets()
+    def set_mode(self, name, tab) -> bool:
+        #self.manage_button_selection_states(button)
+        #tab.clear_widgets()
+        if self.ids.control_tabs.get_current_tab() is not tab:
+            self.ids.control_tabs.switch_tab(tab.tab_label_text)
+
         if self._options.control.mode == name: return False
         self._options.control.mode = name
         self._options.control.params.clear()
         return True
 
-    def manage_button_selection_states(self, selbutton):
-        self.ids.droop_mode.md_bg_color =\
-            "red" if selbutton is self.ids.droop_mode else self._def_btn_color
-        self.ids.vv_mode.md_bg_color =\
-            "red" if selbutton is self.ids.vv_mode else self._def_btn_color
-        self.ids.vw_mode.md_bg_color =\
-            "red" if selbutton is self.ids.vw_mode else self._def_btn_color
-        self.ids.var_watt_mode.md_bg_color =\
-            "red" if selbutton is self.ids.var_watt_mode else self._def_btn_color
-        self.ids.vv_vw_mode.md_bg_color =\
-            "red" if selbutton is self.ids.vv_vw_mode else self._def_btn_color
-        self.ids.const_pf_mode.md_bg_color =\
-            "red" if selbutton is self.ids.const_pf_mode else self._def_btn_color
+    #def manage_button_selection_states(self, selbutton):
+    #    self.ids.droop_mode.md_bg_color =\
+    #        "red" if selbutton is self.ids.droop_mode else self._def_btn_color
+    #    self.ids.vv_mode.md_bg_color =\
+    #        "red" if selbutton is self.ids.vv_mode else self._def_btn_color
+    #    self.ids.vw_mode.md_bg_color =\
+    #        "red" if selbutton is self.ids.vw_mode else self._def_btn_color
+    #    self.ids.var_watt_mode.md_bg_color =\
+    #        "red" if selbutton is self.ids.var_watt_mode else self._def_btn_color
+    #    self.ids.vv_vw_mode.md_bg_color =\
+    #        "red" if selbutton is self.ids.vv_vw_mode else self._def_btn_color
+    #    self.ids.const_pf_mode.md_bg_color =\
+    #        "red" if selbutton is self.ids.const_pf_mode else self._def_btn_color
 
     def save(self):
         self._options.min_soc = self.ids.min_soc.fraction()
@@ -848,17 +872,17 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
                 float(self._param_field_map[key].text)
 
         if self._options.control.mode == "voltvar":
-            self.__extract_data_lists(self.ids.voltvargrid, "volt_vals", "var_vals")
+            self.__extract_data_lists(self.ids.vv_tab_content.ids.grid, "volt_vals", "var_vals")
 
-        if self._options.control.mode == "voltwatt":
-            self.__extract_data_lists(self.ids.voltwattgrid, "volt_vals", "watt_vals")
+        elif self._options.control.mode == "voltwatt":
+            self.__extract_data_lists(self.ids.vw_tab_content.ids.grid, "volt_vals", "watt_vals")
 
-        if self._options.control.mode == "varwatt":
-            self.__extract_data_lists(self.ids.varwattgrid, "var_vals", "watt_vals")
+        elif self._options.control.mode == "varwatt":
+            self.__extract_data_lists(self.ids.var_watt_tab_content.ids.grid, "var_vals", "watt_vals")
 
-        if self._options.control.mode == "vv_vw":
-            self.__extract_data_lists(self.ids.voltvargrid, "vv_volt_vals", "var_vals")
-            self.__extract_data_lists(self.ids.voltwattgrid, "vw_volt_vals", "watt_vals")
+        elif self._options.control.mode == "vv_vw":
+            self.__extract_data_lists(self.ids.vv_vw_tab_content.ids.vv_grid, "vv_volt_vals", "var_vals")
+            self.__extract_data_lists(self.ids.vv_vw_tab_content.ids.vw_grid, "vw_volt_vals", "watt_vals")
 
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)

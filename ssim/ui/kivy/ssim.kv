@@ -193,12 +193,189 @@
     LeftCheckBox:
         id: selected
 
+<DroopTabContent@BoxLayout>
+    orientation: "vertical"
+    padding: 5
+
+    TextFieldFloat:
+        id: p_value
+        hint_text: "P Droop"
+
+    TextFieldFloat:
+        id: q_value
+        hint_text: "Q Droop"
+
+    BoxLayout:
+        size_hint: (1.0, 0.8)
+
+<ConstPFTabContent@BoxLayout>
+    orientation: "vertical"
+    padding: 5
+
+    TextFieldFloat:
+        id: pf_value
+        hint_text: "Power Factor Value"
+
+    BoxLayout:
+        size_hint: (1.0, 0.9)
+
+<VoltVarTabContent>
+    orientation: "vertical"
+    size_hint: (1.0, 1.0)
+    padding: 5
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint: 1.0, 0.07
+
+        MDLabel:
+            id: x_label
+            text: "Voltage (p.u.)"
+
+        MDLabel:
+            id: y_label
+            text: "Reactive Power (kVAR)"
+
+        Button:
+            id: addbtn
+            text: "+"
+            size_hint_x: None
+            width: 25
+            pos_hint_y: 0.9
+            on_release: root.on_add_button()
+
+    XYGridView:
+        id: grid
+        size_hint: (1.0, 0.93)
+
+
+<VoltWattTabContent>
+    orientation: "vertical"
+    size_hint: (1.0, 1.0)
+    padding: 5
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint: 1.0, 0.07
+
+        MDLabel:
+            id: x_label
+            text: "Voltage (p.u.)"
+
+        MDLabel:
+            id: y_label
+            text: "Watts (kW)"
+
+        Button:
+            id: addbtn
+            text: "+"
+            size_hint_x: None
+            width: 25
+            pos_hint_y: 0.9
+            on_release: root.on_add_button()
+
+    XYGridView:
+        id: grid
+        size_hint: (1.0, 0.93)
+
+<VarWattTabContent>
+    orientation: "vertical"
+    size_hint: (1.0, 1.0)
+    padding: 5
+
+    BoxLayout:
+        orientation: "horizontal"
+        size_hint: 1.0, 0.07
+
+        MDLabel:
+            id: x_label
+            text: "Reactive Power (kVAR)"
+
+        MDLabel:
+            id: y_label
+            text: "Watts (kW)"
+
+        Button:
+            id: addbtn
+            text: "+"
+            size_hint_x: None
+            width: 25
+            pos_hint_y: 0.9
+            on_release: root.on_add_button()
+
+    XYGridView:
+        id: grid
+        size_hint: (1.0, 0.93)
+
+
+<VoltVarVarWattTabContent>
+    orientation: "horizontal"
+    size_hint: (1.0, 1.0)
+    padding: 5
+
+    BoxLayout:
+        orientation: "vertical"
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint: 1.0, 0.07
+
+            MDLabel:
+                id: x_label
+                text: "Voltage (p.u.)"
+
+            MDLabel:
+                id: y_label
+                text: "Reactive Power (kVAR)"
+
+            Button:
+                id: addbtn
+                text: "+"
+                size_hint_x: None
+                width: 25
+                pos_hint_y: 0.9
+                on_release: root.on_add_vv_button()
+
+        XYGridView:
+            id: vv_grid
+            size_hint: (1.0, 0.93)
+
+
+    BoxLayout:
+        orientation: "vertical"
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint: 1.0, 0.07
+
+            MDLabel:
+                id: x_label
+                text: "Reactive Power (kVAR)"
+
+            MDLabel:
+                id: y_label
+                text: "Watts (kW)"
+
+            Button:
+                id: addbtn
+                text: "+"
+                size_hint_x: None
+                width: 25
+                pos_hint_y: 0.9
+                on_release: root.on_add_vw_button()
+
+        XYGridView:
+            id: vw_grid
+            size_hint: (1.0, 0.93)
+
+
 <StorageControlConfigurationScreen>:
     name: "configure-storage-controls"
     on_enter: self.set_mode_label_text()
 
     BoxLayout:
         orientation: "vertical"
+        padding: 5
 
         TextFieldPositivePercentage:
             id: min_soc
@@ -220,49 +397,55 @@
             size_hint: (1.0, 0.05)
 
         BoxLayout:
-            orientation: "horizontal"
+
+            #orientation: "horizontal"
             size_hint: (1.0, 0.2)
 
-            MDRaisedButton:
-                id: droop_mode
-                text: "Droop"
-                md_bg_color: '#005376'
-                on_press: root.set_droop_mode()
+            MDTabs:
+                id: control_tabs
+                on_tab_switch: root.on_tab_switch(*args)
 
-            MDRaisedButton:
-                id: vv_mode
-                text: "Volt-Var"
-                md_bg_color: '#005376'
-                on_press: root.set_volt_var_mode()
+                StorageControlModelTab:
+                    id: droop_tab
+                    title: "Droop"
 
-            MDRaisedButton:
-                id: vw_mode
-                text: "Volt-Watt"
-                md_bg_color: '#005376'
-                on_press: root.set_volt_watt_mode()
+                    DroopTabContent:
+                        id: droop_tab_content
 
-            MDRaisedButton:
-                id: var_watt_mode
-                text: "Var-Watt"
-                md_bg_color: '#005376'
-                on_press: root.set_var_watt_mode()
+                StorageControlModelTab:
+                    id: vv_tab
+                    title: "Volt-Var"
 
-            MDRaisedButton:
-                id: vv_vw_mode
-                text: "Volt-Var & Volt-Watt"
-                md_bg_color: '#005376'
-                on_press: root.set_volt_var_and_volt_watt_mode()
+                    VoltVarTabContent:
+                        id: vv_tab_content
 
-            MDRaisedButton:
-                id: const_pf_mode
-                text: "Constant Power Factor"
-                md_bg_color: '#005376'
-                on_press: root.set_const_power_factor_mode()
+                StorageControlModelTab:
+                    id: vw_tab
+                    title: "Volt-Watt"
 
-        BoxLayout:
-            id: param_box
-            orientation: "vertical"
-            size_hint: (1.0, 0.7)
+                    VoltWattTabContent:
+                        id: vw_tab_content
+
+                StorageControlModelTab:
+                    id: var_watt_tab
+                    title: "Var-Watt"
+
+                    VarWattTabContent:
+                        id: var_watt_tab_content
+
+                StorageControlModelTab:
+                    id: vv_vw_tab
+                    title: "Volt-Var & Volt-Watt"
+
+                    VoltVarVarWattTabContent:
+                        id: vv_vw_tab_content
+
+                StorageControlModelTab:
+                    id: const_pf_tab
+                    title: "Constant Power Factor"
+
+                    ConstPFTabContent:
+                        id: const_pf_tab_content
 
         BoxLayout:
             size_hint_y: None
@@ -288,6 +471,7 @@
 
             BoxLayout:
                 orientation: "vertical"
+                padding: 5
 
                 TextFieldOpenDSSName:
                     id: device_name
@@ -403,26 +587,31 @@
 
 <XYGridHeader>
     orientation: "horizontal"
-    size_hint: 0.5, 0.07
+    #size_hint: None, None
+    #size: (root.width, root.height)
+    #width: self.parent.width
 
     MDLabel:
         id: x_label
-        text: "X"
+        #size_hint: 1.0, 1.0
+        text: self.parent.x_label
 
     MDLabel:
         id: y_label
-        text: "Y"
+        #size_hint: 1.0, 1.0
+        text: self.parent.y_label
 
-    Button:
-        id: addbtn
-        text: "+"
-        size_hint_x: 0.1
-        pos_hint_y: 0.9
-        on_release: root.on_add_button()
+#    Button:
+#        id: addbtn
+#        text: "+"
+#        size_hint_x: None
+#        width: 25
+#        pos_hint_y: 0.9
+#        on_release: root.on_add_button()
 
 <XYGridView>
     viewclass: 'XYGridViewItem'
-    size_hint: 0.5, 0.93
+    #size_hint: 0.5, 0.93
     RecycleBoxLayout:
         default_size: None, dp(32)
         default_size_hint: 1, None
@@ -437,7 +626,7 @@
 
 <XYGridViewItem>
     orientation: 'horizontal'
-    size_hint: 0.5, 0.05
+    #size_hint: 0.5, 0.05
     padding: 2
 
     XYItemTextField:
@@ -449,7 +638,8 @@
     Button:
         id: deletebtn
         text: "X"
-        size_hint_x: 0.1
+        size_hint_x: None
+        width: 25
         pos_hint_y: 0.9
         on_release: root.on_delete_button()
 
