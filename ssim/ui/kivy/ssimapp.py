@@ -129,7 +129,7 @@ def parse_float_or_str(strval):
     """
     if not strval: return None
     flt = parse_float(strval)
-    return strval if not flt else flt
+    return strval if flt is None else flt
 
 
 class SSimApp(MDApp):
@@ -571,10 +571,10 @@ class StorageConfigurationScreen(SSimBaseScreen):
 class XYGridView(RecycleView):
 
     def extract_x_vals(self) -> list:
-        return [parse_float_or_str(child.x_value) for child in self.children[0].children]
+        return [child.x_value for child in self.children[0].children]
 
     def extract_y_vals(self) -> list:
-        return [parse_float_or_str(child.y_value) for child in self.children[0].children]
+        return [child.y_value for child in self.children[0].children]
 
 
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
@@ -831,14 +831,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.manager.remove_widget(self)
 
     def __extract_data_lists(self, xyc: XYGridView, l1name, l2name):
-        xl = xyc.extract_x_vals()
-        yl = xyc.extract_y_vals()
-
-        try:
-            xl, yl = (list(t) for t in zip(*sorted(zip(xl, yl))))
-        except:
-            pass
-
+        xl, yl = StorageControlConfigurationScreen.__try_sort(
+            xyc.extract_x_vals(), xyc.extract_y_vals()
+            )
         self._options.control.params[l1name] = xl
         self._options.control.params[l2name] = yl
 
