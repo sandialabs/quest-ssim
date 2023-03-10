@@ -228,9 +228,21 @@
         orientation: "horizontal"
         size_hint: 1.0, 0.07
 
-        MDLabel:
-            id: x_label
-            text: "Voltage (p.u.)"
+
+        BoxLayout:
+            orientation: "horizontal"
+
+            MDLabel:
+                id: x_label
+                text: "Voltage (p.u.)"
+
+            Button:
+                id: sortbtn
+                text: "Sort"
+                size_hint_x: None
+                width: 45
+                pos_hint_y: 0.9
+                on_release: root.on_sort_button()
 
         MDLabel:
             id: y_label
@@ -258,9 +270,20 @@
         orientation: "horizontal"
         size_hint: 1.0, 0.07
 
-        MDLabel:
-            id: x_label
-            text: "Voltage (p.u.)"
+        BoxLayout:
+            orientation: "horizontal"
+
+            MDLabel:
+                id: x_label
+                text: "Voltage (p.u.)"
+
+            Button:
+                id: sortbtn
+                text: "Sort"
+                size_hint_x: None
+                width: 45
+                pos_hint_y: 0.9
+                on_release: root.on_sort_button()
 
         MDLabel:
             id: y_label
@@ -287,9 +310,20 @@
         orientation: "horizontal"
         size_hint: 1.0, 0.07
 
-        MDLabel:
-            id: x_label
-            text: "Reactive Power (kVAR)"
+        BoxLayout:
+            orientation: "horizontal"
+
+            MDLabel:
+                id: x_label
+                text: "Reactive Power (kVAR)"
+
+            Button:
+                id: sortbtn
+                text: "Sort"
+                size_hint_x: None
+                width: 45
+                pos_hint_y: 0.9
+                on_release: root.on_sort_button()
 
         MDLabel:
             id: y_label
@@ -320,9 +354,20 @@
             orientation: "horizontal"
             size_hint: 1.0, 0.07
 
-            MDLabel:
-                id: x_label
-                text: "Voltage (p.u.)"
+            BoxLayout:
+                orientation: "horizontal"
+
+                MDLabel:
+                    id: x_label
+                    text: "Voltage (p.u.)"
+
+                Button:
+                    id: sortbtn
+                    text: "Sort"
+                    size_hint_x: None
+                    width: 45
+                    pos_hint_y: 0.9
+                    on_release: root.on_vv_sort_button()
 
             MDLabel:
                 id: y_label
@@ -348,9 +393,20 @@
             orientation: "horizontal"
             size_hint: 1.0, 0.07
 
-            MDLabel:
-                id: x_label
-                text: "Reactive Power (kVAR)"
+            BoxLayout:
+                orientation: "horizontal"
+
+                MDLabel:
+                    id: x_label
+                    text: "Reactive Power (kVAR)"
+
+                Button:
+                    id: sortbtn
+                    text: "Sort"
+                    size_hint_x: None
+                    width: 45
+                    pos_hint_y: 0.9
+                    on_release: root.on_vw_sort_button()
 
             MDLabel:
                 id: y_label
