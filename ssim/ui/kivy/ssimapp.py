@@ -132,6 +132,29 @@ def parse_float_or_str(strval):
     return strval if flt is None else flt
 
 
+    def try_co_sort(xl: list, yl: list) -> (list, list):
+    """"Attempts to co-sort the supplied lists using the x-list as the sort index
+
+    Parameters
+    ----------
+    xl : list
+        The list of "x" values in this grid view to be sorted and treated as the index.
+    yl: list
+        The list of "y" values in this grid view to be sorted in accordance with the x-list.
+
+    Returns
+    -------
+    tuple:
+        If the two lists can be co-sorted, then the co-sorted versions of them will be
+        returned.  If they cannot b/c an exception occurs, then they are returned
+        unmodified.
+    """
+    try:
+        return (list(t) for t in zip(*sorted(zip(xl, yl))))
+    except:
+        return (xl, yl)
+
+
 class SSimApp(MDApp):
 
     def __init__(self, *args, **kwargs):
@@ -580,29 +603,6 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
 class XYGridView(RecycleView):
 
-    @staticmethod
-    def __try_sort(xl: list, yl: list) -> (list, list):
-        """"Attempts to co-sort the supplied lists using the x-list as the sort index
-
-        Parameters
-        ----------
-        xl : list
-            The list of "x" values in this grid view to be sorted and treated as the index.
-        yl: list
-            The list of "y" values in this grid view to be sorted in accordance with the x-list.
-
-        Returns
-        -------
-        tuple:
-            If the two lists can be co-sorted, then the co-sorted versions of them will be
-            returned.  If they cannot b/c an exception occurs, then they are returned
-            unmodified.
-        """
-        try:
-            return (list(t) for t in zip(*sorted(zip(xl, yl))))
-        except:
-            return (xl, yl)
-
     def extract_data_lists(self, sorted: bool = True) -> (list, list):
         """Reads all values out of the "x" and "y" columns of this control and returns them as
             pair of lists that may be sorted if requested.
@@ -622,7 +622,7 @@ class XYGridView(RecycleView):
         xvs = self.extract_x_vals()
         yvs = self.extract_y_vals()
         if not sorted: return (xvs, yvs)
-        return XYGridView.__try_sort(xvs, yvs)
+        return try_co_sort(xvs, yvs)
 
     def extract_x_vals(self) -> list:
         """Reads all values out of the "x" column of this control and returns them as a list.
@@ -949,32 +949,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             self._options.control.params[label] = def_val
 
     def __set_xy_grid_data(self, grid, xdat, ydat):
-        xs, ys = StorageControlConfigurationScreen.__try_sort(xdat, ydat)
+        xs, ys = try_co_sort(xdat, ydat)R
         dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
         grid.data = dat
-
-    @staticmethod
-    def __try_sort(xl: list, yl: list) -> (list, list):
-        """"Attempts to co-sort the supplied lists using the x-list as the sort index
-
-        Parameters
-        ----------
-        xl : list
-            The list of "x" values in this grid view to be sorted and treated as the index.
-        yl: list
-            The list of "y" values in this grid view to be sorted in accordance with the x-list.
-
-        Returns
-        -------
-        tuple:
-            If the two lists can be co-sorted, then the co-sorted versions of them will be
-            returned.  If they cannot b/c an exception occurs, then they are returned
-            unmodified.
-        """
-        try:
-            return (list(t) for t in zip(*sorted(zip(xl, yl))))
-        except:
-            return (xl, yl)
 
     def set_mode(self, name, tab) -> bool:
         if self.ids.control_tabs.get_current_tab() is not tab:
