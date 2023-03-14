@@ -175,10 +175,19 @@ class SSimBaseScreen(Screen):
 class DiagramPlot(BoxLayout):
 
     def reset_plot(self):
+        """Clears the current diagram widget and draws a new one using the current figure (plt.gcf())"""
         self.clear_widgets()
         self.add_widget(FigureCanvasKivyAgg(plt.gcf()))
 
     def display_plot_error(self, msg):
+        """Puts a label with a supplied message in place of the diagram when there is a reason a diagram
+            can't be displayed.
+
+        Parameters
+        ----------
+        msg : str
+            The message to show in place of the diagram when one can't be displayed.
+        """
         self.clear_widgets()
         self.add_widget(MDLabel(text=msg))
 
@@ -294,6 +303,7 @@ class TextFieldPositiveFloat(MDTextField):
 
 class StorageControlModelTab(FloatLayout, MDTabsBase):
     pass
+
 
 class TextFieldPositivePercentage(MDTextField):
     POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
@@ -572,21 +582,70 @@ class XYGridView(RecycleView):
 
     @staticmethod
     def __try_sort(xl: list, yl: list) -> (list, list):
+        """"Attempts to co-sort the supplied lists using the x-list as the sort index
+
+        Parameters
+        ----------
+        xl : list
+            The list of "x" values in this grid view to be sorted and treated as the index.
+        yl: list
+            The list of "y" values in this grid view to be sorted in accordance with the x-list.
+
+        Returns
+        -------
+        tuple:
+            If the two lists can be co-sorted, then the co-sorted versions of them will be
+            returned.  If they cannot b/c an exception occurs, then they are returned
+            unmodified.
+        """
         try:
             return (list(t) for t in zip(*sorted(zip(xl, yl))))
         except:
             return (xl, yl)
 
-    def extract_data_lists(self, sorted: bool = True):
+    def extract_data_lists(self, sorted: bool = True) -> (list, list):
+        """Reads all values out of the "x" and "y" columns of this control and returns them as
+            pair of lists that may be sorted if requested.
+
+        Parameters
+        ----------
+        sorted : bool
+            True if this method should try and c0-sort the extracted x and y lists before
+            returning them and false otherwise.
+
+        Returns
+        -------
+        tuple:
+            A pair of lists containing the x and y values in this grid.  The lists will be
+            co-sorted using the x list as an index if requested and they can be sorted.
+        """
         xvs = self.extract_x_vals()
         yvs = self.extract_y_vals()
         if not sorted: return (xvs, yvs)
         return XYGridView.__try_sort(xvs, yvs)
 
     def extract_x_vals(self) -> list:
+        """Reads all values out of the "x" column of this control and returns them as a list.
+
+        Returns
+        -------
+        list:
+            A list containing all values in the "x" column of this control.  The values in
+            the list will be of type float if they can be cast as such.  Otherwise, raw text
+            representations will be put in the list in locations where the cast fails.
+        """
         return [child.x_value for child in self.children[0].children]
 
     def extract_y_vals(self) -> list:
+        """Reads all values out of the "y" column of this control and returns them as a list.
+
+        Returns
+        -------
+        list:
+            A list containing all values in the "y" column of this control.  The values in
+            the list will be of type float if they can be cast as such.  Otherwise, raw text
+            representations will be put in the list in locations where the cast fails.
+        """
         return [child.y_value for child in self.children[0].children]
 
 
@@ -595,18 +654,49 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
 
     @property
     def x_value(self):
+        """Returns the current contents of the x value field of this row.
+
+        Returns
+        -------
+        float or str:
+            If the current content of the x value field of this row can be cast to
+            a float, then the float is returned.  Otherwise, the raw string contents
+            of the field are returned.
+        """
         return parse_float_or_str(self.ids.x_field.text)
 
     @property
     def y_value(self):
+        """Returns the current contents of the y value field of this row.
+
+        Returns
+        -------
+        float or str:
+            If the current content of the y value field of this row can be cast to
+            a float, then the float is returned.  Otherwise, the raw string contents
+            of the field are returned.
+        """
         return parse_float_or_str(self.ids.y_field.text)
 
     def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Should have keys for 'x' and 'y'.
+        """
         self.index = index
         self.ids.x_field.text = str(data['x'])
         self.ids.y_field.text = str(data['y'])
 
     def on_delete_button(self):
+        """A callback function for the button that deletes the data item represented by
+        this row from the data list"""
         self.parent.parent.data.pop(self.index)
 
 
@@ -623,45 +713,63 @@ class XYItemTextField(TextInput):
 
 
 class VoltVarTabContent(BoxLayout):
+    """The class that stores the content for the Volt-Var tab in the storage
+     option control tabs"""
 
     def on_add_button(self):
+        """A callback function for the button that adds a new value to the volt-var grid"""
         self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
 
     def on_sort_button(self):
+        """A callback function for the button that sorts the volt-var grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
 class VoltWattTabContent(BoxLayout):
+    """The class that stores the content for the Volt-Watt tab in the storage
+     option control tabs"""
 
     def on_add_button(self):
+        """A callback function for the button that adds a new value to the volt-watt grid"""
         self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
 
     def on_sort_button(self):
+        """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
 class VarWattTabContent(BoxLayout):
+    """The class that stores the content for the Var-Watt tab in the storage
+     option control tabs"""
 
     def on_add_button(self):
+        """A callback function for the button that adds a new value to the var-watt grid"""
         self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
 
     def on_sort_button(self):
+        """A callback function for the button that sorts the var-watt grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
 class VoltVarVarWattTabContent(BoxLayout):
+    """The class that stores the content for the Volt-Var & Var-Watt tab in the storage
+     option control tabs"""
 
     def on_add_vv_button(self):
+        """A callback function for the button that adds a new value to the volt-var grid"""
         self.ids.vv_grid.data.append({'x': 1.0, 'y': 1.0})
 
     def on_add_vw_button(self):
+        """A callback function for the button that adds a new value to the var-watt grid"""
         self.ids.vw_grid.data.append({'x': 1.0, 'y': 1.0})
 
     def on_vv_sort_button(self):
+        """A callback function for the button that sorts the volt-var grid by voltage"""
         xs, ys = self.ids.vv_grid.extract_data_lists()
         self.ids.vv_grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
     def on_vw_sort_button(self):
+        """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.vw_grid.extract_data_lists()
         self.ids.vw_grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
@@ -695,7 +803,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             elif self._options.control.mode == "varwatt":
                 self.set_var_watt_mode()
             elif self._options.control.mode == "vv_vw":
-                self.set_volt_var_and_volt_watt_mode()
+                self.set_volt_var_and_var_watt_mode()
             elif self._options.control.mode == "constantpf":
                 self.set_const_power_factor_mode()
             else:
@@ -724,13 +832,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         elif tab_text == "Var-Watt":
             self.set_var_watt_mode()
         elif tab_text == "Volt-Var & Volt-Watt":
-            self.set_volt_var_and_volt_watt_mode()
+            self.set_volt_var_and_var_watt_mode()
         elif tab_text == "Constant Power Factor":
             self.set_const_power_factor_mode()
         else:
             self.set_droop_mode()
 
     def set_droop_mode(self):
+        """Changes the current contorl mode for the current storage option to droop.
+
+        This ensures control parameters for the droop mode, registers the fields for data
+        extraction, and sets focus on the two fields to put them into editing mode.
+        """
         self.set_mode("droop", self.ids.droop_tab)
         self.__verify_control_param("p_droop", 500)
         self.__verify_control_param("q_droop", -300)
@@ -749,6 +862,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(qfield), 0.05)
 
     def set_volt_var_mode(self):
+        """Changes the current contorl mode for the current storage option to volt-var.
+
+        This ensures control parameters for the volt-var mode and loads the volt-var
+        data into the xy grid.
+        """
         self.set_mode("voltvar", self.ids.vv_tab)
         self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
@@ -759,6 +877,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
 
     def set_volt_watt_mode(self):
+        """Changes the current contorl mode for the current storage option to volt-watt.
+
+        This ensures control parameters for the volt-var mode and loads the volt-watt
+        data into the xy grid.
+        """
         self.set_mode("voltwatt", self.ids.vw_tab)
         self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
@@ -769,6 +892,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
 
     def set_var_watt_mode(self):
+        """Changes the current contorl mode for the current storage option to var-watt.
+
+        This ensures control parameters for the volt-var mode and loads the var-watt
+        data into the xy grid.
+        """
         self.set_mode("varwatt", self.ids.var_watt_tab)
         self.__verify_control_param("var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
@@ -778,7 +906,13 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
 
-    def set_volt_var_and_volt_watt_mode(self):
+    def set_volt_var_and_var_watt_mode(self):
+        """Changes the current contorl mode for the current storage option to volt-var &
+            var-watt.
+
+        This ensures control parameters for the volt-var mode and loads the volt-var &
+        var-watt data into the xy grid.
+        """
         self.set_mode("vv_vw", self.ids.vv_vw_tab)
         self.__verify_control_param("vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
         self.__verify_control_param("vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
@@ -794,6 +928,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
 
     def set_const_power_factor_mode(self):
+        """Changes the current contorl mode for the current storage option to const PF.
+
+        This ensures control parameters for the const PF mode, registers the fields for data
+        extraction, and sets focus on the two fields to put them into editing mode.
+        """
         self.set_mode("constantpf", self.ids.const_pf_tab)
         self.__verify_control_param("pf_val", 0.99)
 
@@ -816,6 +955,22 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     @staticmethod
     def __try_sort(xl: list, yl: list) -> (list, list):
+        """"Attempts to co-sort the supplied lists using the x-list as the sort index
+
+        Parameters
+        ----------
+        xl : list
+            The list of "x" values in this grid view to be sorted and treated as the index.
+        yl: list
+            The list of "y" values in this grid view to be sorted in accordance with the x-list.
+
+        Returns
+        -------
+        tuple:
+            If the two lists can be co-sorted, then the co-sorted versions of them will be
+            returned.  If they cannot b/c an exception occurs, then they are returned
+            unmodified.
+        """
         try:
             return (list(t) for t in zip(*sorted(zip(xl, yl))))
         except:
@@ -842,17 +997,27 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
                 float(self._param_field_map[key].text)
 
         if self._options.control.mode == "voltvar":
-            self._extract_and_store_data_lists(self.ids.vv_tab_content.ids.grid, "volt_vals", "var_vals")
+            self._extract_and_store_data_lists(
+                self.ids.vv_tab_content.ids.grid, "volt_vals", "var_vals"
+                )
 
         elif self._options.control.mode == "voltwatt":
-            self._extract_and_store_data_lists(self.ids.vw_tab_content.ids.grid, "volt_vals", "watt_vals")
+            self._extract_and_store_data_lists(
+                self.ids.vw_tab_content.ids.grid, "volt_vals", "watt_vals"
+                )
 
         elif self._options.control.mode == "varwatt":
-            self._extract_and_store_data_lists(self.ids.var_watt_tab_content.ids.grid, "var_vals", "watt_vals")
+            self._extract_and_store_data_lists(
+                self.ids.var_watt_tab_content.ids.grid, "var_vals", "watt_vals"
+                )
 
         elif self._options.control.mode == "vv_vw":
-            self._extract_and_store_data_lists(self.ids.vv_vw_tab_content.ids.vv_grid, "vv_volt_vals", "var_vals")
-            self._extract_and_store_data_lists(self.ids.vv_vw_tab_content.ids.vw_grid, "vw_volt_vals", "watt_vals")
+            self._extract_and_store_data_lists(
+                self.ids.vv_vw_tab_content.ids.vv_grid, "vv_volt_vals", "var_vals"
+                )
+            self._extract_and_store_data_lists(
+                self.ids.vv_vw_tab_content.ids.vw_grid, "vw_volt_vals", "watt_vals"
+                )
 
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
@@ -1032,38 +1197,12 @@ class MetricConfigurationScreen(SSimBaseScreen):
                     self._selBusses.append(cb)
 
     def on_kv_post(self, base_widget):
-        menu_items = [
-            {
-                "viewclass": "OneLineListItem",
-                "text": "Minimize",
-                "on_release": lambda x="Minimize": self.set_sense(x)
-            },
-            {
-                "viewclass": "OneLineListItem",
-                "text": "Maximize",
-                "on_release": lambda x="Maximize": self.set_sense(x)
-            },
-            {
-                "viewclass": "OneLineListItem",
-                "text": "Seek Value",
-                "on_release": lambda x="Seek Value": self.set_sense(x)
-            }
-        ]
-
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.objectiveText), 0.05)
 
-        #self.menu = MDDropdownMenu(
-        #    caller=self.ids.caller, items=menu_items, width_mult=3
-        #)
-
     def _refocus_field(self, textfield):
         textfield.focus = True
-
-    def drop_sense_menu(self):
-        pass
-        #self.menu.open()
 
     def set_sense(self, value):
         self.ids.caller.text = value
@@ -1811,6 +1950,7 @@ def _show_no_grid_popup(dismiss_screen=None, manager=None):
 
 def _configure_fonts(exo_regular, exo_bold, exo_italic,
                      opensans_regular, opensans_bold, opensans_italic):
+
     # Configure the fonts use but the quest style
     LabelBase.register(
         name='Exo 2',

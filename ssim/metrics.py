@@ -692,7 +692,7 @@ class Metric:
 
 
 class MetricAccumulator:
-    """A class used to accumulate a normalize metric value over time.
+    """A class used to accumulate normalized metric values over time.
 
     This class is rarely used directly.  Its primary purpose is as a base
     class providing functionality to for example, the MetricTimeAccumulator.
