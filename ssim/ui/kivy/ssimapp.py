@@ -132,8 +132,8 @@ def parse_float_or_str(strval):
     return strval if flt is None else flt
 
 
-    def try_co_sort(xl: list, yl: list) -> (list, list):
-    """"Attempts to co-sort the supplied lists using the x-list as the sort index
+def try_co_sort(xl: list, yl: list) -> (list, list):
+    """Attempts to co-sort the supplied lists using the x-list as the sort index
 
     Parameters
     ----------
@@ -949,7 +949,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             self._options.control.params[label] = def_val
 
     def __set_xy_grid_data(self, grid, xdat, ydat):
-        xs, ys = try_co_sort(xdat, ydat)R
+        xs, ys = try_co_sort(xdat, ydat)
         dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
         grid.data = dat
 
