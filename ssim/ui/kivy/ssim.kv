@@ -736,10 +736,12 @@
 
     XYItemTextField:
         id: x_field
+        on_focus : root.on_focus_changed(self, self.focused)
         on_text_validate : root.on_value_changed(self, self.text)
 
     XYItemTextField:
         id: y_field
+        on_focus : root.on_focus_changed(self, self.focused)
         on_text_validate : root.on_value_changed(self, self.text)
 
     Button:

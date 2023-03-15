@@ -730,6 +730,9 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
         if self.parent:
             self.parent.parent.value_changed(self.index)
 
+    def on_focus_changed(self, instance, value):
+        if not value: self.on_value_changed(instance, "")
+
 
 class XYItemTextField(TextInput):
     def __init__(self, *args, **kwargs):
