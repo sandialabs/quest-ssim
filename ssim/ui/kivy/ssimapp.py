@@ -149,6 +149,8 @@ def try_co_sort(xl: list, yl: list) -> (list, list):
         returned.  If they cannot b/c an exception occurs, then they are returned
         unmodified.
     """
+    if len(xl) < 2: return (xl, yl)
+
     try:
         return (list(t) for t in zip(*sorted(zip(xl, yl))))
     except:
@@ -726,6 +728,7 @@ class VoltVarTabContent(BoxLayout):
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
+
 class VoltWattTabContent(BoxLayout):
     """The class that stores the content for the Volt-Watt tab in the storage
      option control tabs"""
@@ -738,6 +741,7 @@ class VoltWattTabContent(BoxLayout):
         """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+
 
 class VarWattTabContent(BoxLayout):
     """The class that stores the content for the Var-Watt tab in the storage
@@ -752,8 +756,9 @@ class VarWattTabContent(BoxLayout):
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
-class VoltVarVarWattTabContent(BoxLayout):
-    """The class that stores the content for the Volt-Var & Var-Watt tab in the storage
+
+class VoltVarVoltWattTabContent(BoxLayout):
+    """The class that stores the content for the Volt-Var & Volt-Watt tab in the storage
      option control tabs"""
 
     def on_add_vv_button(self):
@@ -761,7 +766,7 @@ class VoltVarVarWattTabContent(BoxLayout):
         self.ids.vv_grid.data.append({'x': 1.0, 'y': 1.0})
 
     def on_add_vw_button(self):
-        """A callback function for the button that adds a new value to the var-watt grid"""
+        """A callback function for the button that adds a new value to the volt-watt grid"""
         self.ids.vw_grid.data.append({'x': 1.0, 'y': 1.0})
 
     def on_vv_sort_button(self):
@@ -773,6 +778,7 @@ class VoltVarVarWattTabContent(BoxLayout):
         """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.vw_grid.extract_data_lists()
         self.ids.vw_grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
@@ -786,13 +792,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.ids.max_soc.text = str(self._options.max_soc*100.0)
         self.ids.init_soc.text = str(self._options.initial_soc*100.0)
 
-        self._param_field_map = {}
-
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.max_soc), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.min_soc), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.init_soc), 0.05)
 
-        self._def_btn_color = '#005376'
+        self.load_all_control_data()
 
         if self._options is not None:
             if self._options.control.mode == "droop":
@@ -804,11 +808,19 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             elif self._options.control.mode == "varwatt":
                 self.set_var_watt_mode()
             elif self._options.control.mode == "vv_vw":
-                self.set_volt_var_and_var_watt_mode()
+                self.set_volt_var_and_volt_watt_mode()
             elif self._options.control.mode == "constantpf":
                 self.set_const_power_factor_mode()
             else:
                 self.set_droop_mode()
+
+    def load_all_control_data(self):
+        self.set_droop_data()
+        self.set_volt_var_data()
+        self.set_volt_watt_data()
+        self.set_var_watt_data()
+        self.set_volt_var_and_volt_watt_data()
+        self.set_const_power_factor_data()
 
     @staticmethod
     def __set_focus_clear_sel(widget, value = True):
@@ -833,7 +845,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         elif tab_text == "Var-Watt":
             self.set_var_watt_mode()
         elif tab_text == "Volt-Var & Volt-Watt":
-            self.set_volt_var_and_var_watt_mode()
+            self.set_volt_var_and_volt_watt_mode()
         elif tab_text == "Constant Power Factor":
             self.set_const_power_factor_mode()
         else:
@@ -846,18 +858,19 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         extraction, and sets focus on the two fields to put them into editing mode.
         """
         self.set_mode("droop", self.ids.droop_tab)
-        self.__verify_control_param("p_droop", 500)
-        self.__verify_control_param("q_droop", -300)
+        self.set_droop_data()
+
+
+    def set_droop_data(self):
+        self.__verify_control_param("droop", "p_droop", 500)
+        self.__verify_control_param("droop", "q_droop", -300)
 
         pfield = self.ids.droop_tab_content.ids.p_value
         qfield = self.ids.droop_tab_content.ids.q_value
 
-        pfield.text = str(self._options.control.params["p_droop"])
-        qfield.text = str(self._options.control.params["q_droop"])
-
-        self._param_field_map.clear()
-        self._param_field_map["p_droop"] = pfield
-        self._param_field_map["q_droop"] = qfield
+        pdict = self._options.control.params["droop"]
+        pfield.text = str(pdict["p_droop"])
+        qfield.text = str(pdict["q_droop"])
 
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pfield), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(qfield), 0.05)
@@ -869,13 +882,16 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         data into the xy grid.
         """
         self.set_mode("voltvar", self.ids.vv_tab)
-        self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.set_volt_var_data()
 
-        vvs = self._options.control.params["volt_vals"]
-        var = self._options.control.params["var_vals"]
+    def set_volt_var_data(self):
+        self.__verify_control_param("voltvar", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("voltvar", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        self._param_field_map.clear()
+        pdict = self._options.control.params["voltvar"]
+        vvs = pdict["volt_vals"]
+        var = pdict["var_vals"]
+
         self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
 
     def set_volt_watt_mode(self):
@@ -885,13 +901,16 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         data into the xy grid.
         """
         self.set_mode("voltwatt", self.ids.vw_tab)
-        self.__verify_control_param("volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.set_volt_watt_data()
 
-        vvs = self._options.control.params["volt_vals"]
-        wvs = self._options.control.params["watt_vals"]
+    def set_volt_watt_data(self):
+        self.__verify_control_param("voltwatt", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("voltwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        self._param_field_map.clear()
+        pdict = self._options.control.params["voltwatt"]
+        vvs = pdict["volt_vals"]
+        wvs = pdict["watt_vals"]
+
         self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
 
     def set_var_watt_mode(self):
@@ -901,16 +920,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         data into the xy grid.
         """
         self.set_mode("varwatt", self.ids.var_watt_tab)
-        self.__verify_control_param("var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        vvs = self._options.control.params["var_vals"]
-        wvs = self._options.control.params["watt_vals"]
+    def set_var_watt_data(self):
+        self.__verify_control_param("varwatt", "var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("varwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        self._param_field_map.clear()
+        pdict = self._options.control.params["varwatt"]
+        vvs = pdict["var_vals"]
+        wvs = pdict["watt_vals"]
+
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
 
-    def set_volt_var_and_var_watt_mode(self):
+    def set_volt_var_and_volt_watt_mode(self):
         """Changes the current contorl mode for the current storage option to volt-var &
             var-watt.
 
@@ -918,17 +939,20 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         var-watt data into the xy grid.
         """
         self.set_mode("vv_vw", self.ids.vv_vw_tab)
-        self.__verify_control_param("vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-        self.__verify_control_param("watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.set_volt_var_and_volt_watt_data()
 
-        vvvs = self._options.control.params["vv_volt_vals"]
-        vars = self._options.control.params["var_vals"]
-        vwvs = self._options.control.params["vw_volt_vals"]
-        watts = self._options.control.params["watt_vals"]
+    def set_volt_var_and_volt_watt_data(self):
+        self.__verify_control_param("vv_vw", "vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("vv_vw", "vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
+        self.__verify_control_param("vv_vw", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+        self.__verify_control_param("vv_vw", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
 
-        self._param_field_map.clear()
+        pdict = self._options.control.params["vv_vw"]
+        vvvs = pdict["vv_volt_vals"]
+        vars = pdict["var_vals"]
+        vwvs = pdict["vw_volt_vals"]
+        watts = pdict["watt_vals"]
+
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
 
@@ -939,30 +963,36 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         extraction, and sets focus on the two fields to put them into editing mode.
         """
         self.set_mode("constantpf", self.ids.const_pf_tab)
-        self.__verify_control_param("pf_val", 0.99)
+        self.set_const_power_factor_data()
+
+    def set_const_power_factor_data(self):
+        self.__verify_control_param("constantpf", "pf_val", 0.99)
 
         pffield = self.ids.const_pf_tab_content.ids.pf_value
-        pffield.text = str(self._options.control.params["pf_val"])
-
-        self._param_field_map.clear()
-        self._param_field_map["pf_val"] = pffield
+        pffield.text = str(self._options.control.params["constantpf"]["pf_val"])
 
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pffield), 0.05)
 
-    def __verify_control_param(self, label: str, def_val):
+
+    def __verify_control_param(self, mode: str, label: str, def_val):
         """Verifies that there is a data value in the control parameters for the current
         storage element and puts the default value in if not.
 
         Parameters
         ----------
+        mode : str
+            The control mode for which to store the default value for label
         label : str
             The key to check for in the current storage control parameters.
         def_val
             The value to put into the storage control parameters if a value is not found
             using the supplied label (key).
         """
-        if label not in self._options.control.params:
-            self._options.control.params[label] = def_val
+        if mode not in self._options.control.params:
+            self._options.control.params[mode] = {}
+
+        if label not in self._options.control.params[mode]:
+            self._options.control.params[mode][label] = def_val
 
     def __set_xy_grid_data(self, grid: XYGridView, xdat: list, ydat: list):
         """Converts the supplied lists into a dictionary appropriately keyed to be assigned
@@ -990,8 +1020,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         If the current control mode is the supplied one, then the only thing this does
         is set the supplied tab if it is not correct.
 
-        This clears the control parameters if the mode actually changes.
-
         Parameters
         ----------
         name : str
@@ -1004,7 +1032,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         if self._options.control.mode == name: return False
         self._options.control.mode = name
-        self._options.control.params.clear()
+        #self._options.control.params.clear()
         return True
 
     def save(self):
@@ -1012,34 +1040,32 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self._options.max_soc = self.ids.max_soc.fraction()
         self._options.initial_soc = self.ids.init_soc.fraction()
 
-        self._options.control.params.clear()
+        droop_map = self._options.control.params["droop"]
+        droop_map["p_droop"] = parse_float(self.ids.droop_tab_content.ids.p_value.text)
+        droop_map["q_droop"] = parse_float(self.ids.droop_tab_content.ids.q_value.text)
 
-        for key in self._param_field_map:
-            self._options.control.params[key] =\
-                float(self._param_field_map[key].text)
+        constpf_map = self._options.control.params["constantpf"]
+        constpf_map["pf_val"] = parse_float(self.ids.const_pf_tab_content.ids.pf_value.text)
 
-        if self._options.control.mode == "voltvar":
-            self._extract_and_store_data_lists(
-                self.ids.vv_tab_content.ids.grid, "volt_vals", "var_vals"
-                )
+        self._extract_and_store_data_lists(
+            self.ids.vv_tab_content.ids.grid, "voltvar", "volt_vals", "var_vals"
+            )
 
-        elif self._options.control.mode == "voltwatt":
-            self._extract_and_store_data_lists(
-                self.ids.vw_tab_content.ids.grid, "volt_vals", "watt_vals"
-                )
+        self._extract_and_store_data_lists(
+            self.ids.vw_tab_content.ids.grid, "voltwatt", "volt_vals", "watt_vals"
+            )
 
-        elif self._options.control.mode == "varwatt":
-            self._extract_and_store_data_lists(
-                self.ids.var_watt_tab_content.ids.grid, "var_vals", "watt_vals"
-                )
+        self._extract_and_store_data_lists(
+            self.ids.var_watt_tab_content.ids.grid, "varwatt", "var_vals", "watt_vals"
+            )
 
-        elif self._options.control.mode == "vv_vw":
-            self._extract_and_store_data_lists(
-                self.ids.vv_vw_tab_content.ids.vv_grid, "vv_volt_vals", "var_vals"
-                )
-            self._extract_and_store_data_lists(
-                self.ids.vv_vw_tab_content.ids.vw_grid, "vw_volt_vals", "watt_vals"
-                )
+        self._extract_and_store_data_lists(
+            self.ids.vv_vw_tab_content.ids.vv_grid, "vv_vw", "vv_volt_vals", "var_vals"
+            )
+
+        self._extract_and_store_data_lists(
+            self.ids.vv_vw_tab_content.ids.vw_grid, "vv_vw", "vw_volt_vals", "watt_vals"
+            )
 
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
@@ -1048,20 +1074,24 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
 
-    def _extract_and_store_data_lists(self, xyc: XYGridView, l1name: str, l2name: str):
+    def _extract_and_store_data_lists(self, xyc: XYGridView, mode: str, l1name: str, l2name: str):
         """Reads the x and y data from the supplied grid and stores them in the control
         parameters using the supplied list keys.
 
         Parameters
         ----------
         l1name : str
-            The key by which to store the "x" values read out of the grid into the control parameters
+            The key by which to store the "x" values read out of the grid into the
+            control parameters
         l2name : str
-            The key by which to store the "y" values read out of the grid into the control parameters
+            The key by which to store the "y" values read out of the grid into the
+            control parameters
         """
         xl, yl = xyc.extract_data_lists()
-        self._options.control.params[l1name] = xl
-        self._options.control.params[l2name] = yl
+        param_map = self._options.control.params[mode]
+        param_map[l1name] = xl
+        param_map[l2name] = yl
+
 
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""

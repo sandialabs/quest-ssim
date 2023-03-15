@@ -342,7 +342,7 @@
         size_hint: (1.0, 0.93)
 
 
-<VoltVarVarWattTabContent>
+<VoltVarVoltWattTabContent>
     orientation: "horizontal"
     size_hint: (1.0, 1.0)
     padding: 5
@@ -398,7 +398,7 @@
 
                 MDLabel:
                     id: x_label
-                    text: "Reactive Power (kVAR)"
+                    text: "Voltage (p.u.)"
 
                 Button:
                     id: sortbtn
@@ -493,7 +493,7 @@
                     id: vv_vw_tab
                     title: "Volt-Var & Volt-Watt"
 
-                    VoltVarVarWattTabContent:
+                    VoltVarVoltWattTabContent:
                         id: vv_vw_tab_content
 
                 StorageControlModelTab:
