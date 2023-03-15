@@ -60,6 +60,7 @@ class ImprovementType(int, enum.Enum):
 
         return None
 
+
 def get_default_improvement_type(lower_limit: float, upper_limit: float, objective: float) -> ImprovementType:
     """A utility method to choose an appropriate improvement type based on the
        supplied limits and objective.
@@ -290,9 +291,23 @@ class Metric:
         return ret + "}"
 
     def to_dict(self, key: str) -> dict:
+        """Return a dictionary representation of this metric.
+
+        Parameters
+        ----------
+        key : str
+            The key to which this metric is mapped by a metric owner.
+
+        Returns
+        -------
+        dict
+            A dictionary representation of the metric. Include keys "name",
+            "objective", "upper_limit", and "lower_limit".
+        """
         return {
             "name": key,
-            "limit": self._limit,
+            "lower_limit": self._lower_limit,
+            "upper_limit": self._upper_limit,
             "objective": self._objective
         }
 
@@ -744,8 +759,7 @@ class MetricAccumulator:
         -------
 
         dict
-            A dictionary representation of the metric. Include keys "name",
-            "objective", and "limit".
+            A dictionary representation of the metric managed by this accumulator.
         """
         return self._metric.to_dict(key)
     
@@ -975,6 +989,14 @@ class MetricManager:
         return self._all_metrics.get(name)
 
     def to_dicts(self) -> list[dict]:
+        """Return a list of dictionaries representing all of the metrics being
+         managed by this manager.
+
+        Returns
+        -------
+        dict
+            A list of dictionaries representing all of the metrics managed by this manager.
+        """
         return [
             accumulator.to_dict(name)
             for name, accumulator in self._all_metrics.items()

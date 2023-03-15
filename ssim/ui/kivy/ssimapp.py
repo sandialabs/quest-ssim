@@ -650,7 +650,8 @@ class XYGridView(RecycleView):
 
 
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
-    index = NumericProperty()
+
+    index: int = -1
 
     @property
     def x_value(self):
@@ -874,6 +875,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vvs = self._options.control.params["volt_vals"]
         var = self._options.control.params["var_vals"]
 
+        self._param_field_map.clear()
         self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
 
     def set_volt_watt_mode(self):
@@ -889,6 +891,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vvs = self._options.control.params["volt_vals"]
         wvs = self._options.control.params["watt_vals"]
 
+        self._param_field_map.clear()
         self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
 
     def set_var_watt_mode(self):
@@ -904,6 +907,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vvs = self._options.control.params["var_vals"]
         wvs = self._options.control.params["watt_vals"]
 
+        self._param_field_map.clear()
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
 
     def set_volt_var_and_var_watt_mode(self):
@@ -924,6 +928,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         vwvs = self._options.control.params["vw_volt_vals"]
         watts = self._options.control.params["watt_vals"]
 
+        self._param_field_map.clear()
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
 
@@ -945,15 +950,55 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pffield), 0.05)
 
     def __verify_control_param(self, label: str, def_val):
+        """Verifies that there is a data value in the control parameters for the current
+        storage element and puts the default value in if not.
+
+        Parameters
+        ----------
+        label : str
+            The key to check for in the current storage control parameters.
+        def_val
+            The value to put into the storage control parameters if a value is not found
+            using the supplied label (key).
+        """
         if label not in self._options.control.params:
             self._options.control.params[label] = def_val
 
-    def __set_xy_grid_data(self, grid, xdat, ydat):
+    def __set_xy_grid_data(self, grid: XYGridView, xdat: list, ydat: list):
+        """Converts the supplied lists into a dictionary appropriately keyed to be assigned
+        as the data for the supplied grid and assignes it.
+
+        This performs a try-co-sort of the lists prior to assignment to the grid data.
+
+        Parameters
+        ----------
+        grid : XYGridView
+            The grid to assign data to.
+        xdat : list
+            The list of x values to assign to the x column of the grid.
+        ydat : list
+            The list of y values to assign to the y column of the grid.
+        """
         xs, ys = try_co_sort(xdat, ydat)
         dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
         grid.data = dat
 
-    def set_mode(self, name, tab) -> bool:
+    def set_mode(self, name: str, tab) -> bool:
+        """Changes the current contorl mode for the current storage option to the supplied
+        one and sets the current tab.
+
+        If the current control mode is the supplied one, then the only thing this does
+        is set the supplied tab if it is not correct.
+
+        This clears the control parameters if the mode actually changes.
+
+        Parameters
+        ----------
+        name : str
+            The name of the control mode to make current.
+        tab
+            The tab page to make visible.
+        """
         if self.ids.control_tabs.get_current_tab() is not tab:
             self.ids.control_tabs.switch_tab(tab.tab_label_text)
 
@@ -1003,7 +1048,17 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
 
-    def _extract_and_store_data_lists(self, xyc: XYGridView, l1name, l2name):
+    def _extract_and_store_data_lists(self, xyc: XYGridView, l1name: str, l2name: str):
+        """Reads the x and y data from the supplied grid and stores them in the control
+        parameters using the supplied list keys.
+
+        Parameters
+        ----------
+        l1name : str
+            The key by which to store the "x" values read out of the grid into the control parameters
+        l2name : str
+            The key by which to store the "y" values read out of the grid into the control parameters
+        """
         xl, yl = xyc.extract_data_lists()
         self._options.control.params[l1name] = xl
         self._options.control.params[l2name] = yl
