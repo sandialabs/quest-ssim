@@ -5,7 +5,7 @@
 #:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
 #:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
 
-<DiagramPlot>
+<MatlabPlotBox>
     pos_hint: {"top":1}
 
 <SSimScreen>:
@@ -90,7 +90,7 @@
                     height: 25
                     text: "Grid Model:"
 
-                DiagramPlot:
+                MatlabPlotBox:
                     id: grid_diagram
 
                 BoxLayout:
@@ -226,40 +226,56 @@
 
     BoxLayout:
         orientation: "horizontal"
-        size_hint: 1.0, 0.07
-
 
         BoxLayout:
-            orientation: "horizontal"
+            id: headers
+            orientation: "vertical"
+            size_hint_x: 0.6
 
-            MDLabel:
-                id: x_label
-                text: "Voltage (p.u.)"
+            BoxLayout:
+                orientation: "horizontal"
+                size_hint: 1.0, 0.07
 
-            Button:
-                id: sortbtn
-                text: "Sort"
-                size_hint_x: None
-                width: 45
-                pos_hint_y: 0.9
-                on_release: root.on_sort_button()
+                BoxLayout:
+                    orientation: "horizontal"
 
-        MDLabel:
-            id: y_label
-            text: "Reactive Power (kVAR)"
+                    MDLabel:
+                        id: x_label
+                        text: "Voltage (p.u.)"
+                        size_hint_y: None
+                        height: 25
 
-        Button:
-            id: addbtn
-            text: "+"
-            size_hint_x: None
-            width: 25
-            pos_hint_y: 0.9
-            on_release: root.on_add_button()
+                    Button:
+                        id: sortbtn
+                        text: "Sort"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.9
+                        on_release: root.on_sort_button()
 
-    XYGridView:
-        id: grid
-        size_hint: (1.0, 0.93)
+                MDLabel:
+                    id: y_label
+                    text: "Reactive Power (kVAR)"
+                    size_hint_y: None
+                    height: 25
 
+                Button:
+                    id: addbtn
+                    text: "+"
+                    size_hint: None, None
+                    size: 25, 25
+                    pos_hint_y: 0.9
+                    on_release: root.on_add_button()
+
+            XYGridView:
+                id: grid
+                size_hint: 1.0, 0.93
+                on_item_deleted: root.rebuild_plot()
+                on_value_changed: root.rebuild_plot()
+
+        MatlabPlotBox:
+            id: plot_box
+            size_hint_x: 0.4
 
 <VoltWattTabContent>
     orientation: "vertical"
@@ -268,38 +284,56 @@
 
     BoxLayout:
         orientation: "horizontal"
-        size_hint: 1.0, 0.07
 
         BoxLayout:
-            orientation: "horizontal"
+            id: headers
+            orientation: "vertical"
+            size_hint_x: 0.6
 
-            MDLabel:
-                id: x_label
-                text: "Voltage (p.u.)"
+            BoxLayout:
+                orientation: "horizontal"
+                size_hint: 1.0, 0.07
 
-            Button:
-                id: sortbtn
-                text: "Sort"
-                size_hint_x: None
-                width: 45
-                pos_hint_y: 0.9
-                on_release: root.on_sort_button()
+                BoxLayout:
+                    orientation: "horizontal"
 
-        MDLabel:
-            id: y_label
-            text: "Watts (kW)"
+                    MDLabel:
+                        id: x_label
+                        text: "Voltage (p.u.)"
+                        size_hint_y: None
+                        height: 25
 
-        Button:
-            id: addbtn
-            text: "+"
-            size_hint_x: None
-            width: 25
-            pos_hint_y: 0.9
-            on_release: root.on_add_button()
+                    Button:
+                        id: sortbtn
+                        text: "Sort"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.9
+                        on_release: root.on_sort_button()
 
-    XYGridView:
-        id: grid
-        size_hint: (1.0, 0.93)
+                MDLabel:
+                    id: y_label
+                    text: "Watts (kW)"
+                    size_hint_y: None
+                    height: 25
+
+                Button:
+                    id: addbtn
+                    text: "+"
+                    size_hint: None, None
+                    size: 25, 25
+                    pos_hint_y: 0.9
+                    on_release: root.on_add_button()
+
+            XYGridView:
+                id: grid
+                size_hint: (1.0, 0.93)
+                on_item_deleted: root.rebuild_plot()
+                on_value_changed: root.rebuild_plot()
+
+        MatlabPlotBox:
+            id: plot_box
+            size_hint_x: 0.4
 
 <VarWattTabContent>
     orientation: "vertical"
@@ -308,38 +342,56 @@
 
     BoxLayout:
         orientation: "horizontal"
-        size_hint: 1.0, 0.07
 
         BoxLayout:
-            orientation: "horizontal"
+            id: headers
+            orientation: "vertical"
+            size_hint_x: 0.6
 
-            MDLabel:
-                id: x_label
-                text: "Reactive Power (kVAR)"
+            BoxLayout:
+                orientation: "horizontal"
+                size_hint: 1.0, 0.07
 
-            Button:
-                id: sortbtn
-                text: "Sort"
-                size_hint_x: None
-                width: 45
-                pos_hint_y: 0.9
-                on_release: root.on_sort_button()
+                BoxLayout:
+                    orientation: "horizontal"
 
-        MDLabel:
-            id: y_label
-            text: "Watts (kW)"
+                    MDLabel:
+                        id: x_label
+                        text: "Reactive Power (kVAR)"
+                        size_hint_y: None
+                        height: 25
 
-        Button:
-            id: addbtn
-            text: "+"
-            size_hint_x: None
-            width: 25
-            pos_hint_y: 0.9
-            on_release: root.on_add_button()
+                    Button:
+                        id: sortbtn
+                        text: "Sort"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.9
+                        on_release: root.on_sort_button()
 
-    XYGridView:
-        id: grid
-        size_hint: (1.0, 0.93)
+                MDLabel:
+                    id: y_label
+                    text: "Watts (kW)"
+                    size_hint_y: None
+                    height: 25
+
+                Button:
+                    id: addbtn
+                    text: "+"
+                    size_hint: None, None
+                    size: 25, 25
+                    pos_hint_y: 0.9
+                    on_release: root.on_add_button()
+
+            XYGridView:
+                id: grid
+                size_hint: (1.0, 0.93)
+                on_item_deleted: root.rebuild_plot()
+                on_value_changed: root.rebuild_plot()
+
+        MatlabPlotBox:
+            id: plot_box
+            size_hint_x: 0.4
 
 
 <VoltVarVoltWattTabContent>
@@ -349,80 +401,100 @@
 
     BoxLayout:
         orientation: "vertical"
+        size_hint_x: 0.6
 
         BoxLayout:
-            orientation: "horizontal"
-            size_hint: 1.0, 0.07
+            orientation: "vertical"
 
             BoxLayout:
                 orientation: "horizontal"
+                size_hint: 1.0, 0.07
+
+                BoxLayout:
+                    orientation: "horizontal"
+
+                    MDLabel:
+                        id: x_label
+                        text: "Voltage (p.u.)"
+                        size_hint_y: None
+                        height: 25
+
+                    Button:
+                        id: sortbtn
+                        text: "Sort"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.9
+                        on_release: root.on_vv_sort_button()
 
                 MDLabel:
-                    id: x_label
-                    text: "Voltage (p.u.)"
+                    id: y_label
+                    text: "Reactive Power (kVAR)"
+                    size_hint_y: None
+                    height: 25
 
                 Button:
-                    id: sortbtn
-                    text: "Sort"
-                    size_hint_x: None
-                    width: 45
+                    id: addbtn
+                    text: "+"
+                    size_hint: None, None
+                    size: 25, 25
                     pos_hint_y: 0.9
-                    on_release: root.on_vv_sort_button()
+                    on_release: root.on_add_vv_button()
 
-            MDLabel:
-                id: y_label
-                text: "Reactive Power (kVAR)"
+            XYGridView:
+                id: vv_grid
+                size_hint: (1.0, 0.93)
+                on_item_deleted: root.rebuild_plot()
+                on_value_changed: root.rebuild_plot()
 
-            Button:
-                id: addbtn
-                text: "+"
-                size_hint_x: None
-                width: 25
-                pos_hint_y: 0.9
-                on_release: root.on_add_vv_button()
-
-        XYGridView:
-            id: vv_grid
-            size_hint: (1.0, 0.93)
-
-
-    BoxLayout:
-        orientation: "vertical"
 
         BoxLayout:
-            orientation: "horizontal"
-            size_hint: 1.0, 0.07
+            orientation: "vertical"
 
             BoxLayout:
                 orientation: "horizontal"
+                size_hint: 1.0, 0.07
+
+                BoxLayout:
+                    orientation: "horizontal"
+
+                    MDLabel:
+                        id: x_label
+                        text: "Voltage (p.u.)"
+                        size_hint_y: None
+                        height: 25
+
+                    Button:
+                        id: sortbtn
+                        text: "Sort"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.9
+                        on_release: root.on_vw_sort_button()
 
                 MDLabel:
-                    id: x_label
-                    text: "Voltage (p.u.)"
+                    id: y_label
+                    text: "Watts (kW)"
+                    size_hint_y: None
+                    height: 25
 
                 Button:
-                    id: sortbtn
-                    text: "Sort"
-                    size_hint_x: None
-                    width: 45
+                    id: addbtn
+                    text: "+"
+                    size_hint: None, None
+                    size: 25, 25
                     pos_hint_y: 0.9
-                    on_release: root.on_vw_sort_button()
+                    on_release: root.on_add_vw_button()
 
-            MDLabel:
-                id: y_label
-                text: "Watts (kW)"
+            XYGridView:
+                id: vw_grid
+                size_hint: (1.0, 0.93)
+                on_item_deleted: root.rebuild_plot()
+                on_value_changed: root.rebuild_plot()
 
-            Button:
-                id: addbtn
-                text: "+"
-                size_hint_x: None
-                width: 25
-                pos_hint_y: 0.9
-                on_release: root.on_add_vw_button()
-
-        XYGridView:
-            id: vw_grid
-            size_hint: (1.0, 0.93)
+    MatlabPlotBox:
+        id: plot_box
+        size_hint_x: 0.4
 
 
 <StorageControlConfigurationScreen>:
@@ -450,7 +522,8 @@
             markup: True
             text: "Select a control mode for this storage asset:"
             color: C(hex_black)
-            size_hint: (1.0, 0.05)
+            size_hint_y: None
+            height: 25
 
         BoxLayout:
 
@@ -459,6 +532,7 @@
 
             MDTabs:
                 id: control_tabs
+                lock_swiping: True
                 on_tab_switch: root.on_tab_switch(*args)
 
                 StorageControlModelTab:
@@ -662,9 +736,11 @@
 
     XYItemTextField:
         id: x_field
+        on_text_validate : root.on_value_changed(self, self.text)
 
     XYItemTextField:
         id: y_field
+        on_text_validate : root.on_value_changed(self, self.text)
 
     Button:
         id: deletebtn

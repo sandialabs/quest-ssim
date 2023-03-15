@@ -197,7 +197,7 @@ class SSimBaseScreen(Screen):
         super().__init__(*args, **kwargs)
 
 
-class DiagramPlot(BoxLayout):
+class MatlabPlotBox(BoxLayout):
 
     def reset_plot(self):
         """Clears the current diagram widget and draws a new one using the current figure (plt.gcf())"""
@@ -605,6 +605,30 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
 class XYGridView(RecycleView):
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_item_deleted")
+        self.register_event_type("on_value_changed")
+
+    def delete_item(self, index: int):
+        self.data.pop(index)
+        Clock.schedule_once(lambda dt: self.__on_deleted_item(), 0.05)
+
+    def value_changed(self, index: int):
+        Clock.schedule_once(lambda dt: self.__on_value_changed(), 0.05)
+
+    def __on_value_changed(self):
+        self.dispatch("on_value_changed")
+
+    def on_value_changed(self):
+        pass
+
+    def on_item_deleted(self):
+        pass
+
+    def __on_deleted_item(self):
+        self.dispatch("on_item_deleted")
+
     def extract_data_lists(self, sorted: bool = True) -> (list, list):
         """Reads all values out of the "x" and "y" columns of this control and returns them as
             pair of lists that may be sorted if requested.
@@ -654,7 +678,7 @@ class XYGridView(RecycleView):
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
 
     index: int = -1
-
+        
     @property
     def x_value(self):
         """Returns the current contents of the x value field of this row.
@@ -700,7 +724,11 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     def on_delete_button(self):
         """A callback function for the button that deletes the data item represented by
         this row from the data list"""
-        self.parent.parent.data.pop(self.index)
+        self.parent.parent.delete_item(self.index)
+
+    def on_value_changed(self, instance, text):
+        if self.parent:
+            self.parent.parent.value_changed(self.index)
 
 
 class XYItemTextField(TextInput):
@@ -722,11 +750,27 @@ class VoltVarTabContent(BoxLayout):
     def on_add_button(self):
         """A callback function for the button that adds a new value to the volt-var grid"""
         self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def on_sort_button(self):
         """A callback function for the button that sorts the volt-var grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+
+    def rebuild_plot(self):
+        xs, ys = self.ids.grid.extract_data_lists()
+
+        if len(xs) == 0:
+            self.ids.plot_box.display_plot_error("No Data")
+
+        else:
+            fig = plt.figure()
+            fig.tight_layout()
+            plt.plot(xs, ys)
+            plt.xlabel('Voltage (kV)')
+            plt.ylabel('Reactive Power (kVAR)')
+            plt.title('Volt-Var Control Parameters')
+            self.ids.plot_box.reset_plot()
 
 
 class VoltWattTabContent(BoxLayout):
@@ -736,11 +780,27 @@ class VoltWattTabContent(BoxLayout):
     def on_add_button(self):
         """A callback function for the button that adds a new value to the volt-watt grid"""
         self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def on_sort_button(self):
         """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+
+    def rebuild_plot(self):
+        xs, ys = self.ids.grid.extract_data_lists()
+
+        if len(xs) == 0:
+            self.ids.plot_box.display_plot_error("No Data")
+
+        else:
+            fig = plt.figure()
+            fig.tight_layout()
+            plt.plot(xs, ys)
+            plt.xlabel('Voltage (kV)')
+            plt.ylabel('Watts (kW)')
+            plt.title('Volt-Watt Control Parameters')
+            self.ids.plot_box.reset_plot()
 
 
 class VarWattTabContent(BoxLayout):
@@ -750,11 +810,27 @@ class VarWattTabContent(BoxLayout):
     def on_add_button(self):
         """A callback function for the button that adds a new value to the var-watt grid"""
         self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def on_sort_button(self):
         """A callback function for the button that sorts the var-watt grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
         self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+
+    def rebuild_plot(self):
+        xs, ys = self.ids.grid.extract_data_lists()
+
+        if len(xs) == 0:
+            self.ids.plot_box.display_plot_error("No Data")
+
+        else:
+            fig = plt.figure()
+            fig.tight_layout()
+            plt.plot(xs, ys)
+            plt.xlabel('Reactive Power (kVAR)')
+            plt.ylabel('Watts (kW)')
+            plt.title('Var-Watt Control Parameters')
+            self.ids.plot_box.reset_plot()
 
 
 class VoltVarVoltWattTabContent(BoxLayout):
@@ -764,10 +840,12 @@ class VoltVarVoltWattTabContent(BoxLayout):
     def on_add_vv_button(self):
         """A callback function for the button that adds a new value to the volt-var grid"""
         self.ids.vv_grid.data.append({'x': 1.0, 'y': 1.0})
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def on_add_vw_button(self):
         """A callback function for the button that adds a new value to the volt-watt grid"""
         self.ids.vw_grid.data.append({'x': 1.0, 'y': 1.0})
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def on_vv_sort_button(self):
         """A callback function for the button that sorts the volt-var grid by voltage"""
@@ -778,6 +856,28 @@ class VoltVarVoltWattTabContent(BoxLayout):
         """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.vw_grid.extract_data_lists()
         self.ids.vw_grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+
+    def rebuild_plot(self):
+        vxs, vys = self.ids.vv_grid.extract_data_lists()
+        wxs, wys = self.ids.vv_grid.extract_data_lists()
+
+        if len(vxs) == 0 and len(wxs) == 0:
+            self.ids.plot_box.display_plot_error("No Data")
+
+        else:
+            fig, ax1 = plt.subplots(1)
+            ax2 = ax1.twinx()
+            fig.tight_layout()
+            ax1.plot(vxs, vys)
+            ax1.set_xlabel('Voltage (kV)')
+            ax1.set_ylabel('Reactive Power (kVAR)')
+
+            ax2.plot(wxs, wys)
+            ax2.set_ylabel('Watts (kW)')
+
+            plt.title('Volt-Var & Volt-Watt Control Parameters')
+            self.ids.plot_box.reset_plot()
+
 
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
@@ -862,18 +962,21 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
 
     def set_droop_data(self):
-        self.__verify_control_param("droop", "p_droop", 500)
-        self.__verify_control_param("droop", "q_droop", -300)
-
+        pval, qval = self.verify_droop_params()
         pfield = self.ids.droop_tab_content.ids.p_value
         qfield = self.ids.droop_tab_content.ids.q_value
 
-        pdict = self._options.control.params["droop"]
-        pfield.text = str(pdict["p_droop"])
-        qfield.text = str(pdict["q_droop"])
+        pfield.text = str(pval)
+        qfield.text = str(qval)
 
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pfield), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(qfield), 0.05)
+
+    def verify_droop_params(self) -> (float, float):
+        return (
+            self.__verify_control_param("droop", "p_droop", 500),
+            self.__verify_control_param("droop", "q_droop", -300)
+            )
 
     def set_volt_var_mode(self):
         """Changes the current contorl mode for the current storage option to volt-var.
@@ -885,14 +988,15 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.set_volt_var_data()
 
     def set_volt_var_data(self):
-        self.__verify_control_param("voltvar", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("voltvar", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-
-        pdict = self._options.control.params["voltvar"]
-        vvs = pdict["volt_vals"]
-        var = pdict["var_vals"]
-
+        vvs, var = self.verify_volt_var_params()
         self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
+        self.ids.vv_tab_content.rebuild_plot()
+
+    def verify_volt_var_params(self) -> (list, list):
+        return (
+            self.__verify_control_param("voltvar", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("voltvar", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            )
 
     def set_volt_watt_mode(self):
         """Changes the current contorl mode for the current storage option to volt-watt.
@@ -904,14 +1008,15 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.set_volt_watt_data()
 
     def set_volt_watt_data(self):
-        self.__verify_control_param("voltwatt", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("voltwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-
-        pdict = self._options.control.params["voltwatt"]
-        vvs = pdict["volt_vals"]
-        wvs = pdict["watt_vals"]
-
+        vvs, wvs = self.verify_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
+        self.ids.vw_tab_content.rebuild_plot()
+
+    def verify_volt_watt_params(self) -> (list, list):
+        return (
+            self.__verify_control_param("voltwatt", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("voltwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            )
 
     def set_var_watt_mode(self):
         """Changes the current contorl mode for the current storage option to var-watt.
@@ -920,16 +1025,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         data into the xy grid.
         """
         self.set_mode("varwatt", self.ids.var_watt_tab)
+        self.set_var_watt_data()
 
     def set_var_watt_data(self):
-        self.__verify_control_param("varwatt", "var_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("varwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-
-        pdict = self._options.control.params["varwatt"]
-        vvs = pdict["var_vals"]
-        wvs = pdict["watt_vals"]
-
+        vvs, wvs = self.verify_volt_var_params()
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
+        self.ids.var_watt_tab_content.rebuild_plot()
+
+    def verify_var_watt_params(self) -> (list, list):
+        return (
+            self.__verify_control_param("varwatt", "var_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("varwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            )
 
     def set_volt_var_and_volt_watt_mode(self):
         """Changes the current contorl mode for the current storage option to volt-var &
@@ -942,19 +1049,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.set_volt_var_and_volt_watt_data()
 
     def set_volt_var_and_volt_watt_data(self):
-        self.__verify_control_param("vv_vw", "vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("vv_vw", "vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5])
-        self.__verify_control_param("vv_vw", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-        self.__verify_control_param("vv_vw", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
-
-        pdict = self._options.control.params["vv_vw"]
-        vvvs = pdict["vv_volt_vals"]
-        vars = pdict["var_vals"]
-        vwvs = pdict["vw_volt_vals"]
-        watts = pdict["watt_vals"]
-
+        vvvs, vars, vwvs, watts = self.verify_volt_var_and_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
+        self.ids.vv_vw_tab_content.rebuild_plot()
+
+    def verify_volt_var_and_volt_watt_params(self) -> (list, list, list, list):
+        return (
+            self.__verify_control_param("vv_vw", "vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("vv_vw", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0]),
+            self.__verify_control_param("vv_vw", "vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("vv_vw", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            )
 
     def set_const_power_factor_mode(self):
         """Changes the current contorl mode for the current storage option to const PF.
@@ -966,13 +1072,13 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.set_const_power_factor_data()
 
     def set_const_power_factor_data(self):
-        self.__verify_control_param("constantpf", "pf_val", 0.99)
-
+        cpf = self.verify_const_pf_params()
         pffield = self.ids.const_pf_tab_content.ids.pf_value
-        pffield.text = str(self._options.control.params["constantpf"]["pf_val"])
-
+        pffield.text = str(cpf)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pffield), 0.05)
 
+    def verify_const_pf_params(self) -> float:
+        return self.__verify_control_param("constantpf", "pf_val", 0.99)
 
     def __verify_control_param(self, mode: str, label: str, def_val):
         """Verifies that there is a data value in the control parameters for the current
@@ -993,6 +1099,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         if label not in self._options.control.params[mode]:
             self._options.control.params[mode][label] = def_val
+
+        return self._options.control.params[mode][label]
 
     def __set_xy_grid_data(self, grid: XYGridView, xdat: list, ydat: list):
         """Converts the supplied lists into a dictionary appropriately keyed to be assigned
