@@ -85,6 +85,9 @@ _IMAGE_FILES = [
 _KV_FILES = ["common.kv", "ssim.kv"]
 
 
+def make_xy_grid_data(xs: list, ys: list) -> dict:
+    return [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+
 def parse_float(strval) -> float:
     """A utility method to parse a string into a floating point value.
 
@@ -400,9 +403,7 @@ class EditableSetListItem(OneLineRightIconListItem):
     def __init__(self, item, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._value = item
-        self.ids.delete.bind(
-            on_release=self._delete_item
-        )
+        self.ids.delete.bind(on_release=self._delete_item)
 
     def _delete_item(self, item):
         self.parent.remove_item(self._value)
@@ -678,6 +679,8 @@ class XYGridView(RecycleView):
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
 
     index: int = -1
+
+    last_text: str = ""
         
     @property
     def x_value(self):
@@ -731,7 +734,10 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
             self.parent.parent.value_changed(self.index)
 
     def on_focus_changed(self, instance, value):
-        if not value: self.on_value_changed(instance, "")
+        if value:
+            self.last_text = instance.text
+        elif value != instance.text:
+            self.on_value_changed(instance, instance.text)
 
 
 class XYItemTextField(TextInput):
@@ -758,7 +764,14 @@ class VoltVarTabContent(BoxLayout):
     def on_sort_button(self):
         """A callback function for the button that sorts the volt-var grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
-        self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.grid.data = make_xy_grid_data(xs, ys)
+
+    def on_reset_button(self):
+        """A callback function for the button that resets the volt-var grid data to defaults"""
+        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
+        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
+        self.ids.grid.data = make_xy_grid_data(xs, ys)
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def rebuild_plot(self):
         xs, ys = self.ids.grid.extract_data_lists()
@@ -788,7 +801,14 @@ class VoltWattTabContent(BoxLayout):
     def on_sort_button(self):
         """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
-        self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.grid.data = make_xy_grid_data(xs, ys)
+
+    def on_reset_button(self):
+        """A callback function for the button that resets the volt-var grid data to defaults"""
+        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
+        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
+        self.ids.grid.data = make_xy_grid_data(xs, ys)
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def rebuild_plot(self):
         xs, ys = self.ids.grid.extract_data_lists()
@@ -818,7 +838,14 @@ class VarWattTabContent(BoxLayout):
     def on_sort_button(self):
         """A callback function for the button that sorts the var-watt grid by voltage"""
         xs, ys = self.ids.grid.extract_data_lists()
-        self.ids.grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.grid.data = make_xy_grid_data(xs, ys)
+
+    def on_reset_button(self):
+        """A callback function for the button that resets the volt-var grid data to defaults"""
+        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
+        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
+        self.ids.grid.data = make_xy_grid_data(xs, ys)
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def rebuild_plot(self):
         xs, ys = self.ids.grid.extract_data_lists()
@@ -850,37 +877,50 @@ class VoltVarVoltWattTabContent(BoxLayout):
         self.ids.vw_grid.data.append({'x': 1.0, 'y': 1.0})
         Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
-    def on_vv_sort_button(self):
+    def on_reset_vv_button(self):
+        """A callback function for the button that resets the volt-var grid data to defaults"""
+        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
+        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
+        self.ids.vv_grid.data = make_xy_grid_data(xs, ys)
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
+
+    def on_reset_vw_button(self):
+        """A callback function for the button that resets the volt-var grid data to defaults"""
+        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
+        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
+        self.ids.vw_grid.data = make_xy_grid_data(xs, ys)
+        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
+
+    def on_sort_vv_button(self):
         """A callback function for the button that sorts the volt-var grid by voltage"""
         xs, ys = self.ids.vv_grid.extract_data_lists()
-        self.ids.vv_grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.vv_grid.data = make_xy_grid_data(xs, ys)
 
-    def on_vw_sort_button(self):
+    def on_sort_vw_button(self):
         """A callback function for the button that sorts the volt-watt grid by voltage"""
         xs, ys = self.ids.vw_grid.extract_data_lists()
-        self.ids.vw_grid.data = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
+        self.ids.vw_grid.data = make_xy_grid_data(xs, ys)
 
     def rebuild_plot(self):
         vxs, vys = self.ids.vv_grid.extract_data_lists()
-        wxs, wys = self.ids.vv_grid.extract_data_lists()
+        wxs, wys = self.ids.vw_grid.extract_data_lists()
 
         if len(vxs) == 0 and len(wxs) == 0:
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
             fig, ax1 = plt.subplots(1)
-            ax2 = ax1.twinx()
             #fig.tight_layout()
             ax1.plot(vxs, vys)
             ax1.set_xlabel('Voltage (kV)')
             ax1.set_ylabel('Reactive Power (kVAR)')
 
-            ax2.plot(wxs, wys)
-            ax2.set_ylabel('Watts (kW)')
+            ax2 = ax1.twinx()
+            ax2.plot(wxs, wys, color="red")
+            ax2.set_ylabel('Watts (kW)', color="red")
 
             plt.title('Volt-Var & Volt-Watt Control Parameters')
             self.ids.plot_box.reset_plot()
-
 
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
@@ -1121,8 +1161,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             The list of y values to assign to the y column of the grid.
         """
         xs, ys = try_co_sort(xdat, ydat)
-        dat = [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
-        grid.data = dat
+        grid.data = make_xy_grid_data(xs, ys)
 
     def set_mode(self, name: str, tab) -> bool:
         """Changes the current contorl mode for the current storage option to the supplied

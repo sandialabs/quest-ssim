@@ -246,6 +246,14 @@
                         height: 25
 
                     Button:
+                        id: resetbtn
+                        text: "Reset"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.8
+                        on_release: root.on_reset_button()
+
+                    Button:
                         id: sortbtn
                         text: "Sort"
                         size_hint: None, None
@@ -304,6 +312,14 @@
                         height: 25
 
                     Button:
+                        id: resetbtn
+                        text: "Reset"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.8
+                        on_release: root.on_reset_button()
+
+                    Button:
                         id: sortbtn
                         text: "Sort"
                         size_hint: None, None
@@ -360,6 +376,14 @@
                         text: "Reactive Power (kVAR)"
                         size_hint_y: None
                         height: 25
+
+                    Button:
+                        id: resetbtn
+                        text: "Reset"
+                        size_hint: None, None
+                        size: 45, 25
+                        pos_hint_y: 0.8
+                        on_release: root.on_reset_button()
 
                     Button:
                         id: sortbtn
@@ -429,12 +453,20 @@
                             height: 25
 
                         Button:
-                            id: sortbtn
+                            id: resetvvbtn
+                            text: "Reset"
+                            size_hint: None, None
+                            size: 45, 25
+                            pos_hint_y: 0.8
+                            on_release: root.on_reset_vv_button()
+
+                        Button:
+                            id: sortvvbtn
                             text: "Sort"
                             size_hint: None, None
                             size: 45, 25
                             pos_hint_y: 0.9
-                            on_release: root.on_vv_sort_button()
+                            on_release: root.on_sort_vv_button()
 
                     MDLabel:
                         id: y_label
@@ -443,7 +475,7 @@
                         height: 25
 
                     Button:
-                        id: addbtn
+                        id: addvvbtn
                         text: "+"
                         size_hint: None, None
                         size: 25, 25
@@ -482,12 +514,20 @@
                             height: 25
 
                         Button:
-                            id: sortbtn
+                            id: resetvwbtn
+                            text: "Reset"
+                            size_hint: None, None
+                            size: 45, 25
+                            pos_hint_y: 0.8
+                            on_release: root.on_reset_vw_button()
+
+                        Button:
+                            id: sortvwbtn
                             text: "Sort"
                             size_hint: None, None
                             size: 45, 25
                             pos_hint_y: 0.9
-                            on_release: root.on_vw_sort_button()
+                            on_release: root.on_sort_vw_button()
 
                     MDLabel:
                         id: y_label
@@ -496,7 +536,7 @@
                         height: 25
 
                     Button:
-                        id: addbtn
+                        id: addvwbtn
                         text: "+"
                         size_hint: None, None
                         size: 25, 25
