@@ -230,7 +230,7 @@
         BoxLayout:
             id: headers
             orientation: "vertical"
-            size_hint_x: 0.6
+            size_hint_x: 0.5
 
             BoxLayout:
                 orientation: "horizontal"
@@ -275,7 +275,7 @@
 
         MatlabPlotBox:
             id: plot_box
-            size_hint_x: 0.4
+            size_hint_x: 0.5
 
 <VoltWattTabContent>
     orientation: "vertical"
@@ -288,7 +288,7 @@
         BoxLayout:
             id: headers
             orientation: "vertical"
-            size_hint_x: 0.6
+            size_hint_x: 0.5
 
             BoxLayout:
                 orientation: "horizontal"
@@ -333,7 +333,7 @@
 
         MatlabPlotBox:
             id: plot_box
-            size_hint_x: 0.4
+            size_hint_x: 0.5
 
 <VarWattTabContent>
     orientation: "vertical"
@@ -346,7 +346,7 @@
         BoxLayout:
             id: headers
             orientation: "vertical"
-            size_hint_x: 0.6
+            size_hint_x: 0.5
 
             BoxLayout:
                 orientation: "horizontal"
@@ -391,7 +391,7 @@
 
         MatlabPlotBox:
             id: plot_box
-            size_hint_x: 0.4
+            size_hint_x: 0.5
 
 
 <VoltVarVoltWattTabContent>
@@ -401,100 +401,117 @@
 
     BoxLayout:
         orientation: "vertical"
-        size_hint_x: 0.6
+        size_hint_x: 0.5
 
-        BoxLayout:
-            orientation: "vertical"
-
+        ScrollView:
             BoxLayout:
-                orientation: "horizontal"
-                size_hint: 1.0, 0.07
+                orientation: "vertical"
+                padding: 12
+
+                canvas.before:
+                    Color:
+                        rgba: .5, .5, .5, 1
+                    Line:
+                        width: 2
+                        rectangle: self.x, self.y, self.width, self.height
 
                 BoxLayout:
                     orientation: "horizontal"
+                    size_hint_y: 0.07
+
+                    BoxLayout:
+                        orientation: "horizontal"
+
+                        MDLabel:
+                            id: x_label
+                            text: "Voltage (p.u.)"
+                            size_hint_y: None
+                            height: 25
+
+                        Button:
+                            id: sortbtn
+                            text: "Sort"
+                            size_hint: None, None
+                            size: 45, 25
+                            pos_hint_y: 0.9
+                            on_release: root.on_vv_sort_button()
 
                     MDLabel:
-                        id: x_label
-                        text: "Voltage (p.u.)"
+                        id: y_label
+                        text: "Reactive Power (kVAR)"
                         size_hint_y: None
                         height: 25
 
                     Button:
-                        id: sortbtn
-                        text: "Sort"
+                        id: addbtn
+                        text: "+"
                         size_hint: None, None
-                        size: 45, 25
+                        size: 25, 25
                         pos_hint_y: 0.9
-                        on_release: root.on_vv_sort_button()
+                        on_release: root.on_add_vv_button()
 
-                MDLabel:
-                    id: y_label
-                    text: "Reactive Power (kVAR)"
-                    size_hint_y: None
-                    height: 25
+                XYGridView:
+                    id: vv_grid
+                    size_hint_y: 0.93
+                    on_item_deleted: root.rebuild_plot()
+                    on_value_changed: root.rebuild_plot()
 
-                Button:
-                    id: addbtn
-                    text: "+"
-                    size_hint: None, None
-                    size: 25, 25
-                    pos_hint_y: 0.9
-                    on_release: root.on_add_vv_button()
-
-            XYGridView:
-                id: vv_grid
-                size_hint: (1.0, 0.93)
-                on_item_deleted: root.rebuild_plot()
-                on_value_changed: root.rebuild_plot()
-
-
-        BoxLayout:
-            orientation: "vertical"
-
+        ScrollView:
             BoxLayout:
-                orientation: "horizontal"
-                size_hint: 1.0, 0.07
+                orientation: "vertical"
+                padding: 12
+
+                canvas.before:
+                    Color:
+                        rgba: .5, .5, .5, 1
+                    Line:
+                        width: 2
+                        rectangle: self.x, self.y, self.width, self.height
 
                 BoxLayout:
                     orientation: "horizontal"
+                    size_hint: 1.0, 0.07
+
+                    BoxLayout:
+                        orientation: "horizontal"
+
+                        MDLabel:
+                            id: x_label
+                            text: "Voltage (p.u.)"
+                            size_hint_y: None
+                            height: 25
+
+                        Button:
+                            id: sortbtn
+                            text: "Sort"
+                            size_hint: None, None
+                            size: 45, 25
+                            pos_hint_y: 0.9
+                            on_release: root.on_vw_sort_button()
 
                     MDLabel:
-                        id: x_label
-                        text: "Voltage (p.u.)"
+                        id: y_label
+                        text: "Watts (kW)"
                         size_hint_y: None
                         height: 25
 
                     Button:
-                        id: sortbtn
-                        text: "Sort"
+                        id: addbtn
+                        text: "+"
                         size_hint: None, None
-                        size: 45, 25
+                        size: 25, 25
                         pos_hint_y: 0.9
-                        on_release: root.on_vw_sort_button()
+                        on_release: root.on_add_vw_button()
 
-                MDLabel:
-                    id: y_label
-                    text: "Watts (kW)"
-                    size_hint_y: None
-                    height: 25
-
-                Button:
-                    id: addbtn
-                    text: "+"
-                    size_hint: None, None
-                    size: 25, 25
-                    pos_hint_y: 0.9
-                    on_release: root.on_add_vw_button()
-
-            XYGridView:
-                id: vw_grid
-                size_hint: (1.0, 0.93)
-                on_item_deleted: root.rebuild_plot()
-                on_value_changed: root.rebuild_plot()
+                XYGridView:
+                    id: vw_grid
+                    size_hint: (1.0, 0.93)
+                    on_item_deleted: root.rebuild_plot()
+                    on_value_changed: root.rebuild_plot()
 
     MatlabPlotBox:
         id: plot_box
-        size_hint_x: 0.4
+        size_hint_x: 0.5
 
 
 <StorageControlConfigurationScreen>:

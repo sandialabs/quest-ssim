@@ -768,7 +768,7 @@ class VoltVarTabContent(BoxLayout):
 
         else:
             fig = plt.figure()
-            fig.tight_layout()
+            #fig.tight_layout()
             plt.plot(xs, ys)
             plt.xlabel('Voltage (kV)')
             plt.ylabel('Reactive Power (kVAR)')
@@ -798,7 +798,7 @@ class VoltWattTabContent(BoxLayout):
 
         else:
             fig = plt.figure()
-            fig.tight_layout()
+            #fig.tight_layout()
             plt.plot(xs, ys)
             plt.xlabel('Voltage (kV)')
             plt.ylabel('Watts (kW)')
@@ -828,7 +828,7 @@ class VarWattTabContent(BoxLayout):
 
         else:
             fig = plt.figure()
-            fig.tight_layout()
+            #fig.tight_layout()
             plt.plot(xs, ys)
             plt.xlabel('Reactive Power (kVAR)')
             plt.ylabel('Watts (kW)')
@@ -870,7 +870,7 @@ class VoltVarVoltWattTabContent(BoxLayout):
         else:
             fig, ax1 = plt.subplots(1)
             ax2 = ax1.twinx()
-            fig.tight_layout()
+            #fig.tight_layout()
             ax1.plot(vxs, vys)
             ax1.set_xlabel('Voltage (kV)')
             ax1.set_ylabel('Reactive Power (kVAR)')
