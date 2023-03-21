@@ -1,9 +1,10 @@
 """Core classes and functions for the user interface."""
 import functools
+import hashlib
 import itertools
 import json
 import tempfile
-from os import path
+from os import path, makedirs
 from pathlib import Path, PurePosixPath
 import pkg_resources
 import subprocess
@@ -874,16 +875,35 @@ class Configuration:
         self.pvsystems = pvsystems
         self.storage = storage_devices
         self.sim_duration = sim_duration
-        self._id = None
         self._grid_path = None
         self._federation_path = None
         self._proc = None
         self._workdir = Path(".")
 
-    def evaluate(self, basepath=None):
+    @property
+    def id(self):
+        h = hashlib.sha1()
+        for ess in self.storage:
+            if ess is None:
+                h.update(b"None")
+            else:
+                h.update(
+                    bytes(
+                        str((ess.name,
+                             ess.bus,
+                             ess.phases,
+                             ess.kwh_rated,
+                             ess.kw_rated,
+                             ess.controller)),
+                        "utf-8"
+                    )
+                )
+        return str(h.hexdigest())
+
+    def evaluate(self, basepath="."):
         """Run the simulator for this configuration"""
-        self._workdir = Path(tempfile.mkdtemp(dir=basepath))
-        self._id = path.basename(self._workdir)
+        self._workdir = Path(basepath).absolute() / self.id
+        makedirs(self._workdir, exist_ok=True)
         self._grid_path = PurePosixPath(self._workdir / "grid.json")
         self._federation_path = self._workdir / "federation.json"
         self._write_configuration()
@@ -959,7 +979,7 @@ class Configuration:
         return config
 
     def _federation_config(self):
-        config = {"name": str(self._id)}
+        config = {"name": str(self.id)}
         self._configure_broker(config)
         self._configure_federates(config)
         return config

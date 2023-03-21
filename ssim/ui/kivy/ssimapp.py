@@ -1413,7 +1413,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # store all the project configurations into a list
         for config in self.project.configurations():
             self.configurations.append(config)
-            print(config._id)
+            print(config.id)
 
         # populate the UI with the list of configurations
         ctr = 1
