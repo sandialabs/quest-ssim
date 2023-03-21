@@ -411,15 +411,15 @@ class StorageControl:
         if self.mode == "droop":
             pass
         elif self.mode == "voltvar":
-            return self.__check_curve_generic("voltvar", "Volt-Var", "volt_vals", "var_vals")
+            return self.__check_curve_generic("voltvar", "Volt-Var", "volts", "vars")
         elif self.mode == "voltwatt":
-            return self.__check_curve_generic("voltwatt", "Volt-Watt", "volt_vals", "watt_vals")
+            return self.__check_curve_generic("voltwatt", "Volt-Watt", "volts", "watts")
         elif self.mode == "varwatt":
-            return self.__check_curve_generic("varwatt", "Var-Watt", "var_vals", "watt_vals")
+            return self.__check_curve_generic("varwatt", "Var-Watt", "vars", "watts")
         elif self.mode == "vv_vw":
-            vvarmsg = self.__check_curve_generic("vv_vw", "Volt-Var + Volt-Watt", "vv_volt_vals", "var_vals")
+            vvarmsg = self.__check_curve_generic("vv_vw", "Volt-Var + Volt-Watt", "vv_volts", "vv_vars")
             if vvarmsg: return vvarmsg
-            return self.__check_curve_generic("vv_vw", "Volt-Var + Volt-Watt", "vw_volt_vals", "watt_vals")
+            return self.__check_curve_generic("vv_vw", "Volt-Var + Volt-Watt", "vw_volts", "vw_watts")
         if self.mode == "constantpf":
             pass
 

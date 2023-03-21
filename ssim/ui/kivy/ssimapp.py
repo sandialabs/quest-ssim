@@ -105,6 +105,7 @@ def make_xy_grid_data(xs: list, ys: list) -> list:
     """
     return [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
+
 def parse_float(strval) -> float:
     """A utility method to parse a string into a floating point value.
 
@@ -220,13 +221,14 @@ class SSimBaseScreen(Screen):
 class MatlabPlotBox(BoxLayout):
 
     def reset_plot(self):
-        """Clears the current diagram widget and draws a new one using the current figure (plt.gcf())"""
+        """Clears the current diagram widget and draws a new one using the current
+            figure (plt.gcf())"""
         self.clear_widgets()
         self.add_widget(FigureCanvasKivyAgg(plt.gcf()))
 
     def display_plot_error(self, msg):
-        """Puts a label with a supplied message in place of the diagram when there is a reason a diagram
-            can't be displayed.
+        """Puts a label with a supplied message in place of the diagram when there is a
+            reason a diagram can't be displayed.
 
         Parameters
         ----------
@@ -1040,7 +1042,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.set_mode("droop", self.ids.droop_tab)
         self.set_droop_data()
 
-
     def set_droop_data(self):
         pval, qval = self.verify_droop_params()
         pfield = self.ids.droop_tab_content.ids.p_value
@@ -1074,8 +1075,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def verify_volt_var_params(self) -> (list, list):
         return (
-            self.__verify_control_param("voltvar", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("voltvar", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("voltvar", "volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("voltvar", "vars", [1.0, 1.0, 0.0, -1.0, -1.0])
             )
 
     def set_volt_watt_mode(self):
@@ -1094,8 +1095,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def verify_volt_watt_params(self) -> (list, list):
         return (
-            self.__verify_control_param("voltwatt", "volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("voltwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("voltwatt", "volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("voltwatt", "watts", [1.0, 1.0, 0.0, -1.0, -1.0])
             )
 
     def set_var_watt_mode(self):
@@ -1108,14 +1109,14 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.set_var_watt_data()
 
     def set_var_watt_data(self):
-        vvs, wvs = self.verify_volt_var_params()
+        vvs, wvs = self.verify_var_watt_params()
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
         self.ids.var_watt_tab_content.rebuild_plot()
 
     def verify_var_watt_params(self) -> (list, list):
         return (
-            self.__verify_control_param("varwatt", "var_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("varwatt", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("varwatt", "vars", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("varwatt", "watts", [1.0, 1.0, 0.0, -1.0, -1.0])
             )
 
     def set_volt_var_and_volt_watt_mode(self):
@@ -1136,10 +1137,10 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def verify_volt_var_and_volt_watt_params(self) -> (list, list, list, list):
         return (
-            self.__verify_control_param("vv_vw", "vv_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("vv_vw", "var_vals", [1.0, 1.0, 0.0, -1.0, -1.0]),
-            self.__verify_control_param("vv_vw", "vw_volt_vals", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("vv_vw", "watt_vals", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("vv_vw", "vv_volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("vv_vw", "vv_vars", [1.0, 1.0, 0.0, -1.0, -1.0]),
+            self.__verify_control_param("vv_vw", "vw_volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
+            self.__verify_control_param("vv_vw", "vw_watts", [1.0, 1.0, 0.0, -1.0, -1.0])
             )
 
     def set_const_power_factor_mode(self):
@@ -1240,25 +1241,24 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         constpf_map["pf_val"] = parse_float(self.ids.const_pf_tab_content.ids.pf_value.text)
 
         self._extract_and_store_data_lists(
-            self.ids.vv_tab_content.ids.grid, "voltvar", "volt_vals", "var_vals"
+            self.ids.vv_tab_content.ids.grid, "voltvar", "volts", "vars"
             )
 
         self._extract_and_store_data_lists(
-            self.ids.vw_tab_content.ids.grid, "voltwatt", "volt_vals", "watt_vals"
+            self.ids.vw_tab_content.ids.grid, "voltwatt", "volts", "watts"
             )
 
         self._extract_and_store_data_lists(
-            self.ids.var_watt_tab_content.ids.grid, "varwatt", "var_vals", "watt_vals"
+            self.ids.var_watt_tab_content.ids.grid, "varwatt", "vars", "watts"
             )
 
         self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vv_grid, "vv_vw", "vv_volt_vals", "var_vals"
+            self.ids.vv_vw_tab_content.ids.vv_grid, "vv_vw", "vv_volts", "vv_vars"
             )
 
         self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vw_grid, "vv_vw", "vw_volt_vals", "watt_vals"
+            self.ids.vv_vw_tab_content.ids.vw_grid, "vv_vw", "vw_volts", "vw_watts"
             )
-
 
     def cancel(self):
         self.manager.current = "configure-storage"
