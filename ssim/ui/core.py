@@ -282,7 +282,7 @@ class Project:
         for storage_configuration in self._storage_configurations():
             yield Configuration(
                 self._grid_model_path,
-                self._metrics,
+                self._metricMgrs,
                 self.pvsystems,
                 storage_configuration
             )
