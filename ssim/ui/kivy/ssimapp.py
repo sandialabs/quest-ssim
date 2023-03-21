@@ -85,7 +85,24 @@ _IMAGE_FILES = [
 _KV_FILES = ["common.kv", "ssim.kv"]
 
 
-def make_xy_grid_data(xs: list, ys: list) -> dict:
+def make_xy_grid_data(xs: list, ys: list) -> list:
+    """A utility method to create a list of dictionaries suitable for use by an
+    XYGrid.
+
+    Parameters
+    ----------
+    xs : list
+        The x value list to be the x values in the resulting dictionary.
+    ys : list
+        The y value list to be the y values in the resulting dictionary.
+
+    Returns
+    -------
+    list:
+        A list of dictionaries of the form
+        [{x: x1, y: y1}, {x: x2, y: y2}, ..., {x: xn, y: yn}] which is what's required
+        by an XY grid..
+    """
     return [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
 def parse_float(strval) -> float:
@@ -613,12 +630,19 @@ class XYGridView(RecycleView):
 
     def delete_item(self, index: int):
         self.data.pop(index)
-        Clock.schedule_once(lambda dt: self.__on_deleted_item(), 0.05)
+        Clock.schedule_once(lambda dt: self.__raise_value_changed(), 0.05)
 
-    def value_changed(self, index: int):
-        Clock.schedule_once(lambda dt: self.__on_value_changed(), 0.05)
+    def x_value_changed(self, index: int, value):
+        self.__on_value_changed(index, "x", value)
 
-    def __on_value_changed(self):
+    def y_value_changed(self, index: int, value):
+        self.__on_value_changed(index, "y", value)
+
+    def __on_value_changed(self, index:int, key: str, value):
+        self.data[index][key] = parse_float_or_str(value)
+        Clock.schedule_once(lambda dt: self.__raise_value_changed(), 0.05)
+
+    def __raise_value_changed(self):
         self.dispatch("on_value_changed")
 
     def on_value_changed(self):
@@ -729,18 +753,29 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
         this row from the data list"""
         self.parent.parent.delete_item(self.index)
 
-    def on_value_changed(self, instance, text):
+    def on_x_value_changed(self, instance, text):
         if self.parent:
-            self.parent.parent.value_changed(self.index)
+            self.parent.parent.x_value_changed(self.index, self.x_value)
 
-    def on_focus_changed(self, instance, value):
+    def on_x_focus_changed(self, instance, value):
         if value:
             self.last_text = instance.text
         elif value != instance.text:
-            self.on_value_changed(instance, instance.text)
+            self.on_x_value_changed(instance, instance.text)
+
+    def on_y_value_changed(self, instance, text):
+        if self.parent:
+            self.parent.parent.y_value_changed(self.index, self.y_value)
+
+    def on_y_focus_changed(self, instance, value):
+        if value:
+            self.last_text = instance.text
+        elif value != instance.text:
+            self.on_y_value_changed(instance, instance.text)
 
 
 class XYItemTextField(TextInput):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.def_back_color = self.background_color
@@ -918,6 +953,7 @@ class VoltVarVoltWattTabContent(BoxLayout):
             ax2 = ax1.twinx()
             ax2.plot(wxs, wys, color="red")
             ax2.set_ylabel('Watts (kW)', color="red")
+            ax2.tick_params(axis='y', labelcolor="red")
 
             plt.title('Volt-Var & Volt-Watt Control Parameters')
             self.ids.plot_box.reset_plot()
@@ -979,6 +1015,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return "" if self._options is None else self._options.name
 
     def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
+        self.read_all_data()
         if tab_text == "Droop":
             self.set_droop_mode()
         elif tab_text == "Volt-Var":
@@ -1186,6 +1223,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return True
 
     def save(self):
+        self.read_all_data()
+        self.manager.current = "configure-storage"
+        self.manager.remove_widget(self)
+
+    def read_all_data(self):
         self._options.min_soc = self.ids.min_soc.fraction()
         self._options.max_soc = self.ids.max_soc.fraction()
         self._options.initial_soc = self.ids.init_soc.fraction()
@@ -1217,8 +1259,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             self.ids.vv_vw_tab_content.ids.vw_grid, "vv_vw", "vw_volt_vals", "watt_vals"
             )
 
-        self.manager.current = "configure-storage"
-        self.manager.remove_widget(self)
 
     def cancel(self):
         self.manager.current = "configure-storage"
