@@ -29,6 +29,7 @@ from kivy.clock import Clock
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.list import OneLineListItem
+from kivymd.uix.tab import MDTabsBase
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -89,6 +90,8 @@ class SSimApp(MDApp):
             MetricConfigurationScreen(self.project, name="metric-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
+        screen_manager.add_widget(
+            ResultsVisualizeScreen(self.project, name="results-visualize"))
         screen_manager.add_widget(
             ResultsSummaryScreen(self.project, name="results-summary"))
         screen_manager.add_widget(
@@ -694,12 +697,15 @@ class StorageListItem(TwoLineAvatarIconListItem):
     def edit(self, icon_widget):
         self._der_screen.edit_storage(self)
 
-class ResultsVariableListItem(TwoLineAvatarIconListItem):
+class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
     def __init__(self, variable_name, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # self.config = config
         self.text = variable_name
     
+    def toggle_selection(self):
+        self.parent.parent.parent.parent.parent.parent.update_selected_variables()
+
     @property
     def selected(self):
         return self.ids.selected.active
@@ -1108,6 +1114,14 @@ class RunSimulationScreen(SSimBaseScreen):
     def open_results_summary(self):
         self.manager.current = "results-summary"
 
+    def open_visualize_results(self):
+        self.manager.current = "results-visualize"
+
+class ResultsVisualizeScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.project_results = ProjectResults(self.project) 
+
 
 class ResultsSummaryScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
@@ -1156,27 +1170,77 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.x_data = {}
         self.selected_data = {}
         self.variables = {}
+        self.current_configuration = None
         self.list_items = []
+        self.selected_list_items = {}
         self.variable_data = pd.DataFrame()
 
     def on_enter(self):
-         # extract all results from all the configutations
-        project_results = self.project_results.results()
+        # populated `selected_list_items` assuming no selection from dropdown
+        # menu
+        # TO DO: Replace with evaluated configurations
+        num_configs = len(list(self.project.configurations()))
+        for ctr in range(num_configs):
+            self.selected_list_items['Configuration ' + str(ctr+1)] = [] 
 
-        # extract `x_data` and `selected_variables`
-        config_ctr = 1
-        for result in project_results:
-            headers, data = result.storage_state()
-            self.x_data['Configuration ' + str(config_ctr)] = list(data.loc[:, 'time'])
-            self.variables['Configuration ' + str(config_ctr)] = headers
-            config_ctr += 1
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        print(self.selected_list_items)
+        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+
+
+        #  # extract all results from all the configurations
+        # project_results = self.project_results.results()
+
+        # print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        # print(project_results)
+        # print(type(project_results))
+
+        # # extract `x_data` and `selected_variables`
+        # config_ctr = 1
+        # for result in project_results:
+        #     headers, data = result.storage_state()
+        #     self.x_data['Configuration ' + str(config_ctr)] = list(data.loc[:, 'time'])
+        #     self.variables['Configuration ' + str(config_ctr)] = headers
+        #     config_ctr += 1
 
    
     def update_figure(self):
         print("Figure update command issued from GUI")
-        print(self.x_data)
-
+        
         self.ids.detail_plot_canvas.clear_widgets()
+        project_results = self.project_results.results()
+        
+        fig = plt.figure()
+        plt.clf()
+
+        ctr = 1
+
+        for result in project_results:
+            headers, data = result.storage_state()
+            print(">>>>>>>>>>>>>>>>>>>>")
+            key = 'Configuration ' + str(ctr)
+            # columns to plot
+            columns_to_plot = self.selected_list_items[key]
+            columns_to_plot.insert(0, 'time')
+            # select subset of data based on columns_to_plot
+            print("data:")
+            print(data)
+            data_subset = data[columns_to_plot]
+            print(data_subset)
+            x_data =data_subset.loc[:, 'time']
+            # add the selected columns to plot
+            for column in data_subset.keys()[1:]:
+                plt.plot(x_data, data_subset[column])
+            ctr += 1
+
+        plt.xlabel('time')
+        plt.ylabel('y-label')
+        plt.legend()
+        plt.title('Detail Plots')
+
+        self.ids.detail_plot_canvas.add_widget(
+            FigureCanvasKivyAgg(fig)
+        )
         # fig = plt.figure()
         # # loop for each configuration
         # for y_var in self.selected_variables:
@@ -1193,8 +1257,9 @@ class ResultsDetailScreen(SSimBaseScreen):
         for config in self.project.configurations():
             self.configurations.append(config)
 
-        # Replace with evaluated configurations
+        # TO DO: Replace with evaluated configurations
         num_configs = len(list(self.project.configurations()))
+        num_configs = self.project.num_configurations()
 
         menu_items = []
         for ctr in range(num_configs):
@@ -1210,23 +1275,42 @@ class ResultsDetailScreen(SSimBaseScreen):
         )
         self.menu.open()
 
-    def update_selected_variables(self, value):
-
+    def update_selected_variables(self):
         print('Update selected variables called!')
 
-        # read the current selected configuration
-        self.ids.config_list_detail.text = value
-
-        # now once the list is displayed, update the selected_variables
+        # self.selected_list_items = {}
         selected_items = []
         for variable in self.ids.variable_list_detail.children:
             if variable.selected:
-                self.selected_items.append(variable.text)
-        self.selected_variables[value] = selected_items
+                selected_items.append(variable.text)
 
-        print(self.selected_variables)
+        self.selected_list_items[self.current_configuration] = selected_items
+
+        print(self.current_configuration)
+        print(self.selected_list_items)
+
+    # def update_selected_variables(self, value):
+
+    #     print('Update selected variables called!')
+
+    #     # read the current selected configuration
+    #     self.ids.config_list_detail.text = value
+
+    #     # now once the list is displayed, update the selected_variables
+    #     selected_items = []
+    #     for variable in self.ids.variable_list_detail.children:
+    #         if variable.selected:
+    #             self.selected_items.append(variable.text)
+    #     self.selected_variables[value] = selected_items
+
+    #     print(self.selected_variables)
 
     def set_config(self, value):
+
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>")
+        print(value)
+
+        self.current_configuration = value
 
         print(self.selected_variables)
         # read the current selected configuration
@@ -1256,7 +1340,7 @@ class ResultsDetailScreen(SSimBaseScreen):
                 continue
             else:
                 self.ids.variable_list_detail.add_widget(
-                    ResultsVariableListItem(variable_name = item)
+                    ResultsVariableListItemWithCheckbox(variable_name = item)
                 )
 
         # close the drop-down menu
@@ -1364,6 +1448,9 @@ class SSimScreen(SSimBaseScreen):
         if self.project.grid_model is None:
             _show_no_grid_popup("ssim", self.manager)
             return
+
+class ResultsVisualizationTab(FloatLayout, MDTabsBase):
+    pass
 
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):
