@@ -819,7 +819,7 @@ class VoltVarTabContent(BoxLayout):
         else:
             fig = plt.figure()
             #fig.tight_layout()
-            plt.plot(xs, ys)
+            plt.plot(xs, ys, marker='o')
             plt.xlabel('Voltage (kV)')
             plt.ylabel('Reactive Power (kVAR)')
             plt.title('Volt-Var Control Parameters')
@@ -856,7 +856,7 @@ class VoltWattTabContent(BoxLayout):
         else:
             fig = plt.figure()
             #fig.tight_layout()
-            plt.plot(xs, ys)
+            plt.plot(xs, ys, marker='o')
             plt.xlabel('Voltage (kV)')
             plt.ylabel('Watts (kW)')
             plt.title('Volt-Watt Control Parameters')
@@ -893,7 +893,7 @@ class VarWattTabContent(BoxLayout):
         else:
             fig = plt.figure()
             #fig.tight_layout()
-            plt.plot(xs, ys)
+            plt.plot(xs, ys, marker='o')
             plt.xlabel('Reactive Power (kVAR)')
             plt.ylabel('Watts (kW)')
             plt.title('Var-Watt Control Parameters')
@@ -948,12 +948,12 @@ class VoltVarVoltWattTabContent(BoxLayout):
         else:
             fig, ax1 = plt.subplots(1)
             #fig.tight_layout()
-            l1, = ax1.plot(vxs, vys)
+            l1, = ax1.plot(vxs, vys, marker='o')
             ax1.set_xlabel('Voltage (kV)')
             ax1.set_ylabel('Reactive Power (kVAR)')
 
             ax2 = ax1.twinx()
-            l2, = ax2.plot(wxs, wys, color="red")
+            l2, = ax2.plot(wxs, wys, color="red", marker='o')
             ax2.set_ylabel('Watts (kW)', color="red")
             ax2.tick_params(axis='y', labelcolor="red")
 
