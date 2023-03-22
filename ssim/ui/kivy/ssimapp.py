@@ -285,7 +285,7 @@ class TextFieldPositiveFloat(MDTextField):
         :py:class:`MDTextField` for allowed parameters
     """
 
-    POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
+    POSITIVE_FLOAT = re.compile(r"((\d+(\.\d*)?)|(\d*(\.\d+)))$")
 
     def __init__(self, minimum=0.0, maximum=math.inf, *args, **kwargs):
         super().__init__(*args, **kwargs)
