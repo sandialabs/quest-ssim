@@ -267,7 +267,8 @@ class TextFieldMultiFloat(MDTextField):
 
 
 class TextFieldPositiveFloat(MDTextField):
-    POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
+
+    POSITIVE_FLOAT = re.compile(r"((\d+(\.\d*)?)|(\d*(\.\d+)))$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
