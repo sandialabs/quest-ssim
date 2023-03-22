@@ -47,6 +47,7 @@ from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
 from kivymd.uix.tab import MDTabsBase
+from kivymd.uix.gridlayout import MDGridLayout
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -1502,13 +1503,6 @@ class RunSimulationScreen(SSimBaseScreen):
         self._run_thread.start()
 
 
-class ReliabilityConfigurationScreen(SSimBaseScreen):
-    """Screen for configuring the reliability model."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, pk=None, **kwargs):
@@ -1845,8 +1839,155 @@ class SSimScreen(SSimBaseScreen):
         dg.reset_plot()
 
 
-class ReliabilityModelTab(FloatLayout, MDTabsBase):
-    pass
+class ReliabilityModelTab(MDGridLayout, MDTabsBase):
+    """Base class for tabs used to configure reliability models.
+
+    The property `model_name` should be set to the name the model is
+    saved as in the JSON grid configuration file.
+    """
+
+    def __init__(self, model_name="unnamed", *args, **kwargs):
+        self.model_name = model_name
+        super().__init__(*args, **kwargs)
+
+    def validate(self):
+        try:
+            self.to_dict()
+        except ValueError:
+            return False
+        return True
+
+    def to_dict(self):
+        raise NotImplementedError()
+
+
+class LineReliabilityParams(ReliabilityModelTab):
+    """Parameters for the line reliability model."""
+
+    @property
+    def enabled(self):
+        """Return True if the line reliability model is enabled."""
+        return self.ids.enabled.active
+
+    def to_dict(self):
+        """Return a dictionary of the model parameters."""
+        if self.enabled:
+            return {
+                "enabled": self.enabled,
+                "mtbf": float(self.ids.line_mtbf.text),
+                "min_repair": float(self.ids.line_repair_min.text),
+                "max_repair": float(self.ids.line_repair_max.text)
+            }
+        return {"enabled": self.enabled}
+
+
+class SwitchReliabilityParams(ReliabilityModelTab):
+    """Parameters for the switch reliability model."""
+
+    @property
+    def enabled(self):
+        """Return True if the switch reliability mdoel is enabled."""
+        return self.ids.enabled.active
+
+    def to_dict(self):
+        """Return a dictionary of the model parameters."""
+        if self.enabled:
+            return {
+                "enabled": self.enabled,
+                "mtbf": float(self.ids.switch_mtbf.text),
+                "min_repair": float(self.ids.switch_repair_min.text),
+                "max_repair": float(self.ids.switch_repair_max.text),
+                "p_open": float(self.ids.switch_p_open.text),
+                "p_closed": float(self.ids.switch_p_closed.text),
+                "p_current": float(self.ids.switch_p_current.text)
+            }
+        return {"enabled": self.enabled}
+
+
+class GeneratorReliabilityParams(ReliabilityModelTab):
+    """Parameters for the generator reliability model."""
+
+    @property
+    def enabled(self):
+        """Return True if either the aging or wearout models are enabled."""
+        return self.aging_enabled or self.wearout_enabled
+
+    @property
+    def aging_enabled(self):
+        """Return True if the generator aging model is enabled."""
+        return self.ids.aging_active.active
+
+    @property
+    def wearout_enabled(self):
+        """Return True if the generator wearout model is enabled."""
+        return self.ids.wearout_active.active
+
+    def to_dict(self):
+        """Return a dictionary of the model parameters."""
+        model = {"enabled": self.enabled}
+        if self.aging_enabled:
+            model["aging"] = {
+                "enabled": self.aging_enabled,
+                "mtbf": float(self.ids.aging_mtbf.text),
+                "min_repair": float(self.ids.aging_repair_min.text),
+                "max_repair": float(self.ids.aging_repair_max.text)
+            }
+        if self.wearout_enabled:
+            model["operating_wear_out"] = {
+                "enabled": self.wearout_enabled,
+                "mtbf": float(self.ids.wearout_active.text),
+                "min_repair": float(self.ids.wearout_repair_min.text),
+                "max_repair": float(self.ids.wearout_repair_max.text)
+            }
+        return model
+
+
+class ReliabilityConfigurationScreen(SSimBaseScreen):
+    """Screen for configuring the reliability model."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ids.save.bind(
+            on_press=lambda x: self.save()
+        )
+
+    def _model_tabs(self):
+        return self.ids.reliability_models.get_slides()
+
+    def validate(self):
+        """Validate input for all enabled models."""
+        errors = []
+        for tab in self._model_tabs():
+            if not tab.enabled:
+                continue
+            if not tab.validate():
+                errors.append(tab.title)
+                # TODO Highlight the tab??
+        if errors == []:
+            return True
+        _show_error_popup(
+            f"Errors found in tabs: {', '.join(errors)}"
+        )
+        return False
+
+    def save(self):
+        """Add reliability model parameters from to the Project."""
+        if not self.validate():
+            return
+        for tab in self._model_tabs():
+            Logger.debug(f"model_name: {tab.model_name}")
+            self.project.add_reliability_model(tab.model_name, tab.to_dict())
+
+
+def _show_error_popup(message):
+    content = MessagePopupContent()
+    content.ids.msg_label.text = message
+    popup = Popup(
+        title="Configuration error!",
+        content=content
+    )
+    content.ids.dismissBtn.bind(on_press=popup.dismiss)
+    popup.open()
 
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):

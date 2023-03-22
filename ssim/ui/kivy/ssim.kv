@@ -363,67 +363,67 @@
     helper_text_mode: "on_error"
 
 
-<GeneratorReliabilityParams@FloatLayout>:
-    MDGridLayout:
-        cols: 5
-        rows: 3
-        adaptive_height: True
-        spacing: 25
-        padding: 12
+<GeneratorReliabilityParams@ReliabilityModelTab>:
+    cols: 5
+    rows: 3
+    adaptive_height: True
+    spacing: 25
+    padding: 12
+    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    model_name: "generator"
+
+    MDLabel:
+        font_style: "H6"
+        text: "Failure Mode"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Active"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "MTBF (hours)"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Min. Repair Time (hours)"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Max. Repair Time (hours)"
+        halign: "center"
+
+    MDLabel:
+        text: "Aging"
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    MDCheckbox:
+        id: aging_active
+        active: False
+    ReliabilityParam:
+        id: aging_mtbf
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParam:
+        id: aging_repair_min
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParam:
+        id: aging_repair_max
         pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
-        MDLabel:
-            font_style: "H6"
-            text: "Failure Mode"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Active"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "MTBF (hours)"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Min. Repair Time (hours)"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Max. Repair Time (hours)"
-            halign: "center"
-
-        MDLabel:
-            text: "Aging"
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        MDCheckbox:
-            id: aging_active
-            active: False
-        ReliabilityParam:
-            id: aging_mtbf
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: aging_repair_min
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: aging_repair_max
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-
-        MDLabel:
-            text: "Wearout"
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        MDCheckbox:
-            id: wearout_active
-            active: False
-        ReliabilityParam:
-            id: wearout_mtbf
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: wearout_repair_min
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: wearout_repair_max
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    MDLabel:
+        text: "Wearout"
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    MDCheckbox:
+        id: wearout_active
+        active: False
+    ReliabilityParam:
+        id: wearout_mtbf
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParam:
+        id: wearout_repair_min
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParam:
+        id: wearout_repair_max
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
 
 <ReliabilityParamProbability@ReliabilityParam>:
@@ -431,106 +431,105 @@
     maximum: 1.0
 
 
-<SwitchReliabilityParams@FloatLayout>:
-    MDGridLayout:
-        cols: 7
-        rows: 2
-        adaptive_height: True
-        spacing: 25
-        padding: 12
+<SwitchReliabilityParams@ReliabilityModelTab>:
+    cols: 7
+    rows: 2
+    adaptive_height: True
+    spacing: 25
+    padding: 12
+    pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    model_name: "switch"
+
+    MDLabel:
+        font_style: "H6"
+        text: "Active"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "MTBF (hours)"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Min. Repair Time (hours)"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Max. Repair Time (hours)"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Prob. Fail Open"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Prob. Fail Closed"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Prob. Fail Current"
+        halign: "center"
+
+    MDCheckbox:
+        id: enabled
+        active: False
+    ReliabilityParam:
+        id: switch_mtbf
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParam:
+        id: switch_repair_min
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParam:
+        id: switch_repair_max
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParamProbability:
+        id: switch_p_open
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParamProbability:
+        id: switch_p_closed
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParamProbability:
+        id: switch_p_current
         pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
-        MDLabel:
-            font_style: "H6"
-            text: "Active"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "MTBF (hours)"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Min. Repair Time (hours)"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Max. Repair Time (hours)"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Prob. Fail Open"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Prob. Fail Closed"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Prob. Fail Current"
-            halign: "center"
 
-        MDCheckbox:
-            id: switch_active
-            active: False
-        ReliabilityParam:
-            id: switch_mtbf
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: switch_repair_min
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: switch_repair_max
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParamProbability:
-            id: switch_p_open
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParamProbability:
-            id: switch_p_closed
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParamProbability:
-            id: switch_p_current
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
+<LineReliabilityParams@ReliabilityModelTab>:
+    model_name: "line"
+    cols: 4
+    rows: 2
+    adaptive_height: True
+    spacing: 25
+    padding: 12
+    pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
+    MDLabel:
+        font_style: "H6"
+        text: "Active"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "MTBF (hours)"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Min. Repair Time (hours)"
+        halign: "center"
+    MDLabel:
+        font_style: "H6"
+        text: "Max. Repair Time (hours)"
+        halign: "center"
 
-<LineReliabilityParams@FloatLayout>:
-    MDGridLayout:
-        cols: 4
-        rows: 2
-        adaptive_height: True
-        spacing: 25
-        padding: 12
+    MDCheckbox:
+        id: enabled
+        active: False
+    ReliabilityParam:
+        id: line_mtbf
         pos_hint: {"center_x": 0.5, "center_y": 0.5}
-
-        MDLabel:
-            font_style: "H6"
-            text: "Active"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "MTBF (hours)"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Min. Repair Time (hours)"
-            halign: "center"
-        MDLabel:
-            font_style: "H6"
-            text: "Max. Repair Time (hours)"
-            halign: "center"
-
-        MDCheckbox:
-            id: line_active
-            active: False
-        ReliabilityParam:
-            id: line_mtbf
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: line_repair_min
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-        ReliabilityParam:
-            id: line_repair_max
-            pos_hint: {"center_x": 0.5, "center_y": 0.5}
-
+    ReliabilityParam:
+        id: line_repair_min
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+    ReliabilityParam:
+        id: line_repair_max
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
 
 
 <ReliabilityConfigurationScreen>:
@@ -544,36 +543,28 @@
         MDTabs:
             id: reliability_models
 
-            ReliabilityModelTab:
+            GeneratorReliabilityParams:
                 id: generator_reliability
                 title: "Generators"
 
-                GeneratorReliabilityParams:
-                    id: generator_reliability_params
-
-            ReliabilityModelTab:
+            LineReliabilityParams:
                 id: line_reliability
                 title: "Lines"
 
-                LineReliabilityParams:
-                    id: line_reliability_params
-
-            ReliabilityModelTab:
+            SwitchReliabilityParams:
                 id: switch_reliability
                 title: "Switches"
-
-                SwitchReliabilityParams:
-                    id: switch_reliability_params
 
         BoxLayout:
             orientation: "horizontal"
             Button:
+                id: back
                 text: "back"
                 on_press: root.manager.current = "ssim"
                 size_hint_y: None
             Button:
+                id: save
                 text: "save"
-                on_press: root.save()
                 size_hint_y: None
 
 
