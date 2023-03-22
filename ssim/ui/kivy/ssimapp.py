@@ -948,15 +948,16 @@ class VoltVarVoltWattTabContent(BoxLayout):
         else:
             fig, ax1 = plt.subplots(1)
             #fig.tight_layout()
-            ax1.plot(vxs, vys)
+            l1, = ax1.plot(vxs, vys)
             ax1.set_xlabel('Voltage (kV)')
             ax1.set_ylabel('Reactive Power (kVAR)')
 
             ax2 = ax1.twinx()
-            ax2.plot(wxs, wys, color="red")
+            l2, = ax2.plot(wxs, wys, color="red")
             ax2.set_ylabel('Watts (kW)', color="red")
             ax2.tick_params(axis='y', labelcolor="red")
 
+            ax1.legend([l1, l2], ["Volt-Var", "Volt-Watt"])
             plt.title('Volt-Var & Volt-Watt Control Parameters')
             self.ids.plot_box.reset_plot()
 
@@ -2132,6 +2133,7 @@ class SSimScreen(SSimBaseScreen):
             fig.tight_layout()
 
             ax.add_collection(lc)
+            ax.axis("off")
 
             xs, ys = zip(*[(x, y) for seg in line_segments for x, y in seg])
             min_x = min(xs)
