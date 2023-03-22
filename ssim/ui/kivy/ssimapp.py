@@ -789,6 +789,14 @@ class XYItemTextField(TextInput):
         self.background_color = "red" if not v else self.def_back_color
 
 
+def make_xy_matlab_plot(mpb: MatlabPlotBox, xs: list, ys: list, xlabel: str, ylabel: str, title: str):
+    fig, ax = plt.subplots(1, 1, layout="constrained")
+    ax.plot(xs, ys, marker='o')
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
+    plt.title(title)
+    mpb.reset_plot()
+
 class VoltVarTabContent(BoxLayout):
     """The class that stores the content for the Volt-Var tab in the storage
      option control tabs"""
@@ -817,12 +825,10 @@ class VoltVarTabContent(BoxLayout):
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
-            fig, ax = plt.subplots(1, 1, layout="constrained")
-            ax.plot(xs, ys, marker='o')
-            ax.set_xlabel('Voltage (kV)')
-            ax.set_ylabel('Reactive Power (kVAR)')
-            plt.title('Volt-Var Control Parameters')
-            self.ids.plot_box.reset_plot()
+            make_xy_matlab_plot(
+                self.ids.plot_box, xs, ys, 'Voltage (p.u.)',
+                'Reactive Power (p.u.)', 'Volt-Var Control Parameters'
+            )
 
 
 class VoltWattTabContent(BoxLayout):
@@ -853,12 +859,10 @@ class VoltWattTabContent(BoxLayout):
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
-            fig, ax = plt.subplots(1, 1, layout="constrained")
-            ax.plot(xs, ys, marker='o')
-            ax.set_xlabel('Voltage (kV)')
-            ax.set_ylabel('Watts (kW)')
-            plt.title('Volt-Watt Control Parameters')
-            self.ids.plot_box.reset_plot()
+            make_xy_matlab_plot(
+                self.ids.plot_box, xs, ys, 'Voltage (p.u.)',
+                'Watts (p.u.)', 'Volt-Watt Control Parameters'
+            )
 
 
 class VarWattTabContent(BoxLayout):
@@ -889,12 +893,10 @@ class VarWattTabContent(BoxLayout):
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
-            fig, ax = plt.subplots(1, 1, layout="constrained")
-            ax.plot(xs, ys, marker='o')
-            ax.set_xlabel('Reactive Power (kVAR)')
-            ax.set_ylabel('Watts (kW)')
-            plt.title('Var-Watt Control Parameters')
-            self.ids.plot_box.reset_plot()
+            make_xy_matlab_plot(
+                self.ids.plot_box, xs, ys, 'Reactive Power (p.u.)',
+                'Watts (p.u.)', 'Var-Watt Control Parameters'
+            )
 
 
 class VoltVarVoltWattTabContent(BoxLayout):
@@ -945,12 +947,12 @@ class VoltVarVoltWattTabContent(BoxLayout):
         else:
             fig, ax1 = plt.subplots(1, 1, layout="constrained")
             l1, = ax1.plot(vxs, vys, marker='o')
-            ax1.set_xlabel('Voltage (kV)')
-            ax1.set_ylabel('Reactive Power (kVAR)')
+            ax1.set_xlabel('Voltage (p.u.)')
+            ax1.set_ylabel('Reactive Power (p.u.)')
 
             ax2 = ax1.twinx()
             l2, = ax2.plot(wxs, wys, color="red", marker='o')
-            ax2.set_ylabel('Watts (kW)', color="red")
+            ax2.set_ylabel('Watts (p.u.)', color="red")
             ax2.tick_params(axis='y', labelcolor="red")
 
             ax1.legend([l1, l2], ["Volt-Var", "Volt-Watt"])
