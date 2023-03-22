@@ -29,12 +29,14 @@ from ssim.metrics import MetricManager, MetricTimeAccumulator
 _DEFAULT_RELIABILITY = {
     # "seed": 1234567,
     "line": {
-        "mtbf": 1000000,
+        "enabled": False,
+        "mtbf": 100000000,
         "min_repair": 1,
         "max_repair": 10
     },
     "switch": {
-        "mtbf": 100,
+        "enabled": False,
+        "mtbf": 100000000,
         "min_repair": 5,
         "max_repair": 8,
         "p_open": 1.0,
@@ -43,13 +45,16 @@ _DEFAULT_RELIABILITY = {
     },
     "generator":
     {
+        "enabled": False,
         "aging": {
-            "mtbf": 5000,
+            "enabled": False,
+            "mtbf": 100000000,
             "min_repair": 1.0,
             "max_repair": 1.0
         },
         "operating_wear_out": {
-            "mtbf": 1000,
+            "enabled": False,
+            "mtbf": 100000000,
             "min_repair": 2.0,
             "max_repair": 2.0
         }
@@ -68,6 +73,7 @@ class Project:
         self.storage_devices = []
         self.pvsystems = []
         self._metricMgrs = {}
+        self.reliability_params = _DEFAULT_RELIABILITY
 
     def load_toml_file(self, filename: str):
         """Reads data for this Project from the supplied TOML file.
@@ -304,6 +310,9 @@ class Project:
     def evaluated_configurations(self):
         """Return the number of configurations that have been evaluated."""
         raise NotImplementedError()
+
+    def add_reliability_model(self, name: str, params: dict):
+        self.reliability_params[name] = params
 
 
 class StorageControl:
@@ -868,13 +877,15 @@ class Configuration:
     """A specific grid configuration to be evaluated."""
 
     def __init__(self, grid, metrics, pvsystems,
-                 storage_devices, sim_duration=24):
+                 storage_devices, reliability=None,
+                 sim_duration=24):
         self.results = None
         self.grid = grid
         self.metrics = metrics
         self.pvsystems = pvsystems
         self.storage = storage_devices
         self.sim_duration = sim_duration
+        self.reliability = reliability
         self._grid_path = None
         self._federation_path = None
         self._proc = None
@@ -968,8 +979,7 @@ class Configuration:
         return config
 
     def _configure_reliability(self, config):
-        # TODO user specified reliability params
-        config["reliability"] = _DEFAULT_RELIABILITY
+        config["reliability"] = self.reliability
         return config
 
     def _configure_metrics(self, config):
