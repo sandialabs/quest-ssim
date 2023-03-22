@@ -817,11 +817,10 @@ class VoltVarTabContent(BoxLayout):
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
-            fig = plt.figure()
-            #fig.tight_layout()
-            plt.plot(xs, ys, marker='o')
-            plt.xlabel('Voltage (kV)')
-            plt.ylabel('Reactive Power (kVAR)')
+            fig, ax = plt.subplots(1, 1, layout="constrained")
+            ax.plot(xs, ys, marker='o')
+            ax.set_xlabel('Voltage (kV)')
+            ax.set_ylabel('Reactive Power (kVAR)')
             plt.title('Volt-Var Control Parameters')
             self.ids.plot_box.reset_plot()
 
@@ -854,11 +853,10 @@ class VoltWattTabContent(BoxLayout):
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
-            fig = plt.figure()
-            #fig.tight_layout()
-            plt.plot(xs, ys, marker='o')
-            plt.xlabel('Voltage (kV)')
-            plt.ylabel('Watts (kW)')
+            fig, ax = plt.subplots(1, 1, layout="constrained")
+            ax.plot(xs, ys, marker='o')
+            ax.set_xlabel('Voltage (kV)')
+            ax.set_ylabel('Watts (kW)')
             plt.title('Volt-Watt Control Parameters')
             self.ids.plot_box.reset_plot()
 
@@ -891,11 +889,10 @@ class VarWattTabContent(BoxLayout):
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
-            fig = plt.figure()
-            #fig.tight_layout()
-            plt.plot(xs, ys, marker='o')
-            plt.xlabel('Reactive Power (kVAR)')
-            plt.ylabel('Watts (kW)')
+            fig, ax = plt.subplots(1, 1, layout="constrained")
+            ax.plot(xs, ys, marker='o')
+            ax.set_xlabel('Reactive Power (kVAR)')
+            ax.set_ylabel('Watts (kW)')
             plt.title('Var-Watt Control Parameters')
             self.ids.plot_box.reset_plot()
 
@@ -946,8 +943,7 @@ class VoltVarVoltWattTabContent(BoxLayout):
             self.ids.plot_box.display_plot_error("No Data")
 
         else:
-            fig, ax1 = plt.subplots(1)
-            #fig.tight_layout()
+            fig, ax1 = plt.subplots(1, 1, layout="constrained")
             l1, = ax1.plot(vxs, vys, marker='o')
             ax1.set_xlabel('Voltage (kV)')
             ax1.set_ylabel('Reactive Power (kVAR)')
@@ -2066,6 +2062,7 @@ class SSimScreen(SSimBaseScreen):
 
     def changed_show_bus_labels(self, active_state):
         self.refresh_grid_plot()
+
 
     def refresh_grid_plot(self):
         gm = self.project.grid_model
