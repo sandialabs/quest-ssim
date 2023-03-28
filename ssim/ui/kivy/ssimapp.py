@@ -1839,6 +1839,11 @@ class SSimScreen(SSimBaseScreen):
         dg.reset_plot()
 
 
+class ValidationError(Exception):
+    """Raised for parameter validation errors."""
+    pass
+
+
 class ReliabilityModelTab(MDGridLayout, MDTabsBase):
     """Base class for tabs used to configure reliability models.
 
@@ -1854,7 +1859,9 @@ class ReliabilityModelTab(MDGridLayout, MDTabsBase):
         try:
             self.to_dict()
         except ValueError:
-            return False
+            raise ValidationError(
+                f"Invalid or missing values in {self.model_name}"
+            )
         return True
 
     def to_dict(self):
@@ -1868,6 +1875,18 @@ class LineReliabilityParams(ReliabilityModelTab):
     def enabled(self):
         """Return True if the line reliability model is enabled."""
         return self.ids.enabled.active
+
+    def validate(self):
+        super().validate()
+        if not self.enabled:
+            return True
+        d = self.to_dict()
+        if d["min_repair"] <= d["max_repair"]:
+            return True
+        raise ValidationError(
+            f"{self.model_name}:\n\tMinimum repair time must be "
+            f"less than or equal to maximum repair time."
+        )
 
     def to_dict(self):
         """Return a dictionary of the model parameters."""
@@ -1888,6 +1907,30 @@ class SwitchReliabilityParams(ReliabilityModelTab):
     def enabled(self):
         """Return True if the switch reliability mdoel is enabled."""
         return self.ids.enabled.active
+
+    def validate(self):
+        if not super().validate():
+            return False
+        if not self.enabled:
+            return True
+        d = self.to_dict()
+        # XXX This will work, but we don't provide any useful error
+        #     message to the user.
+        repair_valid = d["min_repair"] <= d["max_repair"]
+        prob_valid = (d["p_open"] + d["p_closed"] + d["p_current"]) == 1.0
+        if repair_valid and prob_valid:
+            return True
+        message = f"{self.model_name}: "
+        if not repair_valid:
+            message += (
+                "\n\tMinimum repair time must be less than or equal "
+                "to maximum repair time"
+            )
+        if not prob_valid:
+            message += (
+                "\n\tp_open, p_closed, and p_current must sum to 1.0"
+            )
+        raise ValidationError(message)
 
     def to_dict(self):
         """Return a dictionary of the model parameters."""
@@ -1922,6 +1965,25 @@ class GeneratorReliabilityParams(ReliabilityModelTab):
         """Return True if the generator wearout model is enabled."""
         return self.ids.wearout_active.active
 
+    def validate(self):
+        super().validate()
+        # Validate relationships between parameters
+        valid = {
+            m: d["min_repair"] <= d["max_repair"]
+            for m, d in self.to_dict().items() if isinstance(d, dict)
+        }
+        if all(valid.values()):
+            return True
+        message = f"{self.model_name}: "
+        for m, isvalid in valid.items():
+            if isvalid:
+                continue
+            message += (
+                f"\n\t{m}: Minimum repair time must be less than or equal "
+                "to maximum repair time."
+            )
+        raise ValidationError(message)
+
     def to_dict(self):
         """Return a dictionary of the model parameters."""
         model = {"enabled": self.enabled}
@@ -1935,7 +1997,7 @@ class GeneratorReliabilityParams(ReliabilityModelTab):
         if self.wearout_enabled:
             model["operating_wear_out"] = {
                 "enabled": self.wearout_enabled,
-                "mtbf": float(self.ids.wearout_active.text),
+                "mtbf": float(self.ids.wearout_mtbf.text),
                 "min_repair": float(self.ids.wearout_repair_min.text),
                 "max_repair": float(self.ids.wearout_repair_max.text)
             }
@@ -1957,16 +2019,25 @@ class ReliabilityConfigurationScreen(SSimBaseScreen):
     def validate(self):
         """Validate input for all enabled models."""
         errors = []
+        error_messages = []
         for tab in self._model_tabs():
             if not tab.enabled:
                 continue
-            if not tab.validate():
+            try:
+                tab.validate()
+            except ValidationError as e:
                 errors.append(tab.title)
+                error_messages.append(
+                    # Work around Kivy bug when displaying tabs
+                    # (see kivy issue #3477)
+                    str(e).replace("\t", "    ")
+                )
                 # TODO Highlight the tab??
         if errors == []:
             return True
         _show_error_popup(
-            f"Errors found in tabs: {', '.join(errors)}"
+            f"Errors found in tabs: {', '.join(errors)}\n\n"
+            + "\n\n".join(error_messages)
         )
         return False
 
