@@ -1058,7 +1058,6 @@ class RunSimulationScreen(SSimBaseScreen):
         # store all the project configurations into a list
         for config in self.project.configurations():
             self.configurations.append(config)
-            print(config._id)
 
         # populate the UI with the list of configurations
         ctr = 1
@@ -1167,13 +1166,12 @@ class ResultsDetailScreen(SSimBaseScreen):
         super().__init__(*args, **kwargs)
         self.configurations: List[Configuration] = []
         self.selected_variables= {}
-        self.x_data = {}
-        self.selected_data = {}
         self.variables = {}
         self.current_configuration = None
         self.list_items = []
         self.selected_list_items = {}
         self.variable_data = pd.DataFrame()
+        self.figure = None
 
     def on_enter(self):
         # populated `selected_list_items` assuming no selection from dropdown
@@ -1187,71 +1185,65 @@ class ResultsDetailScreen(SSimBaseScreen):
         print(self.selected_list_items)
         print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
+    def dismiss_popup(self):
+        self._popup.dismiss()
 
-        #  # extract all results from all the configurations
-        # project_results = self.project_results.results()
-
-        # print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        # print(project_results)
-        # print(type(project_results))
-
-        # # extract `x_data` and `selected_variables`
-        # config_ctr = 1
-        # for result in project_results:
-        #     headers, data = result.storage_state()
-        #     self.x_data['Configuration ' + str(config_ctr)] = list(data.loc[:, 'time'])
-        #     self.variables['Configuration ' + str(config_ctr)] = headers
-        #     config_ctr += 1
-
-   
-    def update_figure(self):
-        print("Figure update command issued from GUI")
-        
-        self.ids.detail_plot_canvas.clear_widgets()
-        project_results = self.project_results.results()
-        
+    def _create_figure(self):
         fig = plt.figure()
         plt.clf()
-
+        project_results = self.project_results.results()
         ctr = 1
-
         for result in project_results:
-            headers, data = result.storage_state()
-            print(">>>>>>>>>>>>>>>>>>>>")
+            _, data = result.storage_state()
             key = 'Configuration ' + str(ctr)
             # columns to plot
             columns_to_plot = self.selected_list_items[key]
-            columns_to_plot.insert(0, 'time')
             # select subset of data based on columns_to_plot
-            print("data:")
-            print(data)
-            data_subset = data[columns_to_plot]
-            print(data_subset)
-            x_data =data_subset.loc[:, 'time']
+            selected_data = data[columns_to_plot]
+            x_data = data.loc[:, 'time']
             # add the selected columns to plot
-            for column in data_subset.keys()[1:]:
-                plt.plot(x_data, data_subset[column])
+            for column in selected_data.keys():
+                plt.plot(x_data, selected_data[column], label=key+'-'+column)
             ctr += 1
 
         plt.xlabel('time')
-        plt.ylabel('y-label')
+        if self.ids.detail_figure_ylabel.text is not None:
+            plt.ylabel(self.ids.detail_figure_ylabel.text)
         plt.legend()
-        plt.title('Detail Plots')
+        if self.ids.detail_figure_title is not None:
+            plt.title(self.ids.detail_figure_title.text)
+        else:
+            plt.title('Detail Plots')
 
+        return fig
+
+
+    def update_figure(self):
+        self.figure = self._create_figure()
+        Logger.debug("Figure update command issued from GUI ...")
+        Logger.debug(self.ids.detail_figure_title.text)
+        self.ids.detail_plot_canvas.clear_widgets()
         self.ids.detail_plot_canvas.add_widget(
-            FigureCanvasKivyAgg(fig)
+            FigureCanvasKivyAgg(self.figure)
         )
-        # fig = plt.figure()
-        # # loop for each configuration
-        # for y_var in self.selected_variables:
-        #     plt.plot(self.x_data, self.variable_data.loc[:, y_var])
-        # plt.xlabel('time')
-        # plt.ylabel('y-label')
-        # plt.legend()
-        # plt.title('Detail Plots')
-        # self.ids.detail_plot_canvas.add_widget(
-        #     FigureCanvasKivyAgg(fig)
-        # )
+
+    def save_figure_options(self):
+        '''Saves the current active figure.'''
+        chooser = SaveFigureDialog(
+            save=self.save_figure, cancel=self.dismiss_popup
+        )
+
+        self._popup = Popup(title="save figure options", content=chooser)
+        self._popup.open()
+
+
+    def save_figure(self, path, filename):
+        Logger.debug("Saving figure ... ")
+        Logger.debug(filename)
+        self.figure.savefig(filename+ '.png', dpi=300)
+    
+    def clear_figure(self):
+        self.ids.detail_plot_canvas.clear_widgets()
 
     def drop_config_menu(self):
         for config in self.project.configurations():
@@ -1259,7 +1251,7 @@ class ResultsDetailScreen(SSimBaseScreen):
 
         # TO DO: Replace with evaluated configurations
         num_configs = len(list(self.project.configurations()))
-        num_configs = self.project.num_configurations()
+        # num_configs = self.project.num_configurations()
 
         menu_items = []
         for ctr in range(num_configs):
@@ -1289,21 +1281,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         print(self.current_configuration)
         print(self.selected_list_items)
 
-    # def update_selected_variables(self, value):
-
-    #     print('Update selected variables called!')
-
-    #     # read the current selected configuration
-    #     self.ids.config_list_detail.text = value
-
-    #     # now once the list is displayed, update the selected_variables
-    #     selected_items = []
-    #     for variable in self.ids.variable_list_detail.children:
-    #         if variable.selected:
-    #             self.selected_items.append(variable.text)
-    #     self.selected_variables[value] = selected_items
-
-    #     print(self.selected_variables)
 
     def set_config(self, value):
 
@@ -1378,6 +1355,11 @@ class SelectGridDialog(FloatLayout):
 class SelectSSIMTOMLDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
+
+class SaveFigureDialog(FloatLayout):
+    save = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+    text_input = ObjectProperty(None)
 
 class SSimScreen(SSimBaseScreen):
 
