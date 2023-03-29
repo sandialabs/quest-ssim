@@ -1181,10 +1181,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         for ctr in range(num_configs):
             self.selected_list_items['Configuration ' + str(ctr+1)] = [] 
 
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        print(self.selected_list_items)
-        print("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-
     def dismiss_popup(self):
         self._popup.dismiss()
 
@@ -1195,15 +1191,15 @@ class ResultsDetailScreen(SSimBaseScreen):
         ctr = 1
         for result in project_results:
             _, data = result.storage_state()
-            key = 'Configuration ' + str(ctr)
+            config_key = 'Configuration ' + str(ctr)
             # columns to plot
-            columns_to_plot = self.selected_list_items[key]
+            columns_to_plot = self.selected_list_items[config_key]
             # select subset of data based on columns_to_plot
             selected_data = data[columns_to_plot]
             x_data = data.loc[:, 'time']
             # add the selected columns to plot
             for column in selected_data.keys():
-                plt.plot(x_data, selected_data[column], label=key+'-'+column)
+                plt.plot(x_data, selected_data[column], label=config_key+'-'+column)
             ctr += 1
 
         plt.xlabel('time')
@@ -1216,7 +1212,6 @@ class ResultsDetailScreen(SSimBaseScreen):
             plt.title('Detail Plots')
 
         return fig
-
 
     def update_figure(self):
         self.figure = self._create_figure()
@@ -1235,7 +1230,6 @@ class ResultsDetailScreen(SSimBaseScreen):
 
         self._popup = Popup(title="save figure options", content=chooser)
         self._popup.open()
-
 
     def save_figure(self, path, filename):
         Logger.debug("Saving figure ... ")
@@ -1303,14 +1297,16 @@ class ResultsDetailScreen(SSimBaseScreen):
         
         # extract the data 
         self.list_items, self.variable_data = current_result.storage_state()
-        print(self.list_items)
-        print(self.variable_data)
 
         self.x_data = list(self.variable_data.loc[:, 'time'])
 
         self.ids.variable_list_detail.clear_widgets()
         # add the list of variables in the selected configuration
         # into the MDList
+
+        Logger.debug('>>> Current selection records: ')
+        Logger.debug(self.selected_list_items)
+
         for item in self.list_items:
             # do not add 'time' to the variable list
             if item == 'time':
