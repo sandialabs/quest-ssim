@@ -292,7 +292,8 @@ class Project:
                 self._grid_model_path,
                 self._metricMgrs,
                 self.pvsystems,
-                storage_configuration
+                storage_configuration,
+                reliability=self.reliability_params
             )
 
     def _storage_configurations(self):
