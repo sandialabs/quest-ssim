@@ -1585,7 +1585,15 @@ class SSimScreen(SSimBaseScreen):
         self.reset_grid_model_label()
         self.reset_project_name_field()
         self.refresh_grid_plot()
+        self.reset_reliability()
         self.dismiss_popup()
+
+    def reset_reliability(self):
+        """Notify the reliability form to reload the model parameters."""
+        Logger.debug(
+            f"Reseting reliability: {self.project.reliability_params}")
+        reliability = self.manager.get_screen("reliability-config")
+        reliability.load(self.project.reliability_params)
 
     def set_current_input_file(self, fullpath):
         self.project._input_file_path = fullpath
@@ -1867,6 +1875,9 @@ class ReliabilityModelTab(MDGridLayout, MDTabsBase):
     def to_dict(self):
         raise NotImplementedError()
 
+    def load(self):
+        raise NotImplementedError()
+
 
 class LineReliabilityParams(ReliabilityModelTab):
     """Parameters for the line reliability model."""
@@ -1890,14 +1901,29 @@ class LineReliabilityParams(ReliabilityModelTab):
 
     def to_dict(self):
         """Return a dictionary of the model parameters."""
-        if self.enabled:
+        try:
             return {
                 "enabled": self.enabled,
                 "mtbf": float(self.ids.line_mtbf.text),
                 "min_repair": float(self.ids.line_repair_min.text),
                 "max_repair": float(self.ids.line_repair_max.text)
             }
-        return {"enabled": self.enabled}
+        except ValueError:
+            return {"enabled": self.enabled}
+
+    def load(self, params):
+        """Load model parameters from `params` into the form.
+
+        Parameters
+        ----------
+        params : dict
+            Distionary with optional keys 'enabled', 'mtbf', 'min_repair',
+            and 'max_repair'.
+        """
+        self.ids.enabled.active = params.get("enabled", False)
+        self.ids.line_mtbf.text = str(params.get("mtbf", ""))
+        self.ids.line_repair_min.text = str(params.get("min_repair", ""))
+        self.ids.line_repair_max.text = str(params.get("max_repair", ""))
 
 
 class SwitchReliabilityParams(ReliabilityModelTab):
@@ -1934,7 +1960,7 @@ class SwitchReliabilityParams(ReliabilityModelTab):
 
     def to_dict(self):
         """Return a dictionary of the model parameters."""
-        if self.enabled:
+        try:
             return {
                 "enabled": self.enabled,
                 "mtbf": float(self.ids.switch_mtbf.text),
@@ -1944,7 +1970,17 @@ class SwitchReliabilityParams(ReliabilityModelTab):
                 "p_closed": float(self.ids.switch_p_closed.text),
                 "p_current": float(self.ids.switch_p_current.text)
             }
-        return {"enabled": self.enabled}
+        except ValueError:
+            return {"enabled": self.enabled}
+
+    def load(self, params):
+        self.ids.enabled.active = params.get("enabled", False)
+        self.ids.switch_mtbf.text = str(params.get("mtbf", ""))
+        self.ids.switch_repair_min.text = str(params.get("min_repair", ""))
+        self.ids.switch_repair_max.text = str(params.get("max_repair", ""))
+        self.ids.switch_p_open.text = str(params.get("p_open", ""))
+        self.ids.switch_p_closed.text = str(params.get("p_closed", ""))
+        self.ids.switch_p_current.text = str(params.get("p_current", ""))
 
 
 class GeneratorReliabilityParams(ReliabilityModelTab):
@@ -1987,21 +2023,44 @@ class GeneratorReliabilityParams(ReliabilityModelTab):
     def to_dict(self):
         """Return a dictionary of the model parameters."""
         model = {"enabled": self.enabled}
-        if self.aging_enabled:
+        try:
             model["aging"] = {
                 "enabled": self.aging_enabled,
                 "mtbf": float(self.ids.aging_mtbf.text),
                 "min_repair": float(self.ids.aging_repair_min.text),
                 "max_repair": float(self.ids.aging_repair_max.text)
             }
-        if self.wearout_enabled:
+        except ValueError:
+            model["aging"] = {"enabled": self.aging_enabled}
+        try:
             model["operating_wear_out"] = {
                 "enabled": self.wearout_enabled,
                 "mtbf": float(self.ids.wearout_mtbf.text),
                 "min_repair": float(self.ids.wearout_repair_min.text),
                 "max_repair": float(self.ids.wearout_repair_max.text)
             }
+        except ValueError:
+            model["operating_wear_out"] = {"enabled": self.wearout_enabled}
         return model
+
+    def _load_aging(self, aging):
+        self.ids.aging_mtbf.text = str(aging.get("mtbf", ""))
+        self.ids.aging_repair_min.text = str(aging.get("min_repair", ""))
+        self.ids.aging_repair_max.text = str(aging.get("max_repair", ""))
+        self.ids.aging_active.active = aging.get("enabled", False)
+
+    def _load_wearout(self, wearout):
+        self.ids.wearout_mtbf.text = str(wearout.get("mtbf", ""))
+        self.ids.wearout_repair_min.text = str(wearout.get("min_repair", ""))
+        self.ids.wearout_repair_max.text = str(wearout.get("max_repair", ""))
+        self.ids.wearout_active.active = wearout.get("enabled", False)
+
+    def load(self, params):
+        """Load the model params from a dict."""
+        if "aging" in params:
+            self._load_aging(params["aging"])
+        if "operating_wear_out" in params:
+            self._load_wearout(params["operating_wear_out"])
 
 
 class ReliabilityConfigurationScreen(SSimBaseScreen):
@@ -2009,6 +2068,7 @@ class ReliabilityConfigurationScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.load(self.project.reliability_params)
         self.ids.save.bind(
             on_press=lambda x: self.save()
         )
@@ -2032,7 +2092,6 @@ class ReliabilityConfigurationScreen(SSimBaseScreen):
                     # (see kivy issue #3477)
                     str(e).replace("\t", "    ")
                 )
-                # TODO Highlight the tab??
         if errors == []:
             return True
         _show_error_popup(
@@ -2040,6 +2099,19 @@ class ReliabilityConfigurationScreen(SSimBaseScreen):
             + "\n\n".join(error_messages)
         )
         return False
+
+    def load(self, params):
+        """Load parameters from `params` into the forms.
+
+        Parameters
+        ----------
+        params : dict
+            Dictionary of reliability model parameters.
+        """
+        for tab in self._model_tabs():
+            if tab.model_name not in params:
+                continue
+            tab.load(params[tab.model_name])
 
     def save(self):
         """Add reliability model parameters from to the Project."""

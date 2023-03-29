@@ -29,34 +29,19 @@ from ssim.metrics import MetricManager, MetricTimeAccumulator
 _DEFAULT_RELIABILITY = {
     # "seed": 1234567,
     "line": {
-        "enabled": False,
-        "mtbf": 100000000,
-        "min_repair": 1,
-        "max_repair": 10
+        "enabled": False
     },
     "switch": {
-        "enabled": False,
-        "mtbf": 100000000,
-        "min_repair": 5,
-        "max_repair": 8,
-        "p_open": 1.0,
-        "p_closed": 0.0,
-        "p_current": 0.0
+        "enabled": False
     },
     "generator":
     {
         "enabled": False,
         "aging": {
-            "enabled": False,
-            "mtbf": 100000000,
-            "min_repair": 1.0,
-            "max_repair": 1.0
+            "enabled": False
         },
         "operating_wear_out": {
-            "enabled": False,
-            "mtbf": 100000000,
-            "min_repair": 2.0,
-            "max_repair": 2.0
+            "enabled": False
         }
     }
 }
@@ -144,6 +129,8 @@ class Project:
         ret += f"name = \'{self.name}\'\n"
         ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
 
+        ret += self._reliability_to_toml()
+
         for so in self.storage_devices:
             ret += so.write_toml()
 
@@ -175,6 +162,11 @@ class Project:
         if "metrics" in tomlData:
             self.__read_metric_map(tomlData["metrics"])
 
+        self.reliability_params = tomlData.get(
+            "reliability",
+            _DEFAULT_RELIABILITY
+        )
+
     def __read_metric_map(self, mdict):
         for ckey in mdict:
             cat_mgr = self.get_manager(ckey)
@@ -182,6 +174,16 @@ class Project:
                 cat_mgr = MetricManager()
                 self._metricMgrs[ckey] = cat_mgr
             cat_mgr.read_toml(mdict[ckey])
+
+    def _reliability_to_toml(self):
+        # Return a toml string containing the reliability params
+        top_level_table = ["reliability"]
+        ret = [f"[{'.'.join(top_level_table)}]"]
+        for model, params in self.reliability_params.items():
+            ret.append(f"[{'.'.join(top_level_table + [model])}]")
+            for param, value in params.items():
+                ret.append(_to_toml(param, value))
+        return "\n".join(ret)
 
     def add_metric(self, category: str, key: str, metric: MetricTimeAccumulator):
         """Adds the supplied metric identified by the supplied key to an existing or
@@ -1037,6 +1039,23 @@ class Configuration:
 
     def is_evaluated(self):
         return self.results is not None
+
+
+def _to_toml(key, value):
+    # turn a key, value pair into a valid one-line toml string
+    if isinstance(value, dict):
+        value = _dict_to_toml(value)
+    if isinstance(value, bool):
+        value = str(value).lower()
+    return f"{key} = " + str(value)
+
+
+def _dict_to_toml(value):
+    table = ", ".join(
+        _to_toml(key, val)
+        for key, val in value.items()
+    )
+    return "{" + table + "}"
 
 
 def _storage_federate_spec(name, grid_path, sim_duration):
