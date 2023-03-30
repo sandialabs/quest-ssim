@@ -5,59 +5,112 @@
 #:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
 #:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
 
+<DiagramPlot>
+    pos_hint: {"top":1}
+
 <SSimScreen>:
     name: 'ssim'
-    bus_list: bus_list
+
     BoxLayout:
         orientation: "vertical"
-        padding: 5
-        spacing: 5
 
         BoxLayout:
             orientation: "horizontal"
-            size_hint: (1.0, 0.5)
+            size_hint_y: None
+            height: 30
 
             Label:
                 text: "Project Name:"
                 color: C(hex_black)
-                size_hint: (0.33, 1.0)
+                size_hint: (0.25, 1.0)
 
             TextInput:
+                id: project_name
                 text: "unnamed"
                 multiline: False
                 valign: "center"
+                on_text: root.project.name = project_name.text
 
-        Button:
-            text: "save to file"
-            on_press: root.write_toml()
+        BoxLayout:
+            orientation: "horizontal"
 
-        Button:
-            text: "read from file"
-            on_press: root.read_toml()
+            BoxLayout:
+                orientation: "vertical"
+                size_hint_x: 0.35
+                padding: 5
+                spacing: 5
 
-        Button:
-            text: "select grid model"
-            on_press: root.select_grid_model()
+                Button:
+                    text: "read from file"
+                    on_press: root.read_toml()
 
-        Button:
-            text: "select storage"
-            on_press: root.open_der_configuration()
+                BoxLayout:
+                    orientation: "horizontal"
+                    #size_hint: (1.0, 0.1)
+                    spacing: 5
 
-        Button:
-            text: "configure loads"
-            on_press: root.open_load_configuration()
+                    Button:
+                        text: "save"
+                        size_hint: (0.5, 1.0)
+                        on_press: root.write_to_toml()
 
-        Button:
-            text: "configure metrics"
-            on_press: root.open_metric_configuration()
+                    Button:
+                        text: "save as"
+                        size_hint: (0.5, 1.0)
+                        on_press: root.write_as_toml()
 
-        Button:
-            text: "Run"
-            on_press: root.do_run_simulation()
+                Button:
+                    text: "select grid model"
+                    on_press: root.select_grid_model()
 
-        TextInput:
-            id: bus_list
-            multiline: True
+                Button:
+                    text: "select storage"
+                    on_press: root.open_der_configuration()
+
+                Button:
+                    text: "configure loads"
+                    on_press: root.open_load_configuration()
+
+                Button:
+                    text: "configure metrics"
+                    on_press: root.open_metric_configuration()
+
+                Button:
+                    text: "Run"
+                    on_press: root.do_run_simulation()
+
+            BoxLayout:
+                orientation: "vertical"
+                id: plot_side_box
+                size_hint_x: 0.65
+
+                MDLabel
+                    id: grid_model_label
+                    size_hint_y: None
+                    height: 25
+                    text: "Grid Model:"
+
+                DiagramPlot:
+                    id: grid_diagram
+
+                BoxLayout:
+                    id: plt_controls
+                    orientation: "horizontal"
+                    size_hint_y: None
+                    height: 30
+
+                    MDLabel
+                        id: show_bus_label
+                        size_hint_x: None
+                        width: 135
+                        text: "Show Bus Labels"
+
+                    CheckBox:
+                        id: show_bus_labels
+                        size_hint_x: None
+                        width: 30
+                        active: True
+                        on_active: root.changed_show_bus_labels(self.active)
 
 <DERConfigurationScreen>:
     name: "der-config"
@@ -75,8 +128,13 @@
                 orientation: "vertical"
                 padding: 5
 
+                Label:
+                    text: "List of Defined Storage Assets"
+                    size_hint: (1.0, 0.05)
+                    color: 0,0,0,1
+
                 ScrollView:
-                    size_hint: (1.0, 0.8)
+                    size_hint: (1.0, 0.75)
                     MDList:
                         id: ess_list
 
@@ -90,23 +148,30 @@
                     size_hint: (1.0, 0.1)
                     text: "Delete Storage"
 
-            Button:
-                text: "list of PV"
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
 
+                Label:
+                    text: "List of Defined PV Assets"
+                    size_hint: (1.0, 0.05)
+                    color: 0,0,0,1
+
+                ScrollView:
+                    size_hint: (1.0, 0.75)
+                    MDList:
+                        id: pv_list
 
         BoxLayout:
             orientation: "horizontal"
-            padding: 5
-            spacing: 5
-            size_hint: (1.0, 0.2)
+            size_hint_y: None
+            height: 30
 
             Button:
-                height: 10
                 text: "back"
                 on_press: root.manager.current = 'ssim'
 
             Button:
-                height: 10
                 text: "save"
                 # Might need something different here to handle the
                 on_press: root.manager.current = 'ssim'
@@ -128,6 +193,9 @@
         id: selected
         active: False
         on_release: root.toggle_selection()
+
+<PVListitem>:
+
 
 <BusListItem>:
 
@@ -206,7 +274,8 @@
             size_hint: (1.0, 0.7)
 
         BoxLayout:
-            size_hint: (1.0, 0.15)
+            size_hint_y: None
+            height: 30
             orientation: "horizontal"
             Button:
                 text: "back"
@@ -262,10 +331,9 @@
                 spacing: 10
                 MDLabel:
                     text: "Select possible busses"
-                    size_hint_y: None
-                    height: 0
+                    size_hint: (1.0, 0.05)
                 MDScrollView:
-                    size_hint: (1.0, 1.0)
+                    size_hint: (1.0, 0.83)
                     MDList:
                         size_hint_y: None
                         height: 0
@@ -276,13 +344,10 @@
                     orientation: "horizontal"
                     MDLabel:
                         id: required_label
-                        size_hint_y: None
-                        height: 0
-                        text: "required?"
+                        text: "Required?"
                     MDSwitch:
+                        #pos_hint: {"left":0.0,"top":0.0}
                         id: required
-                        size_hint_y: None
-                        height: 0
                         active: False
 
                 Button:
@@ -291,7 +356,8 @@
                     on_press: root.edit_control_params()
 
         BoxLayout:
-            size_hint: (1.0, 0.15)
+            size_hint_y: None
+            height: 30
             orientation: "horizontal"
             Button:
                 text: "back"
@@ -344,6 +410,58 @@
         id: check
         listItem: root
 
+<XYGridHeader>
+    orientation: "horizontal"
+    size_hint: 0.5, 0.07
+
+    MDLabel:
+        id: x_label
+        text: "X"
+
+    MDLabel:
+        id: y_label
+        text: "Y"
+
+    Button:
+        id: addbtn
+        text: "+"
+        size_hint_x: 0.1
+        pos_hint_y: 0.9
+        on_release: root.on_add_button()
+
+<XYGridView>
+    viewclass: 'XYGridViewItem'
+    size_hint: 0.5, 0.93
+    RecycleBoxLayout:
+        default_size: None, dp(32)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
+<XYItemTextField>
+    multiline: False
+
+<XYGridViewItem>
+    orientation: 'horizontal'
+    size_hint: 0.5, 0.05
+    padding: 2
+
+    XYItemTextField:
+        id: x_field
+
+    XYItemTextField:
+        id: y_field
+
+    Button:
+        id: deletebtn
+        text: "X"
+        size_hint_x: 0.1
+        pos_hint_y: 0.9
+        on_release: root.on_delete_button()
+
 <MetricConfigurationScreen>:
     name: "metric-config"
 
@@ -368,7 +486,7 @@
                         id: metriclist
 
                         TwoLineIconListItem:
-                            text: "Voltage"
+                            text: "Bus Voltages"
                             secondary_text: "set voltage targets by bus"
                             icon: "plus"
                             on_release: root.configure_voltage_metrics()
@@ -419,49 +537,77 @@
                 BoxLayout:
                     id: metricValueBox
                     orientation: "vertical"
-                    size_hint: None, None
-                    size: self.parent.width, 275
+                    size_hint_y: None
+                    height: 320
                     disabled: True
 
                     Label:
                         id: metriclabel
                         text: "Metric Settings"
-                        size_hint: None, None
-                        size: self.parent.width, 25
+                        size_hint_y: None
+                        height: 25
                         color: 0,0,0,1
 
+                    BoxLayout:
+                        id: metricSenseBox
+                        orientation: "horizontal"
+                        size_hint_y: None
+                        height: 35
+                        disabled: True
+
+                        MDRaisedButton:
+                            id: min_btn
+                            selected: False
+                            text: "Minimize"
+                            size_hint: 0.33, None
+                            #size: self.parent.width, 25
+                            on_release: root.set_minimize_sense()
+
+                        MDRaisedButton:
+                            id: max_btn
+                            selected: False
+                            text: "Maximize"
+                            size_hint: 0.33, None
+                            #size: self.parent.width, 25
+                            on_release: root.set_maximize_sense()
+
+                        MDRaisedButton:
+                            id: seek_btn
+                            selected: False
+                            text: "Seek Value"
+                            size_hint: 0.33, None
+                            #size: self.parent.width, 25
+                            on_release: root.set_seek_value_sense()
+
                     TextFieldMultiFloat:
-                        hint_text: "Limit Value"
-                        id: limitText
+                        hint_text: "Lower Limit Value"
+                        size_hint_y: None
+                        height: 25
+                        id: lowerLimitText
 
                     TextFieldMultiFloat:
                         hint_text: "Objective Value"
+                        size_hint_y: None
+                        height: 25
                         id: objectiveText
 
-                    Label:
-                        id: senselabel
-                        text: "Sense"
-                        size_hint: None, None
-                        size: self.parent.width, 25
-                        color: 0,0,0,1
-
-                    MDRaisedButton:
-                        id: caller
-                        text: "Sense"
-                        size_hint: None, None
-                        size: self.parent.width, 25
-                        on_release: root.drop_sense_menu()
+                    TextFieldMultiFloat:
+                        hint_text: "Upper Limit Value"
+                        size_hint_y: None
+                        height: 25
+                        id: upperLimitText
 
                     Button:
                         id: btnStore
                         text: "store"
-                        size_hint: None, None
-                        size: self.parent.width, 25
+                        size_hint_y: None
+                        height: 25
                         on_release: root.store_metrics()
                         disabled: True
 
                 BoxLayout:
                     orientation: "vertical"
+                    size_hint_y: 40
 
                     Label:
                         id: currMetriclabel
@@ -923,7 +1069,7 @@
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
 
-<SelectSSIMTOMLDialog>:
+<LoadSSIMTOMLDialog>:
     BoxLayout:
         size: root.size
         pos: root.pos
@@ -944,7 +1090,42 @@
                 text: "Load"
                 on_release: root.load(filechooser.path, filechooser.selection)
 
-<NoGridPopupContent>:
+<SaveSSIMTOMLDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        FileChooserListView:
+            id: filechooser
+            path: "."
+            filters: ["*.toml"]
+            dirselect: True
+            on_selection: root.manage_filename_field()
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: "horizontal"
+
+            Label:
+                text: "Filename:"
+                size_hint: 0.1, 1.0
+
+            TextInput:
+                id: filenamefield
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Save"
+                on_release: root.save(filechooser.selection or [filechooser.path], filenamefield.text)
+
+<MetricsNoGridPopupContent>:
     orientation: "vertical"
     Label:
         text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to set voltage metrics.'
