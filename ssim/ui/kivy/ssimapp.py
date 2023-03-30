@@ -155,8 +155,8 @@ class SSimApp(MDApp):
             MetricConfigurationScreen(self.project, name="metric-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
-        screen_manager.add_widget(
-            ResultsVisualizeScreen(self.project, name="results-visualize"))
+        # screen_manager.add_widget(
+        #     ResultsVisualizeScreen(self.project, name="results-visualize"))
         screen_manager.add_widget(
             ResultsSummaryScreen(self.project, name="results-summary"))
         screen_manager.add_widget(
@@ -2055,8 +2055,8 @@ class SSimScreen(SSimBaseScreen):
         dg = self.ids.grid_diagram
         dg.reset_plot()
 
-class ResultsVisualizationTab(FloatLayout, MDTabsBase):
-    pass
+# class ResultsVisualizationTab(FloatLayout, MDTabsBase):
+#     pass
 
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):
