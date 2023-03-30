@@ -906,7 +906,7 @@ class Configuration:
         return config
 
     def _configure_metrics(self, config):
-        voltage_metrics = self.metrics.get("Voltage")
+        voltage_metrics = self.metrics.get("Bus Voltage")
         if voltage_metrics is not None:
             config["busses_to_measure"] = voltage_metrics.to_dicts()
         return config

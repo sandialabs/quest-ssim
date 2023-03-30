@@ -5,6 +5,8 @@
 #:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
 #:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
 
+#:set ssim_light_blue (0.68, 0.85, 0.90, 1.0)
+
 <MatlabPlotBox>
     pos_hint: {"top":1}
 
@@ -583,8 +585,6 @@
             height: 25
 
         BoxLayout:
-
-            #orientation: "horizontal"
             size_hint: (1.0, 0.2)
 
             MDTabs:
@@ -638,6 +638,7 @@
             size_hint_y: None
             height: 30
             orientation: "horizontal"
+
             Button:
                 text: "back"
                 on_press: root.cancel()
@@ -668,6 +669,14 @@
 
                 BoxLayout:
                     orientation: "vertical"
+                    padding: 5
+
+                    canvas.before:
+                        Color:
+                            rgba: ssim_light_blue
+                        Line:
+                            width: 1
+                            rectangle: self.x, self.y, self.width, self.height
 
                     TextFieldPositiveFloat:
                         id: power_input
@@ -679,6 +688,14 @@
 
                 BoxLayout:
                     orientation: "vertical"
+                    padding: 5
+
+                    canvas.before:
+                        Color:
+                            rgba: ssim_light_blue
+                        Line:
+                            width: 1
+                            rectangle: self.x, self.y, self.width, self.height
 
                     TextFieldPositiveFloat:
                         id: duration_input
@@ -690,23 +707,39 @@
 
             BoxLayout:
                 orientation: "vertical"
+                padding: 5
                 spacing: 10
+
                 MDLabel:
                     text: "Select possible busses"
                     size_hint: (1.0, 0.05)
+                    underline: True
+
                 MDScrollView:
                     size_hint: (1.0, 0.83)
+
+                    canvas.before:
+                        Color:
+                            rgba: ssim_light_blue
+                        Line:
+                            width: 1
+                            rectangle: self.x, self.y, self.width, self.height
+
                     MDList:
                         size_hint_y: None
+                        #md_bg_color: ssim_light_blue
                         height: 0
                         id: bus_list
 
                 BoxLayout:
-                    size_hint: (1.0, 0.06)
+                    size_hint_y: None
+                    height: 25
                     orientation: "horizontal"
+
                     MDLabel:
                         id: required_label
                         text: "Required?"
+
                     MDSwitch:
                         #pos_hint: {"left":0.0,"top":0.0}
                         id: required
@@ -722,6 +755,7 @@
             size_hint_y: None
             height: 30
             orientation: "horizontal"
+
             Button:
                 text: "back"
                 on_press: root.cancel()
@@ -776,6 +810,7 @@
 <XYGridView>
     viewclass: 'XYGridViewItem'
     #size_hint: 0.5, 0.93
+
     RecycleBoxLayout:
         default_size: None, dp(32)
         default_size_hint: 1, None
@@ -985,10 +1020,12 @@
             BoxLayout:
                 orientation: "vertical"
                 padding: 5
+
                 Label:
                     text: "Configurations that will be evaluated:"
                     size_hint_y: None
                     height: 50
+
                 ScrollView:
                     canvas.before:
                         Color:
@@ -1003,16 +1040,21 @@
                 orientation: "vertical"
                 padding: 5
                 spacing: 5
+
                 Label:
                     text: "Total number of configurations 256 (128 completed)"
                     size_hint_y: None
                     height: 50
+
                 Button:
                     text: "View Saved Results"
+
                 Button:
                     text: "Resume"
+
                 Button:
                     text: "Remove Configuration"
+
                 Button:
                     text: "Go"
                     on_press: root.run_configurations()
@@ -1053,6 +1095,7 @@
         size: root.size
         pos: root.pos
         orientation: "vertical"
+
         FileChooserListView:
             id: filechooser
             path: "."
@@ -1061,6 +1104,7 @@
         BoxLayout:
             size_hint_y: None
             height: 30
+
             Button:
                 text: "Cancel"
                 on_release: root.cancel()
@@ -1074,6 +1118,7 @@
         size: root.size
         pos: root.pos
         orientation: "vertical"
+
         FileChooserListView:
             id: filechooser
             path: "."
@@ -1082,6 +1127,7 @@
         BoxLayout:
             size_hint_y: None
             height: 30
+
             Button:
                 text: "Cancel"
                 on_release: root.cancel()
@@ -1095,6 +1141,7 @@
         size: root.size
         pos: root.pos
         orientation: "vertical"
+
         FileChooserListView:
             id: filechooser
             path: "."
@@ -1117,6 +1164,7 @@
         BoxLayout:
             size_hint_y: None
             height: 30
+
             Button:
                 text: "Cancel"
                 on_release: root.cancel()
@@ -1127,6 +1175,7 @@
 
 <MetricsNoGridPopupContent>:
     orientation: "vertical"
+
     Label:
         text: 'A grid model has not yet been selected.  Please return to the main screen and choose a grid model before attempting to set voltage metrics.'
         text_size: self.width, None
@@ -1144,6 +1193,7 @@
 
 <MessagePopupContent>:
     orientation: "vertical"
+
     Label:
         id: msg_label
         text_size: self.width, None
@@ -1156,6 +1206,7 @@
 
 <MissingMetricValuesPopupContent>:
     orientation: "vertical"
+
     Label:
         text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Limit"" and ""Objective"" and select a ""Sense"".'
         text_size: self.width, None
