@@ -10,6 +10,7 @@ from os import path
 from pathlib import Path, PurePosixPath
 import pkg_resources
 import subprocess
+import tomli
 
 from ssim import grid
 from ssim.opendss import DSSModel
@@ -65,9 +66,29 @@ class Project:
         self.name = name
         self._grid_model_path = None
         self._grid_model = None
+        self._input_file_path = None
         self.storage_devices = []
-        self._pvsystems = []
+        self.pvsystems = []
         self._metricMgrs = {}
+
+    def load_toml_file(self, filename: str):
+        """Reads data for this Project from the supplied TOML file.
+
+        Parameters
+        ----------
+        filename: str
+            The full path to the TOML file from which input is to be loaded.
+        """
+        self._input_file_path = filename
+        self.clear_metrics()
+        self.clear_options()
+        self.clear_pv()
+
+        with open(filename, 'r') as f:
+            toml = f.read()
+
+        tdat = tomli.loads(toml)
+        self.read_toml(tdat)
 
     @property
     def base_dir(self):
@@ -79,14 +100,32 @@ class Project:
 
     @property
     def bus_names(self):
-        return self._grid_model.bus_names
+        """Returns a collection of all bus names stored in the current DSS model.
+
+        Returns
+        ----------
+        list:
+            The collection of all bus names contained in the current grid model.
+        """
+        return [] if self._grid_model is None else self._grid_model.bus_names
+
+    @property
+    def line_names(self):
+        """Returns a collection of all line names stored in the current DSS model.
+
+        Returns
+        ----------
+        list:
+            The collection of all line names contained in the current grid model.
+        """
+        return [] if self._grid_model is None else self._grid_model.line_names
 
     @property
     def storage_names(self):
         return set(device.name for device in self.storage_devices)
 
     @property
-    def grid_model(self):
+    def grid_model(self) -> DSSModel:
         return self._grid_model
 
     def phases(self, bus):
@@ -137,18 +176,16 @@ class Project:
             so.read_toml(sokey, sodict[sokey])
             self.add_storage_option(so)
 
-        for mkey in tomlData:
-            if mkey == "metrics":
-                self.__read_metric_map(tomlData[mkey])
+        if "metrics" in tomlData:
+            self.__read_metric_map(tomlData["metrics"])
 
     def __read_metric_map(self, mdict):
         for ckey in mdict:
-            self.__read_metric_values(mdict[ckey], ckey)
-
-    def __read_metric_values(self, cdict, ckey):
-        for bus in cdict:
-            mta = MetricTimeAccumulator.read_toml(cdict[bus])
-            self.add_metric(ckey, bus, mta)
+            cat_mgr = self.get_manager(ckey)
+            if cat_mgr is None:
+                cat_mgr = MetricManager()
+                self._metricMgrs[ckey] = cat_mgr
+            cat_mgr.read_toml(mdict[ckey])
 
     def add_metric(self, category: str, key: str, metric: MetricTimeAccumulator):
         """Adds the supplied metric identified by the supplied key to an existing or
@@ -224,6 +261,10 @@ class Project:
         """Removes all storage options from this project."""
         self.storage_devices.clear();
 
+    def clear_pv(self):
+        """Removes all storage options from this project."""
+        self.pvsystems.clear();
+
     def get_manager(self, category: str) -> MetricManager:
         """Retrieves the metric manager identified by the supplied category.
 
@@ -251,8 +292,8 @@ class Project:
         for storage_configuration in self._storage_configurations():
             yield Configuration(
                 self._grid_model_path,
-                self._metricMgrs,
-                self._pvsystems,
+                self._metrics,
+                self.pvsystems,
                 storage_configuration
             )
 
@@ -284,10 +325,11 @@ class StorageControl:
         Name of the control mode (valid choices are 'constantpf',
         'voltvar', 'voltwatt', 'droop')
     params : dict, optional
-        Control-specific parameters
+        Control-specific parameters.  This dictionary, if provided, should contain
+        keys for control modes and each should be paired with a dictionary of parameters.
     """
 
-    def __init__(self, mode, params):
+    def __init__(self, mode, params: dict = {}):
         self.mode = mode
         self.params = params
 
@@ -306,12 +348,15 @@ class StorageControl:
         str:
             A TOML formatted string with the properties of this instance.
         """
-        ret = f"\n\n[{name}.control-mode]\n"
+        ret = f"\n\n[{name}.control-params]\n"
         ret += f"mode = \'{self.mode}\'\n"
 
-        #ret += f"\n\n[{name}.control-mode.params]\n"
         for key in self.params:
-            ret += f"{key} = {str(self.params[key])}\n"
+            ret += f"\n\n[{name}.control-params.{key}]\n"
+
+            kmap = self.params[key]
+            for pkey in kmap:
+                ret += f"\"{pkey}\" = {str(kmap[pkey])}\n"
 
         return ret
 
@@ -328,7 +373,69 @@ class StorageControl:
             if key == "mode":
                 self.mode = tomlData[key]
             else:
-                self.params[key] = float(tomlData[key])
+                self.params[key] = tomlData[key]
+
+
+    def __check_curve_generic(self, mode: str, curvedesc: str, curvename_x: str, curvename_y: str) -> str:
+
+        if mode not in self.params:
+            return f"Unable to find any control parameters for mode \"{mode}\".  This is an application error."
+
+        pmap = self.params[mode]
+
+        if curvename_x not in pmap:
+            return f"Unable to find control param list named \"{curvename_x}\".  This is an application error."
+
+        if curvename_y not in pmap:
+            return f"Unable to find control param list named \"{curvename_y}\".  This is an application error."
+
+        xc = pmap[curvename_x]
+        yc = pmap[curvename_y]
+
+        if type(xc) is not list:
+            return f"Expected a list of x-values for \"{curvedesc}\". Found value is not a list."
+
+        if type(yc) is not list:
+            return f"Expected a list of y-values for \"{curvedesc}\". Found value is not a list."
+
+        if len(xc) != len(yc):
+            return f"There is a different number of x values ({len(xc)}) and y values ({len(yc)})."
+
+        if len(xc) < 2:
+            return f"There must be at least 2 points defined for a \"{curvedesc}\" control curve."
+
+        # There can be no null values in either list.
+        for item in xc:
+            if item is None:
+                return f"There is at least 1 null x value in the \"{curvedesc}\" control curve.  There can be none."
+
+        for item in yc:
+            if item is None:
+                return f"There is at least 1 null y value in the \"{curvedesc}\" control curve.  There can be none."
+
+        if len(set(xc)) != len(xc):
+            return f"There are duplicate x values in the \"{curvedesc}\" control curve.  They must be unique"
+
+        return None
+
+    def validate(self) -> str:
+        if self.mode == "droop":
+            pass
+        elif self.mode == "voltvar":
+            return self.__check_curve_generic("voltvar", "Volt-Var", "volts", "vars")
+        elif self.mode == "voltwatt":
+            return self.__check_curve_generic("voltwatt", "Volt-Watt", "volts", "watts")
+        elif self.mode == "varwatt":
+            return self.__check_curve_generic("varwatt", "Var-Watt", "vars", "watts")
+        elif self.mode == "vv_vw":
+            vvarmsg = self.__check_curve_generic("vv_vw", "Volt-Var + Volt-Watt", "vv_volts", "vv_vars")
+            if vvarmsg: return vvarmsg
+            return self.__check_curve_generic("vv_vw", "Volt-Var + Volt-Watt", "vw_volts", "vw_watts")
+        if self.mode == "constantpf":
+            pass
+
+        return None
+
 
 class StorageOptions:
     """Set of configuration options available for a specific device.
@@ -379,10 +486,7 @@ class StorageOptions:
         self.min_soc = min_soc
         self.max_soc = max_soc
         self.initial_soc = initial_soc
-        self.control = control or StorageControl(
-            'droop',
-            {'p_droop': 500.0, 'q_droop': -300.0}  # completely arbitrary
-        )
+        self.control = control or StorageControl('droop')
         self.soc_model = soc_model
         self.required = required
 
@@ -394,7 +498,7 @@ class StorageOptions:
         str:
             A TOML formatted string with the properties of this instance.
         """
-        tag = "storage-options." + self.name
+        tag = f"storage-options.\"{self.name}\""
         ret = f"\n\n[{tag}]\n"
         ret += f"phases = {str(self.phases)}\n"
         ret += f"required = {str(self.required).lower()}\n"
@@ -429,8 +533,8 @@ class StorageOptions:
         self.power = set(tomlData["power"])
         self.duration = set(tomlData["duration"])
 
-        if "control-mode" in tomlData:
-            self.control.read_toml(tomlData["control-mode"])
+        if "control-params" in tomlData:
+            self.control.read_toml(tomlData["control-params"])
 
     def add_bus(self, bus: str):
         """Adds the supplied bus name to the list of bus names in this storage option.
@@ -634,6 +738,9 @@ class StorageOptions:
 
         return None
 
+    def validate_controls(self) -> str:
+        return self.control.validate()
+
     def validate_busses(self) -> str:
         """Checks to see that the list of busses stored in this class is valid.
 
@@ -816,7 +923,7 @@ class Configuration:
         return config
 
     def _configure_metrics(self, config):
-        voltage_metrics = self.metrics.get("Voltage")
+        voltage_metrics = self.metrics.get("Bus Voltage")
         if voltage_metrics is not None:
             config["busses_to_measure"] = voltage_metrics.to_dicts()
         return config
