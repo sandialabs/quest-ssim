@@ -545,8 +545,7 @@ class Metric:
         Parameters
         ----------
         raw_value : float
-            The raw value of a metric that is in the process of being
-            normalized.
+            The raw value of a metric that is in the process of being normalized.
         limit : float
             The worst acceptable value for the metric.
         objective : float
@@ -595,8 +594,7 @@ class Metric:
     def _validate_inputs(self, do_assert: bool = True) -> str:
         """Tests the validity/usability of the values stored in this metric.
 
-        This uses the static validate_metric_values method.  See it for
-        details.
+        This uses the static validate_metric_values method.  See it for details.
         
         Parameters
         ----------
@@ -786,14 +784,14 @@ class MetricAccumulator:
         return self._metric.write_toml(category, key)
     
     @staticmethod
-    def read_toml(tomlData) -> MetricAccumulator:
+    def read_toml(tomlData: dict) -> MetricAccumulator:
         """Reads the properties of a metric accumulator class instance from a
            TOML formatted dictionary and creates and returns a new
            MetricAccumulator instance.
         
         Parameters
         ----------
-        tomlData
+        tomlData: dict
             The dictionary that contains the metric accumulator properties from
             which to create a new instance.  The minimum set of keys that must
             be present are only those associated with a Metric.
