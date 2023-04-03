@@ -63,7 +63,7 @@ from kivymd.uix.list import (
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.textfield import MDTextField
 
-import tomli, ProjectResults, Results
+import tomli
 from kivymd.uix.label import MDLabel
 
 from ssim.ui import (
