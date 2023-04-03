@@ -1,12 +1,13 @@
 """Core classes and functions for the user interface."""
 import functools
+import hashlib
 import itertools
 import json
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import tempfile
-from os import path
+from os import path, makedirs
 from pathlib import Path, PurePosixPath
 import pkg_resources
 import subprocess
@@ -89,10 +90,6 @@ class Project:
 
         tdat = tomli.loads(toml)
         self.read_toml(tdat)
-
-    @property
-    def base_dir(self):
-        return Path(os.path.abspath(self.name))
 
     @property
     def base_dir(self):
@@ -292,7 +289,7 @@ class Project:
         for storage_configuration in self._storage_configurations():
             yield Configuration(
                 self._grid_model_path,
-                self._metrics,
+                self._metricMgrs,
                 self.pvsystems,
                 storage_configuration
             )
@@ -838,18 +835,35 @@ class Configuration:
         self.pvsystems = pvsystems
         self.storage = storage_devices
         self.sim_duration = sim_duration
-        self._id = None
         self._grid_path = None
         self._federation_path = None
         self._proc = None
         self._workdir = Path(".")
 
-    def evaluate(self, basepath=None):
+    @property
+    def id(self):
+        h = hashlib.sha1()
+        for ess in self.storage:
+            if ess is None:
+                h.update(b"None")
+            else:
+                h.update(
+                    bytes(
+                        str((ess.name,
+                             ess.bus,
+                             ess.phases,
+                             ess.kwh_rated,
+                             ess.kw_rated,
+                             ess.controller)),
+                        "utf-8"
+                    )
+                )
+        return str(h.hexdigest())
+
+    def evaluate(self, basepath="."):
         """Run the simulator for this configuration"""
-        if basepath is not None:
-            os.makedirs(basepath, exist_ok=True)
-        self._workdir = Path(os.path.abspath(tempfile.mkdtemp(dir=basepath)))
-        self._id = path.basename(self._workdir)
+        self._workdir = Path(basepath).absolute() / self.id
+        makedirs(self._workdir, exist_ok=True)
         self._grid_path = PurePosixPath(self._workdir / "grid.json")
         self._federation_path = self._workdir / "federation.json"
         self._write_configuration()
@@ -929,7 +943,7 @@ class Configuration:
         return config
 
     def _federation_config(self):
-        config = {"name": str(self._id)}
+        config = {"name": str(self.id)}
         self._configure_broker(config)
         self._configure_federates(config)
         return config
@@ -1121,15 +1135,23 @@ class Results:
     def storage_state(self):
         """Returns name of the columns (states specific to storage devices 
         in OpendDSS model) and the time-series data as a pandas dataframe."""
-        storage_states, storage_state_data = self._extract_data("storage_power.csv")
+        storage_state_file = Path(self.config_dir / "storage_power.csv")
+        if storage_state_file.is_file():
+            storage_states, storage_state_data = self._extract_data("storage_power.csv")
+        else:
+            storage_states, storage_state_data = [], []
         return storage_states, storage_state_data
 
     def storage_voltages(self):
         """Returns name of the columns (buses) where storage is placed and 
         voltages at those buses as a pandas dataframe"""
-        storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
-        return storage_buses, storage_buses
-
+        storage_voltages_file = Path(self.config_dir / "storage_voltages.csv")
+        if storage_voltages_file.is_file():
+            storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
+        else:
+            storage_buses, storage_voltages = [], []
+        return storage_buses, storage_voltages
+    
     def metrics_log(self):
         """Returns name of columns of the logged metrics, the accumulated value
         of the metric, and the time-series log as a pandas dataframe."""

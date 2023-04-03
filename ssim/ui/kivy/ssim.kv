@@ -187,6 +187,15 @@
         id: edit
         icon: "pencil"
 
+<ResultsVariableListItemWithCheckbox>:
+    id: results_variable_list
+    markup: True
+
+    LeftCheckBox:
+        id: selected
+        active: False
+        on_release: root.toggle_selection()
+
 <PVListitem>:
 
 
@@ -1053,13 +1062,12 @@
                     text: "View Summary"
                     on_press: root.open_results_summary()
                 Button:
+                    text: "Visualize Results"
+                    on_release: root.open_visualize_results()
+                Button:
                     text: "Resume"
-
                 Button:
-                    text: "Remove Configuration"
-
-                Button:
-                    text: "Go"
+                    text: "Run Selected Configurations"
                     on_press: root.run_configurations()
 
         Button:
@@ -1067,6 +1075,141 @@
             size_hint_y: None
             height: 100
             on_press: root.manager.current = 'ssim'
+
+<ResultsSummary@FloatLayout>:
+
+    BoxLayout:
+        orientation: "horizontal"
+        padding: 5
+
+        BoxLayout:
+            id: summary_canvas
+            size_hint_x: 1.5
+            orientation: "vertical"
+            padding: 5
+            spacing: 5
+
+        BoxLayout:
+            orientation: "vertical"
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+
+                BoxLayout:
+                    orientation: "horizontal"
+
+                    BoxLayout:
+                        orientation: "vertical"
+                        Label:
+                            size_hint_y: 0.1
+                            text: "Select y-Display:"
+                            color: 0,0,0,1
+                        Label:
+                            size_hint_y: 0.1
+                            text: "Aggregate Metric:"
+                            color: 0,0,0,1
+
+                        ScrollView:
+                            size_hint_y: 0.8
+                            canvas.before:
+                                Color:
+                                    rgba: .5, .5, .5, 1
+                                Line:
+                                    width: 2
+                                    rectangle: self.x, self.y, self.width, self.height
+                            MDList:
+                                id: metric_list_summary
+
+                    BoxLayout:
+                        orientation: "vertical"
+                        Label:
+                            size_hint_y: 0.1
+                            text: "Select x-Display:"
+                            color: 0,0,0,1
+                        Label:
+                            size_hint_y: 0.1
+                            text: "Configuration Number:"
+                            color: 0,0,0,1
+
+                        ScrollView:
+                            size_hint_y: 0.8
+                            canvas.before:
+                                Color:
+                                    rgba: .5, .5, .5, 1
+                                Line:
+                                    width: 2
+                                    rectangle: self.x, self.y, self.width, self.height
+                            MDList:
+                                id: config_list_summary
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+                spacing: 5
+                Button:
+                    text: "View Details"
+                    on_press: root.open_results_detail()
+                Button:
+                    text: "Compare"
+                    on_press: root.open_results_compare()
+                Button:
+                    text: "Save Figure"
+
+<ResultsDetail@FloatLayout>:
+
+    MDGridLayout:
+        cols: 2
+        rows: 1
+        adaptive_height: True
+        spacing: 25
+        padding: 12
+        pos_hint: {"center_x": 0.5, "center_y": 0.5}
+
+        BoxLayout:
+            id: detail_plot_canvas
+            size_hint_x: 1.5
+            orientation: "vertical"
+            padding: 5
+            spacing: 5
+            Label:
+                text: "Plot Displayed Here!"
+                color: 0, 0, 0, 1
+
+        BoxLayout:
+            orientation: "vertical"
+            Button:
+                text: "Pass"
+
+<ResultsVisualizeScreen>:
+    name: "results-visualize"
+    BoxLayout:
+        orientation: "vertical"
+
+        MDTabs:
+            id: visualization_screens
+
+            ResultsVisualizationTab:
+                id: summary
+                title: "Summary"
+
+                ResultsSummary:
+                    id: summary_page
+
+            ResultsVisualizationTab:
+                id: details
+                title: "Details"
+
+                ResultsDetail:
+                    id: details_page
+
+        BoxLayout:
+            orientation: "horizontal"
+            Button:
+                text: "back"
+                on_press: root.manager.current = "ssim"
+                size_hint_y: None
+
 
 <ResultsDetailScreen>:
     name: "results-detail"
@@ -1078,36 +1221,33 @@
             padding: 5
 
             BoxLayout:
-                id: compare_canvas
+                id: detail_plot_canvas
                 size_hint_x: 1.5
                 orientation: "vertical"
                 padding: 5
                 spacing: 5
                 Label:
-                    text: "Comparison Plot Displayed Here!"
+                    text: "Plot Will Be Displayed Here!"
                     color: 0, 0, 0, 1
 
             BoxLayout:
+                id: right_bar
                 orientation: "vertical"
                 Label:
                     size_hint_y: 0.1
                     text: "Select Configuration:"
                     color: 0,0,0,1
 
-                ScrollView:
-                    size_hint_y: 0.8
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
-                    MDList:
-                        id: config_list_detail
+                MDRaisedButton:
+                    id: config_list_detail
+                    text: "Select Configuration ... "
+                    size_hint_x: 1.0
+                    # size: self.parent.width, 25
+                    on_release: root.drop_config_menu()
 
                 Label:
                     size_hint_y: 0.1
-                    text: "Select Variable:"
+                    text: "Select Variable(s) to Plot:"
                     color: 0,0,0,1
 
                 ScrollView:
@@ -1121,13 +1261,26 @@
                     MDList:
                         id: variable_list_detail
 
-                Button:
-                    size_hint_y: 0.1
-                    text: "Save Figure"
+                MDTextField:
+                    id: detail_figure_title
+                    hint_text: 'Enter custom title ...'
+
+                MDTextField:
+                    id: detail_figure_ylabel
+                    hint_text: 'Enter custom Y-axis label ...'
 
                 Button:
                     size_hint_y: 0.1
-                    text: "Download CSV"
+                    text: "Update Figure"
+                    on_release: root.update_figure()
+                Button:
+                    size_hint_y: 0.1
+                    text: "Clear Figure"
+                    on_release: root.clear_figure()
+                Button:
+                    size_hint_y: 0.1
+                    text: "Save Figure"
+                    on_release: root.save_figure_options()
 
         Button:
             text: "back"
@@ -1432,3 +1585,36 @@
         id: dismissBtn
         text: 'Dismiss'
         size_hint: 1, 0.2
+
+<SaveFigureDialog>:
+    text_input: text_input
+
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+        Label:
+            text: "Enter filename: "
+            height: 30
+        TextInput:
+            id: text_input
+            size_hint_y: None
+            height: 30
+            multiline: False
+
+        FileChooserListView:
+            id: filechooser
+            path: "."
+            filters: ["*.png"]
+            on_selection: text_input.text = self.selection and self.selection[0] or ''
+
+    BoxLayout:
+        size_hint_y: None
+        height: 30
+        Button:
+            text: "Cancel"
+            on_release: root.cancel()
+
+        Button:
+            text: "Save"
+            on_release: root.save(filechooser.path, text_input.text)
