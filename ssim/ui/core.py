@@ -122,7 +122,8 @@ class Project:
 
     def set_grid_model(self, model_path):
         self._grid_model_path = model_path
-        self._grid_model = DSSModel(model_path)
+        if model_path and path.exists(model_path):
+            self._grid_model = DSSModel(model_path)
 
     def write_toml(self) -> str:
         """Writes the properties of this class instance to a string in TOML

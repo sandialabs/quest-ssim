@@ -2193,7 +2193,12 @@ class SSimScreen(SSimBaseScreen):
         self.dismiss_popup()
 
     def reset_grid_model_label(self):
-        self.ids.grid_model_label.text = "Grid Model: " + self.project._grid_model_path
+        self.ids.grid_model_label.text = "Grid Model: "\
+
+        if self.project._grid_model_path:
+            self.ids.grid_model_label.text += self.project._grid_model_path
+        else:
+            self.ids.grid_model_label.text += "None"
 
     def reset_project_name_field(self):
         self.ids.project_name.text = self.project.name
