@@ -12,16 +12,15 @@ import numpy as np
 
 from math import cos, hypot
 
-import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 from matplotlib.collections import LineCollection
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 
-
 import opendssdirect as dssdirect
 from importlib_resources import files, as_file
 
+from bidict import bidict
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 
 import kivy
@@ -1070,6 +1069,12 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         self.load_all_control_data()
 
+        self._mode_dict = bidict({
+            "droop": "Droop", "voltvar": "Volt-Var", "voltwatt": "Volt-Watt",
+            "varwatt": "Var-Watt", "vv_vw": "Volt-Var & Volt-Watt",
+            "constantpf": "Constant Power Factor"
+            })
+
         if self._options is not None:
             if self._options.control.mode == "droop":
                 self.set_droop_mode()
@@ -1108,8 +1113,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
     def set_mode_label_text(self):
         """ Adds the current device name to the label that informs a user to select
         a current control model."""
-        self.ids.mode_label.text =\
-            f"Select a control mode for this storage asset: [b]{self.device_name}[/b]"
+        txt = f"Select a control mode for this storage asset: [b]{self.device_name}[/b]"
+        if self._options.control.mode:
+            pName = self._mode_dict[self._options.control.mode]
+            txt += f", currently [b]{pName}[/b]"
+        self.ids.mode_label.text = txt
 
     @property
     def device_name(self) -> str:
@@ -1125,6 +1133,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return "" if self._options is None else self._options.name
 
     def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
+        """A callback function used by the control mode tab to notify of tab changes
+
+        This extracts and stores any data that was input on the previous tab and then esnures
+        that the new tab is in the correct state.
+        """
         self.read_all_data()
         if tab_text == "Droop":
             self.set_droop_mode()
@@ -1141,6 +1154,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         else:
             self.set_droop_mode()
 
+        self.set_mode_label_text()
+
     def set_droop_mode(self):
         """Changes the current contorl mode for the current storage option to droop.
 
@@ -1152,7 +1167,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_droop_data(self):
         """Verifies the existence of droop parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         pval, qval = self.verify_droop_params()
         pfield = self.ids.droop_tab_content.ids.p_value
         qfield = self.ids.droop_tab_content.ids.q_value
@@ -1190,7 +1206,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_data(self):
         """Verifies the existence of Volt-Var parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvs, var = self.verify_volt_var_params()
         self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
         self.ids.vv_tab_content.rebuild_plot()
@@ -1225,7 +1242,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_watt_data(self):
         """Verifies the existence of Volt-Watt parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvs, wvs = self.verify_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
         self.ids.vw_tab_content.rebuild_plot()
@@ -1260,7 +1278,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_var_watt_data(self):
         """Verifies the existence of Var-Watt parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvs, wvs = self.verify_var_watt_params()
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
         self.ids.var_watt_tab_content.rebuild_plot()
@@ -1296,7 +1315,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_and_volt_watt_data(self):
         """Verifies the existence of Volt-Var & Volt-Watt parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvvs, vars, vwvs, watts = self.verify_volt_var_and_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
@@ -1338,7 +1358,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_const_power_factor_data(self):
         """Verifies the existence of the Constant Power Factor parameters and then sets the
-        contents of the controls used to display and modify them."""
+        contents of the controls used to display and modify them.
+        """
         cpf = self.verify_const_pf_params()
         pffield = self.ids.const_pf_tab_content.ids.pf_value
         pffield.text = str(cpf)
@@ -1728,9 +1749,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self._selBusses.clear()
         for wid in self.ids.interlist.children:
             if isinstance(wid, BusListItemWithCheckbox):
-                cb = wid.ids.check
-                if cb.active:
-                    self._selBusses.append(cb)
+                if wid.ids.check.active:
+                    self._selBusses.append(wid.ids.check)
 
     def on_kv_post(self, base_widget):
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
@@ -2586,7 +2606,6 @@ class SSimScreen(SSimBaseScreen):
 
     def refresh_grid_plot(self):
         gm = self.project.grid_model
-        plt.clf()
 
         if gm is None:
             self.ids.grid_diagram.display_plot_error(
@@ -2594,6 +2613,7 @@ class SSimScreen(SSimBaseScreen):
             )
             return
 
+        plt.clf()
         lines = gm.line_names
         busses = gm.bus_names
 
@@ -2620,7 +2640,6 @@ class SSimScreen(SSimBaseScreen):
                 seg_busses[self.get_raw_bus_name(bus1)] = bc1
                 seg_busses[self.get_raw_bus_name(bus2)] = bc2
 
-
             line_segments = [self.line_bus_coords(line)  for line in seg_lines]
 
             if len(line_segments) == 0:
@@ -2629,22 +2648,11 @@ class SSimScreen(SSimBaseScreen):
                 )
                 return
 
-            #line_widths = [num_phases(line) for line in lines[:-1]]
-
-            #substation_lat, substation_lon = self._get_substation_location()
-            #distance = functools.partial(self._distance_meters, substation_lat, substation_lon)
-
-            #distances = [min(distance(b1[1], b1[0]), distance(b2[1], b2[0]))  # / 2.0
-            #             for b1, b2 in line_segments]
-
-            #groups = [self.group(dist / max(distances)) for dist in distances]
-
             lc = LineCollection(
                 line_segments, norm=plt.Normalize(1, 3), cmap='tab10'
                 )  # , linewidths=line_widths)
 
             lc.set_capstyle('round')
-            #lc.set_array(np.array(groups))
 
             fig, ax = plt.subplots()
             fig.tight_layout()
@@ -2679,13 +2687,6 @@ class SSimScreen(SSimBaseScreen):
                 loc = seg_busses[bus]
                 ax.annotate(bus, (loc[0], loc[1]))
 
-        #plt.title("Grid Layout")
-
-        #xlocs, xlabels = plt.xticks()
-        #ylocs, ylabels = plt.yticks()
-        #plt.xticks(ticks=xlocs, labels=[])
-        #plt.yticks(ticks=ylocs, labels=[])
-        #plt.grid()
         plt.xticks([])
         plt.yticks([])
 
@@ -2718,7 +2719,6 @@ def _show_no_grid_popup(dismiss_screen=None, manager=None):
             manager.current = dismiss_screen
 
     poppup_content.ids.dismissBtn.bind(on_press=dismiss)
-    # open the popup
     popup.open()
 
 
