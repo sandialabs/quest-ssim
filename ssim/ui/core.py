@@ -1,9 +1,13 @@
 """Core classes and functions for the user interface."""
 import functools
+import hashlib
 import itertools
 import json
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
 import tempfile
-from os import path
+from os import path, makedirs
 from pathlib import Path, PurePosixPath
 import pkg_resources
 import subprocess
@@ -86,6 +90,10 @@ class Project:
 
         tdat = tomli.loads(toml)
         self.read_toml(tdat)
+
+    @property
+    def base_dir(self):
+        return Path(os.path.abspath(self.name))
 
     @property
     def bus_names(self):
@@ -282,7 +290,7 @@ class Project:
         for storage_configuration in self._storage_configurations():
             yield Configuration(
                 self._grid_model_path,
-                self._metrics,
+                self._metricMgrs,
                 self.pvsystems,
                 storage_configuration
             )
@@ -828,20 +836,40 @@ class Configuration:
         self.pvsystems = pvsystems
         self.storage = storage_devices
         self.sim_duration = sim_duration
-        self._id = None
         self._grid_path = None
         self._federation_path = None
         self._proc = None
         self._workdir = Path(".")
 
-    def evaluate(self, basepath=None):
+    @property
+    def id(self):
+        h = hashlib.sha1()
+        for ess in self.storage:
+            if ess is None:
+                h.update(b"None")
+            else:
+                h.update(
+                    bytes(
+                        str((ess.name,
+                             ess.bus,
+                             ess.phases,
+                             ess.kwh_rated,
+                             ess.kw_rated,
+                             ess.controller)),
+                        "utf-8"
+                    )
+                )
+        return str(h.hexdigest())
+
+    def evaluate(self, basepath="."):
         """Run the simulator for this configuration"""
-        self._workdir = Path(tempfile.mkdtemp(dir=basepath))
-        self._id = path.basename(self._workdir)
+        self._workdir = Path(basepath).absolute() / self.id
+        makedirs(self._workdir, exist_ok=True)
         self._grid_path = PurePosixPath(self._workdir / "grid.json")
         self._federation_path = self._workdir / "federation.json"
         self._write_configuration()
         self._run()
+        self._mark_done()
         return self._load_results()
 
     def wait(self):
@@ -862,6 +890,9 @@ class Configuration:
             ["helics", "run", "--path", str(self._federation_path)],
             cwd=self._workdir
         )
+
+    def _mark_done(self):
+        (self._workdir / "evaluated").touch()
 
     def _load_results(self):
         # TODO load the output files/data into a results object (maybe
@@ -913,7 +944,7 @@ class Configuration:
         return config
 
     def _federation_config(self):
-        config = {"name": str(self._id)}
+        config = {"name": str(self.id)}
         self._configure_broker(config)
         self._configure_federates(config)
         return config
@@ -998,6 +1029,62 @@ def _get_federate_config(federate):
     )
 
 
+class ProjectResults:
+    """Container of all results for a project.
+
+    Parameters
+    ----------
+    project : Project
+       Project that the results belong to.
+    """
+
+    def __init__(self, project):
+        self.base_dir = project.base_dir
+
+    def results(self):
+        # Iterate over the resulted configurations and yield iterator of Results
+        for configuration_dir in self._resulted_configurations():
+            yield Results(self.base_dir / configuration_dir)
+
+    def _resulted_configurations(self):
+        # results from each configuration has its own directory
+        for item in os.listdir(self.base_dir):
+            # check to see if the directory is from a configuration
+            if not self._is_configuration_dir(item):
+                continue
+            # check to see if the configuration has been completely evaluated
+            if self._is_evaluated(item):
+                yield item
+
+    def _is_configuration_dir(self, item):
+        if item in {'.', '..'}:
+            return False
+        return (
+            os.path.exists(self.base_dir / item / "federation.json")
+            and os.path.exists(self.base_dir / item / "grid.json")
+        )
+
+    def _is_evaluated(self, item):
+        return os.path.exists(self.base_dir / item / "evaluated")
+
+    # TO DO: Add methods for the plotting function
+    def plot_metrics(self):
+        for result in self.results():
+            col_names, metric_value, df_metrics = result.metrics_log()
+            return col_names, metric_value, df_metrics
+
+    def plot_accumulated_metrics(self):
+        config_count = 0
+        for result in self.results():
+            _, metric_value, _ = result.metrics_log()
+            fig = plt.figure()
+            plt.plot(config_count, metric_value)
+            plt.xlabel('Configuration ID')
+            plt.ylabel('Accumated Metric')
+            plt.title('Comparison of Metric for Different Configurations')
+            config_count += 1
+            return fig
+
 _OPENDSS_ILLEGAL_CHARACTERS = "\t\n .="
 
 
@@ -1015,5 +1102,66 @@ def is_valid_opendss_name(name: str) -> bool:
 class Results:
     """Results from simulating a specific configuration."""
 
-    def __init__(self):
-        pass
+    def __init__(self, config_dir):
+        self.config_dir = config_dir
+
+    def _extract_data(self, csv_file):
+        df_extracted_data = pd.read_csv(self.config_dir / csv_file)
+        # extract column names
+        col_names = list(df_extracted_data.columns)
+        # extract all datapoints as a pandas dataframe
+        num_rows = df_extracted_data.shape[0]
+        data = df_extracted_data.iloc[0:num_rows-1]
+        return col_names, data
+
+    def bus_voltages(self):
+        """Returns name of columns (bus names) and the time-series bus 
+        voltages as a pandas dataframe."""
+        bus_names, bus_voltages = self._extract_data("bus_voltage.csv")
+        return bus_names, bus_voltages
+    
+    def grid_state(self):
+        """Returns name of columns (grid states) and the time-series data
+        as a pandas dataframe."""
+        states, state_data = self._extract_data("grid_state.csv")
+        return states, state_data
+
+    def pde_loading(self):
+        """Returns name of the columns (power delivery elements with 
+        the OpenDSS model) and the loading of the power delievery elements
+        as a pandas dataframe."""
+        pde_elements, pde_loading = self._extract_data("pde_loading.csv")
+        return pde_elements, pde_loading
+
+    def storage_state(self):
+        """Returns name of the columns (states specific to storage devices 
+        in OpendDSS model) and the time-series data as a pandas dataframe."""
+        storage_state_file = Path(self.config_dir / "storage_power.csv")
+        if storage_state_file.is_file():
+            storage_states, storage_state_data = self._extract_data("storage_power.csv")
+        else:
+            storage_states, storage_state_data = [], []
+        return storage_states, storage_state_data
+
+    def storage_voltages(self):
+        """Returns name of the columns (buses) where storage is placed and 
+        voltages at those buses as a pandas dataframe"""
+        storage_voltages_file = Path(self.config_dir / "storage_voltages.csv")
+        if storage_voltages_file.is_file():
+            storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
+        else:
+            storage_buses, storage_voltages = [], []
+        return storage_buses, storage_voltages
+    
+    def metrics_log(self):
+        """Returns name of columns of the logged metrics, the accumulated value
+        of the metric, and the time-series log as a pandas dataframe."""
+        df_metrics = pd.read_csv(self.config_dir / "metric_log.csv")
+        # extract column names
+        col_names = list(df_metrics.columns)
+        num_rows = df_metrics.shape[0]
+        # extract accumulated value of the metric from the last row
+        accumulated_metric = df_metrics.iloc[-1:].loc[num_rows - 1,'time']
+        # extract all the datapoints as a pandas dataframe
+        data = df_metrics.iloc[0 : num_rows-1]
+        return col_names, accumulated_metric, data

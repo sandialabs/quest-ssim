@@ -3,7 +3,9 @@ from contextlib import ExitStack
 import itertools
 import os
 import re
+import pandas as pd
 from threading import Thread
+import matplotlib.pyplot as plt
 from typing import List
 
 import numpy as np
@@ -29,6 +31,7 @@ from kivy.logger import Logger, LOG_LEVELS
 from kivy.uix.floatlayout import FloatLayout
 from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, TwoLineAvatarIconListItem, OneLineAvatarIconListItem
 from kivy.uix.boxlayout import BoxLayout
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.properties import ObjectProperty, StringProperty, NumericProperty
 from kivy.uix.popup import Popup
@@ -45,6 +48,7 @@ from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
+from kivymd.uix.tab import MDTabsBase
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -57,12 +61,16 @@ from kivymd.uix.list import (
 
 from kivymd.uix.selectioncontrol import MDCheckbox
 from kivymd.uix.textfield import MDTextField
+
+import tomli
 from kivymd.uix.label import MDLabel
 
 from ssim.ui import (
     Configuration,
     Project,
     StorageOptions,
+    ProjectResults,
+    Results,
     is_valid_opendss_name
 )
 
@@ -196,6 +204,14 @@ class SSimApp(MDApp):
             MetricConfigurationScreen(self.project, name="metric-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
+        # screen_manager.add_widget(
+        #     ResultsVisualizeScreen(self.project, name="results-visualize"))
+        screen_manager.add_widget(
+            ResultsSummaryScreen(self.project, name="results-summary"))
+        screen_manager.add_widget(
+            ResultsCompareScreen(self.project, name="results-compare"))
+        screen_manager.add_widget(
+            ResultsDetailScreen(self.project, name="results-detail"))
         screen_manager.current = "ssim"
 
         return screen_manager
@@ -215,6 +231,7 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
+        self.project_results = ProjectResults(self.project)
         super().__init__(*args, **kwargs)
 
 
@@ -324,7 +341,8 @@ class TextFieldMultiFloat(MDTextField):
 
 
 class TextFieldPositiveFloat(MDTextField):
-    POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
+
+    POSITIVE_FLOAT = re.compile(r"((\d+(\.\d*)?)|(\d*(\.\d+)))$")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -707,7 +725,7 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     index: int = -1
 
     last_text: str = ""
-        
+
     @property
     def x_value(self):
         """Returns the current contents of the x value field of this row.
@@ -1651,6 +1669,29 @@ class PVListItem(TwoLineAvatarIconListItem):
         self._der_screen = der_screen
 
 
+class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
+    def __init__(self, variable_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # self.config = config
+        self.text = variable_name
+
+    def toggle_selection(self):
+        self.parent.parent.parent.parent.parent.parent.update_selected_variables()
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
+
+class VariableListItem(TwoLineAvatarIconListItem):
+    def __init__(self, pk=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pk = pk
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
 class LoadConfigurationScreen(SSimBaseScreen):
     pass
 
@@ -1689,7 +1730,11 @@ class RightCheckbox(IRightBodyTouch, MDCheckbox):
 
 
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
-    pass
+    def toggle_configuration_check(self, check):
+        print(check)
+        if check.active:
+            print('Configuration checked')
+        print("selection made")
 
 
 class MetricConfigurationScreen(SSimBaseScreen):
@@ -2069,7 +2114,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # store all the project configurations into a list
         for config in self.project.configurations():
             self.configurations.append(config)
-            print(config._id)
+            print(config.id)
 
         # populate the UI with the list of configurations
         ctr = 1
@@ -2115,13 +2160,221 @@ class RunSimulationScreen(SSimBaseScreen):
         # run all the configurations
         for config in self.selected_configurations:
             print(config)
-            config.evaluate()
+            config.evaluate(basepath=self.project.base_dir)
             config.wait()
 
     def run_configurations(self):
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
 
+    def open_results_summary(self):
+        self.manager.current = "results-summary"
+
+    def open_visualize_results(self):
+        self.manager.current = "results-visualize"
+
+class ResultsVisualizeScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.project_results = ProjectResults(self.project)
+
+
+class ResultsSummaryScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.project_results = ProjectResults(self.project)
+
+    def on_enter(self):
+        self.draw_canvas()
+        for result in self.project_results.results():
+            print(result.config_dir)
+
+    def draw_canvas(self):
+        # sample plot for testing purposes
+        # TO DO: develop the backend for creating these plots
+        # x_data = [1, 2, 3, 4, 5]
+        # y_data = [1, 4, 9, 15, 25]
+        # fig, ax = plt.subplots()
+        # ax.plot(x_data, y_data)
+        # ax.set_xlabel('Configuration #')
+        # ax.set_ylabel('Aggregate Metics')
+
+        accumulated_metric_fig = self.project_results.plot_accumulated_metrics()
+
+        # Add Kivy widget to the canvas
+        self.ids.summary_canvas.clear_widgets()
+        self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
+
+    def open_results_compare(self):
+        self.manager.current = "results-compare"
+
+    def open_results_detail(self):
+        self.manager.current = "results-detail"
+
+
+class ResultsCompareScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class ResultsDetailScreen(SSimBaseScreen):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.configurations: List[Configuration] = []
+        self.selected_variables= {}
+        self.variables = {}
+        self.current_configuration = None
+        self.list_items = []
+        self.selected_list_items = {}
+        self.variable_data = pd.DataFrame()
+        self.figure = None
+
+    def on_enter(self):
+        # populated `selected_list_items` assuming no selection from dropdown
+        # menu
+        # TO DO: Replace with evaluated configurations
+        num_configs = len(list(self.project.configurations()))
+        for ctr in range(num_configs):
+            self.selected_list_items['Configuration ' + str(ctr+1)] = []
+
+    def dismiss_popup(self):
+        self._popup.dismiss()
+
+    def _create_figure(self):
+        fig = plt.figure()
+        plt.clf()
+        project_results = self.project_results.results()
+        ctr = 1
+        for result in project_results:
+            _, data = result.storage_state()
+            config_key = 'Configuration ' + str(ctr)
+            # columns to plot
+            columns_to_plot = self.selected_list_items[config_key]
+            # select subset of data based on columns_to_plot
+            selected_data = data[columns_to_plot]
+            x_data = data.loc[:, 'time']
+            # add the selected columns to plot
+            for column in selected_data.keys():
+                plt.plot(x_data, selected_data[column], label=config_key+'-'+column)
+            ctr += 1
+
+        plt.xlabel('time')
+        if self.ids.detail_figure_ylabel.text is not None:
+            plt.ylabel(self.ids.detail_figure_ylabel.text)
+        plt.legend()
+        if self.ids.detail_figure_title is not None:
+            plt.title(self.ids.detail_figure_title.text)
+        else:
+            plt.title('Detail Plots')
+
+        return fig
+
+    def update_figure(self):
+        self.figure = self._create_figure()
+        Logger.debug("Figure update command issued from GUI ...")
+        Logger.debug(self.ids.detail_figure_title.text)
+        self.ids.detail_plot_canvas.clear_widgets()
+        self.ids.detail_plot_canvas.add_widget(
+            FigureCanvasKivyAgg(self.figure)
+        )
+
+    def save_figure_options(self):
+        '''Saves the current active figure.'''
+        chooser = SaveFigureDialog(
+            save=self.save_figure, cancel=self.dismiss_popup
+        )
+
+        self._popup = Popup(title="save figure options", content=chooser)
+        self._popup.open()
+
+    def save_figure(self, path, filename):
+        Logger.debug("Saving figure ... ")
+        Logger.debug(filename)
+        self.figure.savefig(filename+ '.png', dpi=300)
+
+    def clear_figure(self):
+        self.ids.detail_plot_canvas.clear_widgets()
+
+    def drop_config_menu(self):
+        for config in self.project.configurations():
+            self.configurations.append(config)
+
+        # TO DO: Replace with evaluated configurations
+        num_configs = len(list(self.project.configurations()))
+        # num_configs = self.project.num_configurations()
+
+        menu_items = []
+        for ctr in range(num_configs):
+            display_text = "Configuration " + str(ctr+1)
+            menu_items.append({
+                "viewclass": "OneLineListItem",
+                "text" : display_text,
+                "on_release": lambda x=display_text: self.set_config(x)
+            })
+
+        self.menu = MDDropdownMenu(
+            caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+        )
+        self.menu.open()
+
+    def update_selected_variables(self):
+        print('Update selected variables called!')
+
+        # self.selected_list_items = {}
+        selected_items = []
+        for variable in self.ids.variable_list_detail.children:
+            if variable.selected:
+                selected_items.append(variable.text)
+
+        self.selected_list_items[self.current_configuration] = selected_items
+
+        print(self.current_configuration)
+        print(self.selected_list_items)
+
+
+    def set_config(self, value):
+
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>")
+        print(value)
+
+        self.current_configuration = value
+
+        print(self.selected_variables)
+        # read the current selected configuration
+        self.ids.config_list_detail.text = value
+
+        # extract all results from all the configutations
+        project_results = self.project_results.results()
+        # obtain the index for the current selected configuration
+        # TODO: setup a proper mapping system between Results and Configuration
+        current_result_index = int(value[-1]) - 1
+        # extract the `current_result` based on selection from drop down menu
+        current_result = next(itertools.islice(project_results, current_result_index, None))
+
+        # extract the data
+        self.list_items, self.variable_data = current_result.storage_state()
+
+        self.x_data = list(self.variable_data.loc[:, 'time'])
+
+        self.ids.variable_list_detail.clear_widgets()
+        # add the list of variables in the selected configuration
+        # into the MDList
+
+        Logger.debug('>>> Current selection records: ')
+        Logger.debug(self.selected_list_items)
+
+        for item in self.list_items:
+            # do not add 'time' to the variable list
+            if item == 'time':
+                continue
+            else:
+                self.ids.variable_list_detail.add_widget(
+                    ResultsVariableListItemWithCheckbox(variable_name = item)
+                )
+
+        # close the drop-down menu
+        self.menu.dismiss()
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
@@ -2171,6 +2424,11 @@ class SaveSSIMTOMLDialog(FloatLayout):
         else:
             self.ids.filenamefield.text = os.path.basename(sel)
 
+
+class SaveFigureDialog(FloatLayout):
+    save = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+    text_input = ObjectProperty(None)
 
 class SSimScreen(SSimBaseScreen):
 
@@ -2442,6 +2700,9 @@ class SSimScreen(SSimBaseScreen):
 
         dg = self.ids.grid_diagram
         dg.reset_plot()
+
+# class ResultsVisualizationTab(FloatLayout, MDTabsBase):
+#     pass
 
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):
