@@ -122,8 +122,7 @@ def get_default_improvement_type(limit: float, objective: float) -> ImprovementT
 
 
 class Metric:
-    """A class used to normalize metric values for subsequence combination and
-       comparison.
+    """A class used to normalize metric values for subsequence combination and comparison.
 
     Parameters
     ----------
@@ -139,16 +138,16 @@ class Metric:
         The desired sense of the metric such as Minimize or Maximize.
 
         If this input is not provided, then a default is determined based on
-        the limit and objective.
+        the limits and objective.
     a : float
         The parameter that controls the curvature of the normalization function
-        below the limit (on the bad side of the limit).  It is recommended that
+        beyond a limit (on the bad side of a limit).  It is recommended that
         you use the default value.
     b : float
-        The parameter that controls the slope of the normalization curve at the
+        The parameter that controls the slope of the normalization curve at a
         limit.  It is recommended that you use the default value.
     c : float
-        Sets the normalized value (y value) at the limit.  It is recommended
+        Sets the normalized value (y value) at a limit.  It is recommended
         that you use the default value.
     g : float
         The parameter that controls the curvature of the normalization function
@@ -238,8 +237,8 @@ class Metric:
         tomlData: dict
             The dictionary that contains the metric properties from which to
             create a new metric instance.  The minimum set of keys that must
-            be present are "limit", "objective", and "sense".  "sense" must
-            point to something that can be parsed to an ImprovementType
+            be present are "lower_limit", "upper_limit", "objective", and "sense".
+            "sense" must point to something that can be parsed to an ImprovementType
             enumeration value.
 
         Returns
@@ -255,8 +254,7 @@ class Metric:
         return Metric(lower_limit, upper_limit, objective, impType)
     
     def write_toml(self, category, key) -> str:
-        """Writes the properties of this class instance to a string in TOML
-           format.
+        """Writes the properties of this class instance to a string in TOML format.
         
         Parameters
         ----------
@@ -323,7 +321,7 @@ class Metric:
         -------
         float:
             A normalized value based on the supplied raw value, this metrics
-            limit and objective, and the other curve parameters of this metric.
+            limit values, the objective, and the other curve parameters of this metric.
         """
         if self._imp_type == ImprovementType.Minimize:
             return self._normalize_for_minimization(value)
@@ -346,7 +344,7 @@ class Metric:
         -------
         float:
             A normalized value based on the supplied raw value, this metrics
-            limit and objective, and the other curve parameters of this metric.
+            lower limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for minimization.
         """
         return self.__do_max_norm__(-value, -self._lower_limit, -self._objective)
@@ -364,7 +362,7 @@ class Metric:
         -------
         float:
             A normalized value based on the supplied raw value, this metrics
-            limit and objective, and the other curve parameters of this metric.
+            upper limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for maximization.
         """
         return self.__do_max_norm__(value, self._upper_limit, self._objective)
@@ -392,41 +390,40 @@ class Metric:
 
     def _violated(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
-           that falls in the region of the space below (or worse than) the limit.
+           that falls in the region of the space beyond (worse than) a limit.
 
         Parameters
         ----------
         norm_val : float
             The metric value that has already undergone pre-normalization that
             is to be normalized.  It must have been a metric value in the
-            violated region (worse than the limit).
+            violated region (worse than a limit).
 
         Returns
         -------
         float:
-            A normalized value based on the supplied pre-normalized value, this
-            metrics limit and objective, and the other curve parameters of this
-            metric.
+            A normalized value based on the supplied pre-normalized value
+            and the other curve parameters of this metric.
         """
         return -(self._a * norm_val * norm_val) / 2.0 + \
             self._b * norm_val + self._c
 
     def _feasible(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
-           that falls in the region between the limit and the objective.
+           that falls in one of the regions between a limit and the objective.
 
         Parameters
         ----------
         norm_val : float
             The metric value that has already undergone pre-normalization that
-            is to be normalized.  It must have been a metric value in the
-            region between the limit and the objective.
+            is to be normalized.  It must have been a metric value in one of the
+            regions between a limit and the objective.
 
         Returns
         -------
         float:
             A normalized value based on the supplied pre-normalized value, this
-            metrics limit and objective, and the other curve parameters of this
+            metrics limits and objective, and the other curve parameters of this
             metric.
         """
         d = self._d()
@@ -434,21 +431,20 @@ class Metric:
 
     def _super_optimal(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
-           that falls in the region above the objective.
+           that falls in the region beyond (better than) the objective.
 
         Parameters
         ----------
         norm_val : float
             The metric value that has already undergone pre-normalization that
             is to be normalized.  It must have been a metric value in the
-            region above the objective.
+            region beyond (better than) the objective.
 
         Returns
         -------
         float:
-            A normalized value based on the supplied pre-normalized value, this
-            metrics limit and objective, and the other curve parameters of this
-            metric.
+            A normalized value based on the supplied pre-normalized value and the
+            other curve parameters of this metric.
         """
         h = self._h(self._d())
         return self._g * math.sqrt(norm_val + h - 1.0) - self._phi(h) + 1.0
