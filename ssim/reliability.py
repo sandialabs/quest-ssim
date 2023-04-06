@@ -413,7 +413,7 @@ class GridReliabilityModel:
                 f"line.{line}": self._make_line_reliability_model()
                 for line, properties in lines if not properties.IsSwitch
             }
-        self._switchs = {}
+        self._switches = {}
         if self._switch_reliability_enabled:
             self._switches = {
                 f"line.{switch}": self._make_switch_reliability_model(switch)
@@ -512,6 +512,8 @@ class GridReliabilityModel:
         return rm
 
     def peek(self):
+        if self._num_models == 0:
+            return np.inf
         return min(
             model.next_update() for model in self.all_models()
         )
@@ -529,12 +531,18 @@ class GridReliabilityModel:
             self._generators.items()
         )
 
+    @property
+    def _num_models(self):
+        return len(list(self.all_models()))
+
     def all_models(self):
         return itertools.chain(
             model for _, model in self._all_components()
         )
 
     def update(self, time, generator_status):
+        if self._num_models == 0:
+            return
         for model in itertools.chain(self._lines.values(),
                                      self._switches.values()):
             model.update(time)
