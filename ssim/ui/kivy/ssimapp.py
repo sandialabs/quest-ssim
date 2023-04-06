@@ -832,6 +832,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     @staticmethod
     def __try_sort(xl: list, yl: list) -> (list, list):
+        if len(xl) == 0 and len(yl) == 0:
+            return [], []
         try:
             return (list(t) for t in zip(*sorted(zip(xl, yl))))
         except:
