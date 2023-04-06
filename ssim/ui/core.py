@@ -288,11 +288,16 @@ class Project:
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
         for storage_configuration in self._storage_configurations():
+            storage_devices, inv_controls = zip(*storage_configuration)
+            inv_controls = list(
+                filter(lambda ic: ic is not None, inv_controls)
+            )
             yield Configuration(
                 self._grid_model_path,
                 self._metricMgrs,
                 self.pvsystems,
-                storage_configuration,
+                storage_devices,
+                inv_controls,
                 reliability=self.reliability_params
             )
 
@@ -325,14 +330,106 @@ class StorageControl:
     ----------
     mode : str
         Name of the control mode (valid choices are 'constantpf',
-        'voltvar', 'voltwatt', 'droop')
+        'voltvar', 'varwatt', 'vv_vw', or 'droop')
     params : dict, optional
         Control-specific parameters
     """
 
+    _INVERTER_CONTROLS = {'voltvar', 'voltwatt', 'varwatt', 'vv_vw',
+                          'constantpf'}
+
+    _EXTERNAL_CONTROLS = {'droop'}
+
+    _CURVE_NAME_X = {
+        "voltvar": ("volt_vals",),
+        "voltwatt": ("volt_vals",),
+        "varwatt": ("var_vals",),
+        "vv_vw": ("vv_volt_vals", "vw_volt_vals")
+    }
+
+    _CURVE_NAME_Y = {
+        "voltvar": ("var_vals",),
+        "voltwatt": ("watt_vals",),
+        "varwatt": ("watt_vals",),
+        "vv_vw": ("var_vals", "watt_vals")
+    }
+
+    _CURVE_DESC = {
+        "voltvar": "Volt-Var",
+        "voltwatt": "Volt-Watt",
+        "varwatt": "Var-Watt",
+        "vv_vw": "Volt-Var + Var-Watt"
+    }
+
     def __init__(self, mode, params):
         self.mode = mode
         self.params = params
+
+    @property
+    def is_external(self):
+        return self.mode not in StorageControl._INVERTER_CONTROLS
+
+    def get_invcontrol(self, storage_name):
+        """Return a specification of an InvControl implementing the control.
+
+        Parameters
+        ----------
+        storage_name : str
+            Name of the storage device the inverter control is to be
+            applied to.
+
+        Returns
+        -------
+        grid.InvControlSpecification
+
+        Raises
+        ------
+        ValueError
+            If the control mode cannot be implemented by an inverter
+            control.
+
+        """
+        if self.mode not in StorageControl._INVERTER_CONTROLS:
+            raise ValueError(
+                "Cannot convert external control to inverter control."
+            )
+        curve1, curve2 = self._active_curves()
+        return grid.InvControlSpecification(
+            name=f"{storage_name}_control",
+            der_list=[f"Storage.{storage_name}"],
+            inv_control_mode=self.mode,
+            function_curve_1=curve1,
+            function_curve_2=curve2,
+        )
+
+    def _active_curves(self):
+        x_names = StorageControl._CURVE_NAME_X[self.mode]
+        y_names = StorageControl._CURVE_NAME_Y[self.mode]
+        curves = tuple(
+            tuple(zip(self.params[x], self.params[y]))
+            for x, y in zip(x_names, y_names)
+        )
+        return curves[0], curves[1] if len(curves) == 2 else None
+
+    @property
+    def active_params(self):
+        """Return only the params relevant to the active mode.
+
+        Returns
+        -------
+        dict
+            Dictionary of parameters thar are relevant the the
+            currently active control mode.
+        """
+        if self.mode in StorageControl._INVERTER_CONTROLS:
+            return {}
+        # This is trivial for now, since we only use droop or
+        # invcontrol; however, in the future it will need to be
+        # rewritten to handle additional control modes.
+        return {
+            "p_droop": self.params["p_droop"],
+            "q_droop": self.params["q_droop"]
+        }
 
     def write_toml(self, name: str)->str:
         """Writes the properties of this class instance to a string in TOML
@@ -373,115 +470,51 @@ class StorageControl:
             else:
                 self.params[key] = tomlData[key]
 
-    def __check_curve_generic(self, curvedesc: str, curvename_x: str, curvename_y: str) -> str:
-
-        if curvename_x not in self.params:
-            return f"Unable to find control param list named \"{curvename_x}\".  This is an application error."
-
-        if curvename_y not in self.params:
-            return f"Unable to find control param list named \"{curvename_y}\".  This is an application error."
-
-        xc = self.params[curvename_x]
-        yc = self.params[curvename_y]
-
-        if type(xc) is not list:
-            return f"Expected a list of x-values for \"{curvedesc}\". Found value is not a list."
-
-        if type(yc) is not list:
-            return f"Expected a list of y-values for \"{curvedesc}\". Found value is not a list."
-
-        if len(xc) != len(yc):
-            return f"There is a different number of x values ({len(xc)}) and y values ({len(yc)})."
-
-        if len(xc) < 2:
-            return f"There must be at least 2 points defined for a \"{curvedesc}\" control curve."
-
-        # There can be no null values in either list.
-        for item in xc:
-            if item is None:
-                return f"There is at least 1 null x value in the \"{curvedesc}\" control curve.  There can be none."
-
-        for item in yc:
-            if item is None:
-                return f"There is at least 1 null y value in the \"{curvedesc}\" control curve.  There can be none."
-
-        if len(set(xc)) != len(xc):
-            return f"There are duplicate x values in the \"{curvedesc}\" control curve.  They must be unique"
-
-        return None
-
     def validate(self) -> str:
-        if self.mode == "droop":
-            pass
-        elif self.mode == "voltvar":
-            return self.__check_curve_generic("Volt-Var", "volt_vals", "var_vals")
-        elif self.mode == "voltwatt":
-            return self.__check_curve_generic("Volt-Watt", "volt_vals", "watt_vals")
-        elif self.mode == "varwatt":
-            return self.__check_curve_generic("Var-Watt", "var_vals", "watt_vals")
-        elif self.mode == "vv_vw":
-            vvarmsg = self.__check_curve_generic("Volt-Var + Var-Watt", "vv_volt_vals", "var_vals")
-            if vvarmsg: return vvarmsg
-            return self.__check_curve_generic("Volt-Var + Var-Watt", "vw_volt_vals", "watt_vals")
-        if self.mode == "constantpf":
-            pass
+        if self.mode not in StorageControl._INVERTER_CONTROLS:
+            return None
+        return self._check_curves()
 
-        return None
+    def _check_curves(self):
+        names_x = StorageControl._CURVE_NAME_X[self.mode]
+        names_y = StorageControl._CURVE_NAME_Y[self.mode]
+        curvedesc = StorageControl._CURVE_DESC[self.mode]
+        for name_x, name_y in zip(names_x, names_y):
+            if name_x not in self.params:
+                return (f'Unable to find control param list named "{name_x}".'
+                        '  This is an application error.')
+            if name_y not in self.params:
+                return (f'Unable to find control param list named "{name_y}".'
+                        '  This is an application error.')
+            xs = self.params[name_x]
+            ys = self.params[name_y]
+            error = self._check_curve(curvedesc, xs, ys)
+            if error is not None:
+                return error
 
-    def __check_curve_generic(self, curvedesc: str, curvename_x: str, curvename_y: str) -> str:
+    def _check_curve(self, curvedesc, xs, ys):
+        if not isinstance(xs, list):
+            return (f'Expected a list of x-values for "{curvedesc}".'
+                    ' Found value is not a list')
+        if not isinstance(ys, list):
+            return (f'Expected a list of y-values for "{curvedesc}".'
+                    ' Found value is not a list')
+        if len(xs) != len(ys):
+            return (f"There is a different number of x-values ({len(xs)})"
+                    f" and y-values ({len(ys)})")
+        if len(xs) < 2:
+            return ('There must be at least 2 points defined for '
+                    f' a "{curvedesc}" control curve')
+        if any(x is None for x in xs):
+            return (f'There is at least 1 null x value in the "{curvedesc}" '
+                    'control curve.  There can be none.')
+        if any(y is None for y in ys):
+            return (f'There is at least 1 null y value in the "{curvedesc}" '
+                    'control curve.  There can be none.')
+        if len(set(xs)) != len(xs):
+            return (f'There are duplicate x values in the "{curvedesc}" '
+                    'control curve.  They must be unique')
 
-        if curvename_x not in self.params:
-            return f"Unable to find control param list named \"{curvename_x}\".  This is an application error."
-
-        if curvename_y not in self.params:
-            return f"Unable to find control param list named \"{curvename_y}\".  This is an application error."
-
-        xc = self.params[curvename_x]
-        yc = self.params[curvename_y]
-
-        if type(xc) is not list:
-            return f"Expected a list of x-values for \"{curvedesc}\". Found value is not a list."
-
-        if type(yc) is not list:
-            return f"Expected a list of y-values for \"{curvedesc}\". Found value is not a list."
-
-        if len(xc) != len(yc):
-            return f"There is a different number of x values ({len(xc)}) and y values ({len(yc)})."
-
-        if len(xc) < 2:
-            return f"There must be at least 2 points defined for a \"{curvedesc}\" control curve."
-
-        # There can be no null values in either list.
-        for item in xc:
-            if item is None:
-                return f"There is at least 1 null x value in the \"{curvedesc}\" control curve.  There can be none."
-
-        for item in yc:
-            if item is None:
-                return f"There is at least 1 null y value in the \"{curvedesc}\" control curve.  There can be none."
-
-        if len(set(xc)) != len(xc):
-            return f"There are duplicate x values in the \"{curvedesc}\" control curve.  They must be unique"
-
-        return None
-
-    def validate(self) -> str:
-        if self.mode == "droop":
-            pass
-        elif self.mode == "voltvar":
-            return self.__check_curve_generic("Volt-Var", "volt_vals", "var_vals")
-        elif self.mode == "voltwatt":
-            return self.__check_curve_generic("Volt-Watt", "volt_vals", "watt_vals")
-        elif self.mode == "varwatt":
-            return self.__check_curve_generic("Var-Watt", "var_vals", "watt_vals")
-        elif self.mode == "vv_vw":
-            vvarmsg = self.__check_curve_generic("Volt-Var + Var-Watt", "vv_volt_vals", "var_vals")
-            if vvarmsg: return vvarmsg
-            return self.__check_curve_generic("Volt-Var + Var-Watt", "vw_volt_vals", "watt_vals")
-        if self.mode == "constantpf":
-            pass
-
-        return None
 
 class StorageOptions:
     """Set of configuration options available for a specific device.
@@ -824,23 +857,40 @@ class StorageOptions:
             return cfgs
         return cfgs + 1
 
+    @property
+    def _inverter_control(self):
+        if self.control.is_external:
+            return None
+        return self.control.get_invcontrol(self.name)
+
     def configurations(self):
-        """Return a generator that yields all possible configurations."""
+        """Return a generator that yields all possible configurations.
+
+        Yields tuples where the first element is a
+        :py:class:`grid.StorageSpecification` and the second element
+        is a :py:class:`grid.InvControlSpecification`. If no inverter
+        control is defined then the sencond element will be None.
+
+        """
+        inv_control = self._inverter_control
         for bus in self.busses:
             for power in self.power:
                 for duration in self.duration:
                     # TODO need to add other parameters (e.g. min/max soc)
-                    yield grid.StorageSpecification(
-                        self.name,
-                        bus,
-                        duration * power,
-                        power,
-                        self.control.mode,
-                        soc=self.initial_soc,
-                        controller_params=self.control.params
+                    yield (
+                        grid.StorageSpecification(
+                            self.name,
+                            bus,
+                            duration * power,
+                            power,
+                            self.control.mode if inv_control is None else None,
+                            soc=self.initial_soc,
+                            controller_params=self.control.active_params
+                        ),
+                        self._inverter_control
                     )
         if not self.required:
-            yield None
+            yield None, None
 
 
 class MetricCongifuration:
@@ -880,13 +930,15 @@ class Configuration:
     """A specific grid configuration to be evaluated."""
 
     def __init__(self, grid, metrics, pvsystems,
-                 storage_devices, reliability=None,
+                 storage_devices, inverter_controls,
+                 reliability=None,
                  sim_duration=24):
         self.results = None
         self.grid = grid
         self.metrics = metrics
         self.pvsystems = pvsystems
         self.storage = storage_devices
+        self.inv_controls = inverter_controls
         self.sim_duration = sim_duration
         self.reliability = reliability
         self._grid_path = None
@@ -953,6 +1005,7 @@ class Configuration:
         config = {}
         self._configure_grid_model(config)
         self._configure_storage(config)
+        self._configure_inverters(config)
         self._configure_pv(config)
         self._configure_inverters(config)
         self._configure_reliability(config)
@@ -978,7 +1031,10 @@ class Configuration:
         return config
 
     def _configure_inverters(self, config):
-        config["invcontrol"] = []
+        config["invcontrol"] = list(
+            inv.to_dict()
+            for inv in self.inv_controls
+        )
         return config
 
     def _configure_reliability(self, config):
