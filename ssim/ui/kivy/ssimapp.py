@@ -1054,8 +1054,8 @@ class VoltVarVoltWattTabContent(BoxLayout):
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
 
-    def __init__(self, der_screen, config, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, der_screen, project, *args, **kwargs):
+        super().__init__(project, *args, **kwargs)
         self._der_screen = der_screen
         self._options = args[0]
 
