@@ -1,6 +1,8 @@
 from __future__ import annotations
+
 import enum
 import math
+
 
 @enum.unique
 class ImprovementType(int, enum.Enum):
@@ -11,7 +13,7 @@ class ImprovementType(int, enum.Enum):
     Minimize = 0
     Maximize = 1
     SeekValue = 2
-    
+
     @staticmethod
     def parse(str: str):
         """A utility method to parse a string into a member of the
@@ -36,25 +38,25 @@ class ImprovementType(int, enum.Enum):
         toParse = str.casefold()
         if toParse == "minimize":
             return ImprovementType.Minimize
-        
+
         if toParse == "min":
             return ImprovementType.Minimize
 
         if toParse == "maximize":
             return ImprovementType.Maximize
-        
+
         if toParse == "max":
             return ImprovementType.Maximize
 
         if toParse == "seek value":
             return ImprovementType.SeekValue
-        
+
         if toParse == "seekvalue":
             return ImprovementType.SeekValue
-        
+
         if toParse == "seek":
             return ImprovementType.SeekValue
-        
+
         if toParse.isdigit():
             return ImprovementType(int(toParse))
 
@@ -122,8 +124,7 @@ def get_default_improvement_type(limit: float, objective: float) -> ImprovementT
 
 
 class Metric:
-    """A class used to normalize metric values for subsequence combination and
-       comparison.
+    """A class used to normalize metric values for subsequence combination and comparison.
 
     Parameters
     ----------
@@ -139,32 +140,33 @@ class Metric:
         The desired sense of the metric such as Minimize or Maximize.
 
         If this input is not provided, then a default is determined based on
-        the limit and objective.
+        the limits and objective.
     a : float
         The parameter that controls the curvature of the normalization function
-        below the limit (on the bad side of the limit).  It is recommended that
+        beyond a limit (on the bad side of a limit).  It is recommended that
         you use the default value.
     b : float
-        The parameter that controls the slope of the normalization curve at the
+        The parameter that controls the slope of the normalization curve at a
         limit.  It is recommended that you use the default value.
     c : float
-        Sets the normalized value (y value) at the limit.  It is recommended
+        Sets the normalized value (y value) at a limit.  It is recommended
         that you use the default value.
     g : float
         The parameter that controls the curvature of the normalization function
         above the objective (on the good side of the objective).  It is
         recommended that you use the default value.
     """
+
     def __init__(
-        self,
-        lower_limit: float,
-        upper_limit: float,
-        objective: float,
-        imp_type: ImprovementType = None,
-        a: float=5.0,
-        b: float=5.0,
-        c: float=0.0,
-        g: float=0.2
+            self,
+            lower_limit: float,
+            upper_limit: float,
+            objective: float,
+            imp_type: ImprovementType = None,
+            a: float = 5.0,
+            b: float = 5.0,
+            c: float = 0.0,
+            g: float = 0.2
     ):
         self._lower_limit = lower_limit
         self._upper_limit = upper_limit
@@ -174,14 +176,30 @@ class Metric:
         if imp_type is None:
             self._imp_type = get_default_improvement_type(
                 self._lower_limit, self._upper_limit, self._objective
-                )
+            )
 
         self._a = a
         self._b = b
         self._c = c
         self._g = g
         self._validate_inputs()
-                
+
+    def __eq__(self, other):
+        return self._lower_limit == other._lower_limit and \
+            self._upper_limit == other._upper_limit and \
+            self._objective == other._objective and \
+            self._imp_type == other._imp_type and \
+            self._a == other._a and \
+            self._b == other._b and \
+            self._c == other._c and \
+            self._g == other._g
+
+    def __hash__(self):
+        return hash((
+            self._lower_limit, self._upper_limit, self._objective, self._imp_type,
+            self._a, self._b, self._c, self._g
+        ))
+
     @property
     def lower_limit(self) -> float:
         """Allows access to the supplied lower limit value for this metric.
@@ -214,7 +232,7 @@ class Metric:
             The value that provides full satisfaction for this metric.
         """
         return self._objective
-    
+
     @property
     def improvement_type(self) -> ImprovementType:
         """Allows access to the supplied improvement type or "sense" for this
@@ -227,7 +245,7 @@ class Metric:
             (minimize, maximize, etc.)..
         """
         return self._imp_type
-    
+
     @staticmethod
     def read_toml(tomlData) -> Metric:
         """Reads the properties of a metric class instance from a TOML
@@ -238,8 +256,8 @@ class Metric:
         tomlData: dict
             The dictionary that contains the metric properties from which to
             create a new metric instance.  The minimum set of keys that must
-            be present are "limit", "objective", and "sense".  "sense" must
-            point to something that can be parsed to an ImprovementType
+            be present are "lower_limit", "upper_limit", "objective", and "sense".
+            "sense" must point to something that can be parsed to an ImprovementType
             enumeration value.
 
         Returns
@@ -248,15 +266,14 @@ class Metric:
             A newly created metric made using the properties in the supplied
             TOML dictionary.
         """
-        lower_limit = None if "lower_limit" not in tomlData else  tomlData["lower_limit"]
-        upper_limit = None if "upper_limit" not in tomlData else  tomlData["upper_limit"]
+        lower_limit = None if "lower_limit" not in tomlData else tomlData["lower_limit"]
+        upper_limit = None if "upper_limit" not in tomlData else tomlData["upper_limit"]
         objective = tomlData["objective"]
         impType = ImprovementType.parse(tomlData["sense"])
         return Metric(lower_limit, upper_limit, objective, impType)
-    
+
     def write_toml(self, category, key) -> str:
-        """Writes the properties of this class instance to a string in TOML
-           format.
+        """Writes the properties of this class instance to a string in TOML format.
         
         Parameters
         ----------
@@ -274,19 +291,19 @@ class Metric:
         str:
             A TOML formatted string with the properties of this instance.
         """
-        #ret = f"\n\n[metrics.{category}.{key}]\n"
+        # ret = f"\n\n[metrics.{category}.{key}]\n"
         ret = "{" + f"name=\"{key}\", "
         if self._lower_limit is not None:
-             ret += f"lower_limit = {str(self._lower_limit)}, "
+            ret += f"lower_limit = {str(self._lower_limit)}, "
 
         if self._upper_limit is not None:
-             ret += f"upper_limit = {str(self._upper_limit)}, "
+            ret += f"upper_limit = {str(self._upper_limit)}, "
 
         if self._objective is not None:
-             ret += f"objective = {str(self._objective)}, "
+            ret += f"objective = {str(self._objective)}, "
 
         if self._imp_type is not None:
-             ret += f"sense = \"{str(self._imp_type.name)}\""
+            ret += f"sense = \"{str(self._imp_type.name)}\""
 
         return ret + "}"
 
@@ -323,7 +340,7 @@ class Metric:
         -------
         float:
             A normalized value based on the supplied raw value, this metrics
-            limit and objective, and the other curve parameters of this metric.
+            limit values, the objective, and the other curve parameters of this metric.
         """
         if self._imp_type == ImprovementType.Minimize:
             return self._normalize_for_minimization(value)
@@ -346,7 +363,7 @@ class Metric:
         -------
         float:
             A normalized value based on the supplied raw value, this metrics
-            limit and objective, and the other curve parameters of this metric.
+            lower limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for minimization.
         """
         return self.__do_max_norm__(-value, -self._lower_limit, -self._objective)
@@ -364,7 +381,7 @@ class Metric:
         -------
         float:
             A normalized value based on the supplied raw value, this metrics
-            limit and objective, and the other curve parameters of this metric.
+            upper limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for maximization.
         """
         return self.__do_max_norm__(value, self._upper_limit, self._objective)
@@ -392,41 +409,40 @@ class Metric:
 
     def _violated(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
-           that falls in the region of the space below (or worse than) the limit.
+           that falls in the region of the space beyond (worse than) a limit.
 
         Parameters
         ----------
         norm_val : float
             The metric value that has already undergone pre-normalization that
             is to be normalized.  It must have been a metric value in the
-            violated region (worse than the limit).
+            violated region (worse than a limit).
 
         Returns
         -------
         float:
-            A normalized value based on the supplied pre-normalized value, this
-            metrics limit and objective, and the other curve parameters of this
-            metric.
+            A normalized value based on the supplied pre-normalized value
+            and the other curve parameters of this metric.
         """
         return -(self._a * norm_val * norm_val) / 2.0 + \
             self._b * norm_val + self._c
 
     def _feasible(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
-           that falls in the region between the limit and the objective.
+           that falls in one of the regions between a limit and the objective.
 
         Parameters
         ----------
         norm_val : float
             The metric value that has already undergone pre-normalization that
-            is to be normalized.  It must have been a metric value in the
-            region between the limit and the objective.
+            is to be normalized.  It must have been a metric value in one of the
+            regions between a limit and the objective.
 
         Returns
         -------
         float:
             A normalized value based on the supplied pre-normalized value, this
-            metrics limit and objective, and the other curve parameters of this
+            metrics limits and objective, and the other curve parameters of this
             metric.
         """
         d = self._d()
@@ -434,21 +450,20 @@ class Metric:
 
     def _super_optimal(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
-           that falls in the region above the objective.
+           that falls in the region beyond (better than) the objective.
 
         Parameters
         ----------
         norm_val : float
             The metric value that has already undergone pre-normalization that
             is to be normalized.  It must have been a metric value in the
-            region above the objective.
+            region beyond (better than) the objective.
 
         Returns
         -------
         float:
-            A normalized value based on the supplied pre-normalized value, this
-            metrics limit and objective, and the other curve parameters of this
-            metric.
+            A normalized value based on the supplied pre-normalized value and the
+            other curve parameters of this metric.
         """
         h = self._h(self._d())
         return self._g * math.sqrt(norm_val + h - 1.0) - self._phi(h) + 1.0
@@ -532,8 +547,8 @@ class Metric:
 
     @staticmethod
     def _do_pre_normalization(
-        raw_value: float, limit: float, objective: float
-        ) -> float:
+            raw_value: float, limit: float, objective: float
+    ) -> float:
         """Calculates the pre-normalized equivalent of the supplied raw value
            for the given limit and objective.
 
@@ -545,8 +560,7 @@ class Metric:
         Parameters
         ----------
         raw_value : float
-            The raw value of a metric that is in the process of being
-            normalized.
+            The raw value of a metric that is in the process of being normalized.
         limit : float
             The worst acceptable value for the metric.
         objective : float
@@ -560,8 +574,8 @@ class Metric:
         return (raw_value - limit) / (objective - limit)
 
     def __do_max_norm__(
-        self, value: float, limit: float, objective: float
-        ) -> float:
+            self, value: float, limit: float, objective: float
+    ) -> float:
         """Calculates the normalized equivalent of the supplied raw value for
            the supplied limit and objective assuming maximization.
 
@@ -595,8 +609,7 @@ class Metric:
     def _validate_inputs(self, do_assert: bool = True) -> str:
         """Tests the validity/usability of the values stored in this metric.
 
-        This uses the static validate_metric_values method.  See it for
-        details.
+        This uses the static validate_metric_values method.  See it for details.
         
         Parameters
         ----------
@@ -620,13 +633,13 @@ class Metric:
         """
         Metric.validate_metric_values(
             self._lower_limit, self._upper_limit, self._objective, self._imp_type, do_assert
-            )
-            
+        )
+
     @staticmethod
     def validate_metric_values(
-        lower_limit: float, upper_limit: float, objective: float, imp_type: ImprovementType,
-        do_assert: bool = False
-        ) -> str:
+            lower_limit: float, upper_limit: float, objective: float, imp_type: ImprovementType,
+            do_assert: bool = False
+    ) -> str:
         """Tests the validity/usability of the metric values provided.
 
         This will either return an error string or throw an exception with an
@@ -672,7 +685,7 @@ class Metric:
         try:
             assert objective != None, \
                 "A value must be provided for the objective."
-            
+
             assert imp_type != None, \
                 "A value must be provided for the sense."
 
@@ -688,7 +701,7 @@ class Metric:
                 assert lower_limit < objective, \
                     "The lower limit must be less than the objective"
 
-            else: # elif imp_type == ImprovementType.SeekValue:
+            else:  # elif imp_type == ImprovementType.SeekValue:
                 assert upper_limit is not None, \
                     "The upper limit cannot be None for a seek value metric"
                 assert upper_limit > objective, \
@@ -717,10 +730,17 @@ class MetricAccumulator:
     m : Metric
         The metric whose value will be accumulated over time.
     """
+
     def __init__(self, m: Metric = None):
         self._metric = m
         self._accumulated = 0.0
         self._total_time = 0.0
+
+    def __eq__(self, other):
+        return self._metric == other._metric
+
+    def __hash__(self):
+        return hash(self._metric)
 
     def accumulate(self, value: float, d_time: float) -> float:
         """Adds in normalized value weighted by the amount of time provided.
@@ -744,7 +764,7 @@ class MetricAccumulator:
         self._total_time += d_time
         self._accumulated += d_time * met_val
         return met_val
-    
+
     def to_dict(self, key: str) -> dict:
         """Return a dictionary representation of the metric being accumulated.
         
@@ -762,7 +782,7 @@ class MetricAccumulator:
             A dictionary representation of the metric managed by this accumulator.
         """
         return self._metric.to_dict(key)
-    
+
     def write_toml(self, category: str, key: str) -> str:
         """Writes the properties of this class instance to a string in TOML
            format.
@@ -784,16 +804,16 @@ class MetricAccumulator:
             A TOML formatted string with the properties of this instance.
         """
         return self._metric.write_toml(category, key)
-    
+
     @staticmethod
-    def read_toml(tomlData) -> MetricAccumulator:
+    def read_toml(tomlData: dict) -> MetricAccumulator:
         """Reads the properties of a metric accumulator class instance from a
            TOML formatted dictionary and creates and returns a new
            MetricAccumulator instance.
         
         Parameters
         ----------
-        tomlData
+        tomlData: dict
             The dictionary that contains the metric accumulator properties from
             which to create a new instance.  The minimum set of keys that must
             be present are only those associated with a Metric.
@@ -870,10 +890,17 @@ class MetricTimeAccumulator(MetricAccumulator):
         The time to be the initial "current time" for this accumulator.
         The default is 0.
     """
-    def __init__(self, m: Metric, init_time: float=0.0):
+
+    def __init__(self, m: Metric, init_time: float = 0.0):
         MetricAccumulator.__init__(self, m)
         self._curr_time = init_time
-            
+
+    def __eq__(self, other):
+        return self._metric == other._metric
+
+    def __hash__(self):
+        return hash(self._metric)
+
     @staticmethod
     def read_toml(tomlData) -> MetricTimeAccumulator:
         """Reads the properties of a metric time accumulator class instance
@@ -920,15 +947,51 @@ class MetricTimeAccumulator(MetricAccumulator):
         if curr_time == self._curr_time: return 0.0
         val = MetricAccumulator.accumulate(
             self, value, curr_time - self._curr_time
-            )
+        )
         self._curr_time = curr_time
         return val
 
 
 class MetricManager:
     """A class used to manage a set of metric accumulators keyed on names."""
+
     def __init__(self):
         self._all_metrics = {}
+
+    def __eq__(self, other):
+        """Checks to see if this manager is functionally equivalent to another.
+
+        Functionally equivalent means that for the purpose of solving, this manager will
+        be effectively equivalent. An example of functionally equivalent but not strictly
+        equivalent would be if the metrics are the same but not in the same order in the
+        dictionary.
+
+        Parameters
+        ----------
+        other:
+            The other MetricManager to compare to this for functional equivalence.
+
+        Return
+        ------
+        bool:
+            True if the other is functionally equivalent to this and False otherwise.
+        """
+        if len(self._all_metrics) != len(other._all_metrics): return False
+
+        for mk, ma in self._all_metrics.items():
+            if mk not in other._all_metrics: return False
+            if ma != other._all_metrics[mk]: return False
+
+        return True
+
+    def __hash__(self):
+        hval = 0
+
+        # Iterate in sorted order to make a functional rather than literal hash.
+        for k, v in sorted(self._all_metrics.items()):
+            hval = hash((hval, k, v))
+
+        return hval
 
     def add_accumulator(self, name: str, accum: MetricTimeAccumulator):
         """ Adds a new time accumulator to this metric manager.
@@ -949,7 +1012,7 @@ class MetricManager:
             self._all_metrics[name] = accum
         else:
             self.remove_accumulator(name)
-        
+
     def remove_accumulator(self, name: str) -> bool:
         """ Removes an existing time accumulator from this metric manager
         
@@ -1052,7 +1115,7 @@ class MetricManager:
             instances.
         """
         return self._all_metrics
-    
+
     @property
     def get_total_accumulation(self) -> float:
         """Computes and returns the total accumulated metric value over all
@@ -1068,7 +1131,6 @@ class MetricManager:
         for accumulator in self._all_metrics.values():
             ret += accumulator.accumulated_value
         return ret
-
 
 # if __name__ == "__main__":
 #    m_ = Metric(None, 1.05, 1.0, ImprovementType.Minimize)

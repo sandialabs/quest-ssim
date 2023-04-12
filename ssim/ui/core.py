@@ -3,16 +3,19 @@ import functools
 import hashlib
 import itertools
 import json
-import tempfile
+import os
+import subprocess
 from os import path, makedirs
 from pathlib import Path, PurePosixPath
-import pkg_resources
-import subprocess
-import tomli
 
+import matplotlib.pyplot as plt
+import pandas as pd
+import pkg_resources
+import tomli
 from ssim import grid
-from ssim.opendss import DSSModel
 from ssim.metrics import MetricManager, MetricTimeAccumulator
+from ssim.opendss import DSSModel
+
 
 # To Do
 #
@@ -25,6 +28,31 @@ from ssim.metrics import MetricManager, MetricTimeAccumulator
 # 2. Add basic Configuration implementation
 # 3. Implement Configuration.evaluate()
 
+def __eq_maybe_none(v1, v2) -> bool:
+    """Compares two objects for equality where 0, 1, or both of the arguments
+    may be None.
+
+    Parameters
+    ----------
+    v1:
+        The first of two objects to compare.  This argument may be None.
+    v2:
+        The second of the two objects to compare.  This argument may be None.
+
+    Return
+    ------
+    bool:
+        True if both arguments are None.  False if 1 is None and the other is not.
+        Otherwise, the result of v1 == v2.
+    """
+    if v1 is None:
+        return v2 is None
+
+    if v2 is None:
+        return False  # we already know v1 is not None.
+
+    return v1 == v2
+
 
 _DEFAULT_RELIABILITY = {
     # "seed": 1234567,
@@ -35,15 +63,15 @@ _DEFAULT_RELIABILITY = {
         "enabled": False
     },
     "generator":
-    {
-        "enabled": False,
-        "aging": {
-            "enabled": False
-        },
-        "operating_wear_out": {
-            "enabled": False
+        {
+            "enabled": False,
+            "aging": {
+                "enabled": False
+            },
+            "operating_wear_out": {
+                "enabled": False
+            }
         }
-    }
 }
 
 
@@ -59,6 +87,51 @@ class Project:
         self.pvsystems = []
         self._metricMgrs = {}
         self.reliability_params = _DEFAULT_RELIABILITY
+
+    def __eq__(self, other):
+
+        # Should input file path be included?  Maybe not.
+        if self.name != other.name or \
+                not __eq_maybe_none(self._grid_model_path == other._grid_model_path):  # or \
+            # not __eq_maybe_none(self._input_file_path == other._input_file_path):
+            return False;
+
+        if len(self.storage_devices) != len(other.storage_devices): return False
+        if len(self.pvsystems) != len(other.pvsystems): return False
+        if len(self._metricMgrs) != len(other._metricMgrs): return False
+
+        for so in self.storage_devices:
+            if not so in other.storage_devices: return False
+
+        for pv in self.pvsystems:
+            if not pv in other.pvsystems: return False
+
+        for k, v in self._metricMgrs:
+            if k not in other._metricMgrs: return False
+            if v != other._metricMgrs[k]: return False
+
+        return True
+
+    def __hash__(self):
+        hval = hash(self.name)
+
+        if self._grid_model_path is not None:
+            hval = hash((hval, self._grid_model_path))
+
+        # as with __eq__, skip the input file path.
+        # if self._input_file_path is not None:
+        #    hval = hash((hval, self._input_file_path))
+
+        for so in self.storage_devices.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
+
+        for pv in self.pvsystems.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
+
+        for k, v in sorted(self._metricMgrs.items()):
+            hval = hash((hval, k, v))
+
+        return hval
 
     def load_toml_file(self, filename: str):
         """Reads data for this Project from the supplied TOML file.
@@ -78,6 +151,10 @@ class Project:
 
         tdat = tomli.loads(toml)
         self.read_toml(tdat)
+
+    @property
+    def base_dir(self):
+        return Path(os.path.abspath(self.name))
 
     @property
     def bus_names(self):
@@ -114,7 +191,8 @@ class Project:
 
     def set_grid_model(self, model_path):
         self._grid_model_path = model_path
-        self._grid_model = DSSModel(model_path)
+        if model_path and path.exists(model_path):
+            self._grid_model = DSSModel(model_path)
 
     def write_toml(self) -> str:
         """Writes the properties of this class instance to a string in TOML
@@ -204,11 +282,11 @@ class Project:
         """
         cat_mgr = self.get_manager(category)
         if cat_mgr is None:
-            cat_mgr= MetricManager()
+            cat_mgr = MetricManager()
             self._metricMgrs[category] = cat_mgr
-             
+
         cat_mgr.add_accumulator(key, metric)
-        
+
     def remove_metric(self, category: str, key: str) -> bool:
         """Removes the metric identified by the supplied key in the supplied category.
 
@@ -250,7 +328,7 @@ class Project:
         cat_mgr = self.get_manager(category)
         if cat_mgr is None: return None
         return cat_mgr.get_accumulator(key)
-    
+
     def clear_metrics(self):
         """Removes all metrics from all managers and removes all managers."""
         self._metricMgrs.clear();
@@ -432,7 +510,30 @@ class StorageControl:
             "q_droop": self.params["q_droop"]
         }
 
-    def write_toml(self, name: str)->str:
+    def __eq__(self, other):
+
+        if self.mode != other.mode: return False
+
+        smp = self.mode in self.params
+        omp = self.mode in other.params
+        if smp != omp: return False
+
+        # if it's not in 1, it's not in either and we are done and equal.
+        if not smp: return True
+
+        # if we're here, then there are params for the mode in each of self and other
+        # compare them now, only for the chosen mode.
+        return self.params[mode] == other.params[mode]
+
+    def __hash__(self):
+        hval = hash(self.mode)
+
+        if self.mode in self.params:
+            hval = hash(hval, self.params)
+
+        return hval
+
+    def write_toml(self, name: str) -> str:
         """Writes the properties of this class instance to a string in TOML
            format.
 
@@ -450,7 +551,7 @@ class StorageControl:
         ret = f"\n\n[{name}.control-params]\n"
         ret += f"mode = \'{self.mode}\'\n"
 
-        #ret += f"\n\n[{name}.control-mode.params]\n"
+        # ret += f"\n\n[{name}.control-mode.params]\n"
         for key in self.params:
             ret += f"\n\n[{name}.control-params.{key}]\n"
 
@@ -574,7 +675,29 @@ class StorageOptions:
         self.soc_model = soc_model
         self.required = required
 
-    def write_toml(self)->str:
+    def __eq__(self, other):
+
+        return self.name == other.name and \
+            self.phases == other.phases and \
+            self.min_soc == other.min_soc and \
+            self.max_soc == other.max_soc and \
+            self.initial_soc == other.initial_soc and \
+            self.power == other.power and \
+            self.duration == other.duration and \
+            self.busses == other.busses and \
+            self.soc_model == other.soc_model and \
+            not __eq_maybe_none(self.control, other.control) and \
+            self.required == other.required
+
+    def __hash__(self):
+        hval = 0 if not self.control else hash(self.control)
+
+        return hash((
+            hval, self.name, self.phases, self.min_soc, self.max_soc, self.initial_soc, \
+            self.power, self.duration, self.busses, self.soc_model, self.required
+        ))
+
+    def write_toml(self) -> str:
         """Writes the properties of this class instance to a string in TOML format.
 
         Returns
@@ -902,7 +1025,7 @@ class MetricCongifuration:
        Only voltage metrics are supported at this time.
     """
 
-    def __init__(self, bus, objective, limit):
+    def __init__(self, bus, objective, lower_limit, upper_limit):
         """Constructs a new MetricConfiguration object.
 
         Parameters
@@ -912,12 +1035,25 @@ class MetricCongifuration:
         objective
             The objective value for this metric configuration.  This is the target
             value which if achieved, results in full satisfaction.
-        limit
-            The worst acceptable value for this metric.
+        lower_limit
+            The worst acceptable value for this metric on the low side of the objective.
+        upper_limit
+            The worst acceptable value for this metric on the high side of the objective.
         """
         self.bus = bus
-        self.limit = limit
+        self.upper_limit = upper_limit
+        self.lower_limit = lower_limit
         self.objective = objective
+
+    def __eq__(self, other):
+        return __eq_maybe_none(self.bus, other.bus) and \
+            self.lower_limit == other.lower_limit and \
+            self.upper_limit == other.upper_limit and \
+            self.objective == other.objective
+
+    def __hash__(self):
+        hval = 0 if self.bus is None else hash(self.bus)
+        return hash((hval, self.upper_limit, self.lower_limit, self.objective))
 
     def to_dict(self):
         """Return a dict representation of this metric."""
@@ -948,6 +1084,63 @@ class Configuration:
         self._proc = None
         self._workdir = Path(".")
 
+    def __eq__(self, other):
+        """Compares this instance of a Configuration to another for functional
+        equality.
+
+        Funcitonal equality means "effectively equal", not necessarily literaly equal.
+        As an example, in some cases, it may not matter if the order of some objects
+        in a collection be the same, as long as there is an equivalent object in each.
+
+        The intent is to ensure that if this returns true, then an analysis using this
+        object will result in the same answer as an analysis using the other.
+
+        Parameters
+        ----------
+        other:
+            The other configuration to compare to this one for equality.
+
+        Return
+        ------
+        bool:
+            True if the other is functionally equal to this and false otherwise.
+        """
+        if self.grid != other.grid or \
+                self.sim_duration != other.sim_duration or \
+                not __eq_maybe_none(self._grid_path, other._grid_path) or \
+                not __eq_maybe_none(self._federation_path, other._federation_path) or \
+                not __eq_maybe_none(self._workdir, other._workdir):
+            return False
+
+        if len(self.metrics) != len(other.metrics): return False
+        if len(self.pvsystems) != len(other.pvsystems): return False
+        if len(self.storage) != len(other.storage): return False
+
+        for k, v in self.metrics:
+            if k not in other.metrics: return False
+            if v != other._metricMgrs[k]: return False
+
+        for pv in self.pvsystems:
+            if not pv in other.pvsystems: return False
+
+        for ss in self.storage:
+            if not ss in other.storage: return False
+
+    def __hash__(self):
+        hVal = hash((
+            self.grid, self.sim_duration, self._grid_path,
+            self._federation_path, self._workdir
+        ))
+
+        for k, v in sorted(self._metricMgrs.items()):
+            hval = hash((hval, k, v))
+
+        for so in self.storage.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
+
+        for pv in self.pvsystems.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
+
     @property
     def id(self):
         h = hashlib.sha1()
@@ -976,6 +1169,7 @@ class Configuration:
         self._federation_path = self._workdir / "federation.json"
         self._write_configuration()
         self._run()
+        self._mark_done()
         return self._load_results()
 
     def wait(self):
@@ -996,6 +1190,9 @@ class Configuration:
             ["helics", "run", "--path", str(self._federation_path)],
             cwd=self._workdir
         )
+
+    def _mark_done(self):
+        (self._workdir / "evaluated").touch()
 
     def _load_results(self):
         # TODO load the output files/data into a results object (maybe
@@ -1065,31 +1262,31 @@ class Configuration:
         # specify the EMS federate ?
         # lookup and specify the path(s) the the federate config files
         config["federates"] = [
-            _federate_spec(
-                "metrics",
-                f"metrics-federate"
-                f" {self._grid_path}"
-                f" {_get_federate_config('metrics')}"
-            ),
-            _federate_spec(
-                "logger",
-                f"logger-federate --hours {self.sim_duration}"
-                f" {self._grid_path}"
-                f" {_get_federate_config('logger')}"
-            ),
-            _federate_spec(
-                "grid",
-                f"grid-federate --hours {self.sim_duration}"
-                f" {self._grid_path}"
-                f" {_get_federate_config('grid')}"
-            ),
-            _federate_spec(
-                "reliability",
-                f"reliability-federate --hours {self.sim_duration}"
-                f" {self._grid_path}"
-                f" {_get_federate_config('reliability')}"
-            )
-        ] + list(
+                                  _federate_spec(
+                                      "metrics",
+                                      f"metrics-federate"
+                                      f" {self._grid_path}"
+                                      f" {_get_federate_config('metrics')}"
+                                  ),
+                                  _federate_spec(
+                                      "logger",
+                                      f"logger-federate --hours {self.sim_duration}"
+                                      f" {self._grid_path}"
+                                      f" {_get_federate_config('logger')}"
+                                  ),
+                                  _federate_spec(
+                                      "grid",
+                                      f"grid-federate --hours {self.sim_duration}"
+                                      f" {self._grid_path}"
+                                      f" {_get_federate_config('grid')}"
+                                  ),
+                                  _federate_spec(
+                                      "reliability",
+                                      f"reliability-federate --hours {self.sim_duration}"
+                                      f" {self._grid_path}"
+                                      f" {_get_federate_config('reliability')}"
+                                  )
+                              ] + list(
             _storage_federate_spec(
                 ess.name, self._grid_path, self.sim_duration)
             for ess in self.storage if ess is not None
@@ -1152,6 +1349,63 @@ def _get_federate_config(federate):
     )
 
 
+class ProjectResults:
+    """Container of all results for a project.
+
+    Parameters
+    ----------
+    project : Project
+       Project that the results belong to.
+    """
+
+    def __init__(self, project):
+        self.base_dir = project.base_dir
+
+    def results(self):
+        # Iterate over the resulted configurations and yield iterator of Results
+        for configuration_dir in self._resulted_configurations():
+            yield Results(self.base_dir / configuration_dir)
+
+    def _resulted_configurations(self):
+        # results from each configuration has its own directory
+        for item in os.listdir(self.base_dir):
+            # check to see if the directory is from a configuration
+            if not self._is_configuration_dir(item):
+                continue
+            # check to see if the configuration has been completely evaluated
+            if self._is_evaluated(item):
+                yield item
+
+    def _is_configuration_dir(self, item):
+        if item in {'.', '..'}:
+            return False
+        return (
+                os.path.exists(self.base_dir / item / "federation.json")
+                and os.path.exists(self.base_dir / item / "grid.json")
+        )
+
+    def _is_evaluated(self, item):
+        return os.path.exists(self.base_dir / item / "evaluated")
+
+    # TO DO: Add methods for the plotting function
+    def plot_metrics(self):
+        for result in self.results():
+            col_names, metric_value, df_metrics = result.metrics_log()
+            return col_names, metric_value, df_metrics
+
+    def plot_accumulated_metrics(self):
+        config_count = 0
+        for result in self.results():
+            _, metric_value, _ = result.metrics_log()
+            fig = plt.figure()
+            plt.plot(config_count, metric_value)
+            plt.xlabel('Configuration ID')
+            plt.ylabel('Accumated Metric')
+            plt.title('Comparison of Metric for Different Configurations')
+            config_count += 1
+            return fig
+
+
 _OPENDSS_ILLEGAL_CHARACTERS = "\t\n .="
 
 
@@ -1161,13 +1415,74 @@ def is_valid_opendss_name(name: str) -> bool:
     OpenDSS names may not contain whitespace, '.', or '='.
     """
     return (
-        len(name) > 0
-        and not any(c in _OPENDSS_ILLEGAL_CHARACTERS for c in name)
+            len(name) > 0
+            and not any(c in _OPENDSS_ILLEGAL_CHARACTERS for c in name)
     )
 
 
 class Results:
     """Results from simulating a specific configuration."""
 
-    def __init__(self):
-        pass
+    def __init__(self, config_dir):
+        self.config_dir = config_dir
+
+    def _extract_data(self, csv_file):
+        df_extracted_data = pd.read_csv(self.config_dir / csv_file)
+        # extract column names
+        col_names = list(df_extracted_data.columns)
+        # extract all datapoints as a pandas dataframe
+        num_rows = df_extracted_data.shape[0]
+        data = df_extracted_data.iloc[0:num_rows - 1]
+        return col_names, data
+
+    def bus_voltages(self):
+        """Returns name of columns (bus names) and the time-series bus
+        voltages as a pandas dataframe."""
+        bus_names, bus_voltages = self._extract_data("bus_voltage.csv")
+        return bus_names, bus_voltages
+
+    def grid_state(self):
+        """Returns name of columns (grid states) and the time-series data
+        as a pandas dataframe."""
+        states, state_data = self._extract_data("grid_state.csv")
+        return states, state_data
+
+    def pde_loading(self):
+        """Returns name of the columns (power delivery elements with
+        the OpenDSS model) and the loading of the power delievery elements
+        as a pandas dataframe."""
+        pde_elements, pde_loading = self._extract_data("pde_loading.csv")
+        return pde_elements, pde_loading
+
+    def storage_state(self):
+        """Returns name of the columns (states specific to storage devices
+        in OpendDSS model) and the time-series data as a pandas dataframe."""
+        storage_state_file = Path(self.config_dir / "storage_power.csv")
+        if storage_state_file.is_file():
+            storage_states, storage_state_data = self._extract_data("storage_power.csv")
+        else:
+            storage_states, storage_state_data = [], []
+        return storage_states, storage_state_data
+
+    def storage_voltages(self):
+        """Returns name of the columns (buses) where storage is placed and
+        voltages at those buses as a pandas dataframe"""
+        storage_voltages_file = Path(self.config_dir / "storage_voltages.csv")
+        if storage_voltages_file.is_file():
+            storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
+        else:
+            storage_buses, storage_voltages = [], []
+        return storage_buses, storage_voltages
+
+    def metrics_log(self):
+        """Returns name of columns of the logged metrics, the accumulated value
+        of the metric, and the time-series log as a pandas dataframe."""
+        df_metrics = pd.read_csv(self.config_dir / "metric_log.csv")
+        # extract column names
+        col_names = list(df_metrics.columns)
+        num_rows = df_metrics.shape[0]
+        # extract accumulated value of the metric from the last row
+        accumulated_metric = df_metrics.iloc[-1:].loc[num_rows - 1, 'time']
+        # extract all the datapoints as a pandas dataframe
+        data = df_metrics.iloc[0: num_rows - 1]
+        return col_names, accumulated_metric, data

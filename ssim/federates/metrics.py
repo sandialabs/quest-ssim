@@ -49,8 +49,8 @@ class MetricsFederate:
                 bv_dict["name"],
                 MetricTimeAccumulator(
                     Metric(
-                        bv_dict["limit"], bv_dict["objective"],
-                        ImprovementType.SeekValue
+                        bv_dict["lower_limit"], bv_dict["upper_limit"], bv_dict["objective"],
+                        ImprovementType.SeekValues
                         ),
                     0.0
                 )

@@ -1,55 +1,35 @@
 """Storage Sizing and Placement Kivy application"""
-from contextlib import ExitStack
 import itertools
 import math
 import os
 import re
+from contextlib import ExitStack
+from math import cos, hypot
 from threading import Thread
 from typing import List
 
-import numpy as np
-
-from math import cos, hypot
-
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.figure import Figure
-from matplotlib.collections import LineCollection
-from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
-
-
-import opendssdirect as dssdirect
-from importlib_resources import files, as_file
-
-from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
-
 import kivy
-import functools
-from kivymd.app import MDApp
-from ssim.ui import Project, StorageOptions, is_valid_opendss_name
-from kivy.logger import Logger, LOG_LEVELS
-from kivy.uix.floatlayout import FloatLayout
-from kivymd.uix.list import IRightBodyTouch, ILeftBodyTouch, TwoLineAvatarIconListItem, OneLineAvatarIconListItem
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.screenmanager import Screen, ScreenManager
-from kivy.properties import ObjectProperty, StringProperty, NumericProperty
-from kivy.uix.popup import Popup
-from kivy.uix.boxlayout import BoxLayout
-from kivy.core.text import LabelBase
+import matplotlib.pyplot as plt
+import opendssdirect as dssdirect
+import pandas as pd
+from bidict import bidict
+from importlib_resources import files, as_file
 from kivy.clock import Clock
-from kivy.uix.behaviors import FocusBehavior
-from kivymd.uix.menu import MDDropdownMenu
-from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
-from kivymd.uix.list import OneLineListItem
+from kivy.core.text import LabelBase
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
+from kivy.logger import Logger, LOG_LEVELS
+from kivy.properties import ObjectProperty, StringProperty
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.popup import Popup
 from kivy.uix.recycleview import RecycleView
-from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
-from kivy.uix.scrollview import ScrollView
+from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.textinput import TextInput
-from kivymd.uix.tab import MDTabsBase
-from kivymd.uix.gridlayout import MDGridLayout
-
 from kivymd.app import MDApp
+from kivymd.uix.gridlayout import MDGridLayout
+from kivymd.uix.label import MDLabel
+from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivymd.uix.list import (
     TwoLineAvatarIconListItem,
     TwoLineIconListItem,
@@ -57,18 +37,19 @@ from kivymd.uix.list import (
     OneLineRightIconListItem,
     MDList
 )
-
+from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.selectioncontrol import MDCheckbox
+from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.textfield import MDTextField
-from kivymd.uix.label import MDLabel
-
+from matplotlib.collections import LineCollection
+from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 from ssim.ui import (
     Configuration,
     Project,
     StorageOptions,
+    ProjectResults,
     is_valid_opendss_name
 )
-
 
 _FONT_FILES = {
     "exo_regular": "Exo2-Regular.ttf",
@@ -79,11 +60,9 @@ _FONT_FILES = {
     "opensans_italic": "OpenSans-Italic.ttf"
 }
 
-
 _IMAGE_FILES = [
     "button_down.png", "button_normal.png", "gray.png", "white.png"
 ]
-
 
 _KV_FILES = ["common.kv", "ssim.kv"]
 
@@ -188,7 +167,6 @@ class SSimApp(MDApp):
         super().__init__(*args, **kwargs)
 
     def build(self):
-
         screen_manager = ScreenManager()
         screen_manager.add_widget(SSimScreen(self.project, name="ssim"))
         screen_manager.add_widget(
@@ -201,6 +179,14 @@ class SSimApp(MDApp):
             ReliabilityConfigurationScreen(self.project, name="reliability-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
+        # screen_manager.add_widget(
+        #     ResultsVisualizeScreen(self.project, name="results-visualize"))
+        screen_manager.add_widget(
+            ResultsSummaryScreen(self.project, name="results-summary"))
+        screen_manager.add_widget(
+            ResultsCompareScreen(self.project, name="results-compare"))
+        screen_manager.add_widget(
+            ResultsDetailScreen(self.project, name="results-detail"))
         screen_manager.current = "ssim"
 
         return screen_manager
@@ -220,6 +206,7 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
+        self.project_results = ProjectResults(self.project)
         super().__init__(*args, **kwargs)
 
 
@@ -614,7 +601,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
         popup = Popup(
             title='Invalid Storage Input', content=content, auto_dismiss=False,
             size_hint=(0.4, 0.4)
-            )
+        )
         content.ids.msg_label.text = str(msg)
         content.ids.dismissBtn.bind(on_press=popup.dismiss)
         popup.open()
@@ -646,13 +633,13 @@ class StorageConfigurationScreen(SSimBaseScreen):
         if self.show_error(self.options.validate_busses()): return
         if self.show_error(self.options.validate_controls()): return
 
-        #self._der_screen.add_ess(self.options)
+        # self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
     def cancel(self):
-        #if self._editing is not None:
-            # Restore the original device
+        # if self._editing is not None:
+        # Restore the original device
         #    self._der_screen.add_ess(self._editing)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
@@ -678,7 +665,7 @@ class XYGridView(RecycleView):
     def y_value_changed(self, index: int, value):
         self.__on_value_changed(index, "y", value)
 
-    def __on_value_changed(self, index:int, key: str, value):
+    def __on_value_changed(self, index: int, key: str, value):
         self.data[index][key] = parse_float_or_str(value)
         Clock.schedule_once(lambda dt: self.__raise_value_changed(), 0.05)
 
@@ -741,7 +728,6 @@ class XYGridView(RecycleView):
 
 
 class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
-
     index: int = -1
 
     last_text: str = ""
@@ -871,10 +857,11 @@ class XYItemTextField(TextInput):
     requirement that the contents be a floating point number by indicating
     if it is not.
     """
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.def_back_color = self.background_color
-        self.bind(text = self.set_error_message)
+        self.bind(text=self.set_error_message)
         self.hint_text = "Enter a number."
 
     def set_error_message(self, instance, text):
@@ -1074,20 +1061,26 @@ class VoltVarVoltWattTabContent(BoxLayout):
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
 
-    def __init__(self, der_screen, config, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, der_screen, project, *args, **kwargs):
+        super().__init__(project, *args, **kwargs)
         self._der_screen = der_screen
         self._options = args[0]
 
-        self.ids.min_soc.text = str(self._options.min_soc*100.0)
-        self.ids.max_soc.text = str(self._options.max_soc*100.0)
-        self.ids.init_soc.text = str(self._options.initial_soc*100.0)
+        self.ids.min_soc.text = str(self._options.min_soc * 100.0)
+        self.ids.max_soc.text = str(self._options.max_soc * 100.0)
+        self.ids.init_soc.text = str(self._options.initial_soc * 100.0)
 
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.max_soc), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.min_soc), 0.05)
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.init_soc), 0.05)
 
         self.load_all_control_data()
+
+        self._mode_dict = bidict({
+            "droop": "Droop", "voltvar": "Volt-Var", "voltwatt": "Volt-Watt",
+            "varwatt": "Var-Watt", "vv_vw": "Volt-Var & Volt-Watt",
+            "constantpf": "Constant Power Factor"
+        })
 
         if self._options is not None:
             if self._options.control.mode == "droop":
@@ -1120,15 +1113,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.set_const_power_factor_data()
 
     @staticmethod
-    def __set_focus_clear_sel(widget, value = True):
+    def __set_focus_clear_sel(widget, value=True):
         widget.focus = value
         Clock.schedule_once(lambda dt: widget.cancel_selection(), 0.05)
 
     def set_mode_label_text(self):
         """ Adds the current device name to the label that informs a user to select
         a current control model."""
-        self.ids.mode_label.text =\
-            f"Select a control mode for this storage asset: [b]{self.device_name}[/b]"
+        txt = f"Select a control mode for this storage asset: [b]{self.device_name}[/b]"
+        if self._options.control.mode:
+            pName = self._mode_dict[self._options.control.mode]
+            txt += f", currently [b]{pName}[/b]"
+        self.ids.mode_label.text = txt
 
     @property
     def device_name(self) -> str:
@@ -1144,6 +1140,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return "" if self._options is None else self._options.name
 
     def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
+        """A callback function used by the control mode tab to notify of tab changes
+
+        This extracts and stores any data that was input on the previous tab and then esnures
+        that the new tab is in the correct state.
+        """
         self.read_all_data()
         if tab_text == "Droop":
             self.set_droop_mode()
@@ -1160,6 +1161,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         else:
             self.set_droop_mode()
 
+        self.set_mode_label_text()
+
     def set_droop_mode(self):
         """Changes the current contorl mode for the current storage option to droop.
 
@@ -1171,7 +1174,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_droop_data(self):
         """Verifies the existence of droop parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         pval, qval = self.verify_droop_params()
         pfield = self.ids.droop_tab_content.ids.p_value
         qfield = self.ids.droop_tab_content.ids.q_value
@@ -1196,7 +1200,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return (
             self.__verify_control_param("droop", "p_droop", 500),
             self.__verify_control_param("droop", "q_droop", -300)
-            )
+        )
 
     def set_volt_var_mode(self):
         """Changes the current contorl mode for the current storage option to volt-var.
@@ -1209,7 +1213,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_data(self):
         """Verifies the existence of Volt-Var parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvs, var = self.verify_volt_var_params()
         self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
         self.ids.vv_tab_content.rebuild_plot()
@@ -1231,7 +1236,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return (
             self.__verify_control_param("voltvar", "volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
             self.__verify_control_param("voltvar", "vars", [1.0, 1.0, 0.0, -1.0, -1.0])
-            )
+        )
 
     def set_volt_watt_mode(self):
         """Changes the current contorl mode for the current storage option to volt-watt.
@@ -1244,7 +1249,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_watt_data(self):
         """Verifies the existence of Volt-Watt parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvs, wvs = self.verify_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
         self.ids.vw_tab_content.rebuild_plot()
@@ -1266,7 +1272,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return (
             self.__verify_control_param("voltwatt", "volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
             self.__verify_control_param("voltwatt", "watts", [1.0, 1.0, 0.0, -1.0, -1.0])
-            )
+        )
 
     def set_var_watt_mode(self):
         """Changes the current contorl mode for the current storage option to var-watt.
@@ -1279,7 +1285,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_var_watt_data(self):
         """Verifies the existence of Var-Watt parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvs, wvs = self.verify_var_watt_params()
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
         self.ids.var_watt_tab_content.rebuild_plot()
@@ -1301,7 +1308,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return (
             self.__verify_control_param("varwatt", "vars", [0.5, 0.95, 1.0, 1.05, 1.5]),
             self.__verify_control_param("varwatt", "watts", [1.0, 1.0, 0.0, -1.0, -1.0])
-            )
+        )
 
     def set_volt_var_and_volt_watt_mode(self):
         """Changes the current contorl mode for the current storage option to volt-var &
@@ -1315,7 +1322,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_volt_var_and_volt_watt_data(self):
         """Verifies the existence of Volt-Var & Volt-Watt parameters and then sets the contents of
-        the controls used to display and modify them."""
+        the controls used to display and modify them.
+        """
         vvvs, vars, vwvs, watts = self.verify_volt_var_and_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
@@ -1344,7 +1352,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             self.__verify_control_param("vv_vw", "vv_vars", [1.0, 1.0, 0.0, -1.0, -1.0]),
             self.__verify_control_param("vv_vw", "vw_volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
             self.__verify_control_param("vv_vw", "vw_watts", [1.0, 1.0, 0.0, -1.0, -1.0])
-            )
+        )
 
     def set_const_power_factor_mode(self):
         """Changes the current contorl mode for the current storage option to const PF.
@@ -1357,7 +1365,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     def set_const_power_factor_data(self):
         """Verifies the existence of the Constant Power Factor parameters and then sets the
-        contents of the controls used to display and modify them."""
+        contents of the controls used to display and modify them.
+        """
         cpf = self.verify_const_pf_params()
         pffield = self.ids.const_pf_tab_content.ids.pf_value
         pffield.text = str(cpf)
@@ -1450,7 +1459,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         if self._options.control.mode == name: return False
         self._options.control.mode = name
-        #self._options.control.params.clear()
+        # self._options.control.params.clear()
         return True
 
     def save(self):
@@ -1496,7 +1505,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         """
         self._extract_and_store_data_lists(
             self.ids.vv_tab_content.ids.grid, "voltvar", "volts", "vars"
-            )
+        )
 
     def read_voltwatt_data(self):
         """Reads and stores the entered data out of the controls for Volt-Watt mode.
@@ -1505,7 +1514,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         """
         self._extract_and_store_data_lists(
             self.ids.vw_tab_content.ids.grid, "voltwatt", "volts", "watts"
-            )
+        )
 
     def read_varwatt_data(self):
         """Reads and stores the entered data out of the controls for Var-Watt mode.
@@ -1514,7 +1523,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         """
         self._extract_and_store_data_lists(
             self.ids.var_watt_tab_content.ids.grid, "varwatt", "vars", "watts"
-            )
+        )
 
     def read_voltvar_and_voltwatt_data(self):
         """Reads and stores the entered data out of the controls for Volt-Var & Volt-Watt mode.
@@ -1523,11 +1532,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         """
         self._extract_and_store_data_lists(
             self.ids.vv_vw_tab_content.ids.vv_grid, "vv_vw", "vv_volts", "vv_vars"
-            )
+        )
 
         self._extract_and_store_data_lists(
             self.ids.vv_vw_tab_content.ids.vw_grid, "vv_vw", "vw_volts", "vw_watts"
-            )
+        )
 
     def cancel(self):
         """Returns to the "configure-storage" form.
@@ -1632,8 +1641,8 @@ class DERConfigurationScreen(SSimBaseScreen):
     def edit_storage(self, ess_list_item):
         ess = ess_list_item.ess
         # Remove from the list so it can be re-added after editing
-        #self.project.remove_storage_option(ess)
-        #self.ids.ess_list.remove_widget(ess_list_item)
+        # self.project.remove_storage_option(ess)
+        # self.ids.ess_list.remove_widget(ess_list_item)
         self.manager.add_widget(
             StorageConfigurationScreen(self, ess, name="configure-storage"))
         self.manager.current = "configure-storage"
@@ -1665,6 +1674,30 @@ class PVListItem(TwoLineAvatarIconListItem):
         self.text = pv.name
         self.secondary_text = str(pv.bus)
         self._der_screen = der_screen
+
+
+class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
+    def __init__(self, variable_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # self.config = config
+        self.text = variable_name
+
+    def toggle_selection(self):
+        self.parent.parent.parent.parent.parent.parent.update_selected_variables()
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
+
+class VariableListItem(TwoLineAvatarIconListItem):
+    def __init__(self, pk=None, **kwargs):
+        super().__init__(**kwargs)
+        self.pk = pk
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
 
 
 class LoadConfigurationScreen(SSimBaseScreen):
@@ -1705,11 +1738,14 @@ class RightCheckbox(IRightBodyTouch, MDCheckbox):
 
 
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
-    pass
+    def toggle_configuration_check(self, check):
+        print(check)
+        if check.active:
+            print('Configuration checked')
+        print("selection made")
 
 
 class MetricConfigurationScreen(SSimBaseScreen):
-
     _selBusses = []
     _currentMetricCategory = "None"
     _metricIcons = {"Bus Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"}
@@ -1720,9 +1756,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self._selBusses.clear()
         for wid in self.ids.interlist.children:
             if isinstance(wid, BusListItemWithCheckbox):
-                cb = wid.ids.check
-                if cb.active:
-                    self._selBusses.append(cb)
+                if wid.ids.check.active:
+                    self._selBusses.append(wid.ids.check)
 
     def on_kv_post(self, base_widget):
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
@@ -1787,21 +1822,21 @@ class MetricConfigurationScreen(SSimBaseScreen):
         is_varied = len(metrics) > 1
 
         if common_lower_limit is None:
-            self.ids.lowerLimitText.set_varied_mode() if is_varied else\
+            self.ids.lowerLimitText.set_varied_mode() if is_varied else \
                 self.ids.lowerLimitText.set_not_set_mode()
         else:
             self.ids.lowerLimitText.text = str(common_lower_limit)
             Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
 
         if common_upper_limit is None:
-            self.ids.upperLimitText.set_varied_mode() if is_varied else\
+            self.ids.upperLimitText.set_varied_mode() if is_varied else \
                 self.ids.upperLimitText.set_not_set_mode()
         else:
             self.ids.upperLimitText.text = str(common_upper_limit)
             Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
 
         if common_obj is None:
-            self.ids.objectiveText.set_varied_mode() if is_varied else\
+            self.ids.objectiveText.set_varied_mode() if is_varied else \
                 self.ids.objectiveText.set_not_set_mode()
         else:
             self.ids.objectiveText.text = str(common_obj)
@@ -1951,19 +1986,19 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
             if m.metric.improvement_type == ImprovementType.Minimize:
                 deets = "Upper Limit=" + str(m.metric.upper_limit) + ", " + \
-                    "Objective=" + str(m.metric.objective) + ", " + \
-                    "Sense=Minimize"
+                        "Objective=" + str(m.metric.objective) + ", " + \
+                        "Sense=Minimize"
 
             elif m.metric.improvement_type == ImprovementType.Maximize:
                 deets = "Lower Limit=" + str(m.metric.lower_limit) + ", " + \
-                    "Objective=" + str(m.metric.objective) + ", " + \
-                    "Sense=Maximize"
+                        "Objective=" + str(m.metric.objective) + ", " + \
+                        "Sense=Maximize"
 
             elif m.metric.improvement_type == ImprovementType.SeekValue:
                 deets = "Lower Limit=" + str(m.metric.lower_limit) + ", " + \
-                    "Upper Limit=" + str(m.metric.upper_limit) + ", " + \
-                    "Objective=" + str(m.metric.objective) + ", " + \
-                    "Sense=Seek Value"
+                        "Upper Limit=" + str(m.metric.upper_limit) + ", " + \
+                        "Objective=" + str(m.metric.objective) + ", " + \
+                        "Sense=Seek Value"
 
             bItem = MetricListItem(text=txt, secondary_text=deets)
             bItem.bus = key
@@ -2016,7 +2051,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         popup = Popup(
             title='Missing Metric Values', content=content, auto_dismiss=False,
             size_hint=(0.4, 0.4)
-            )
+        )
         content.ids.dismissBtn.bind(on_press=popup.dismiss)
         popup.open()
         return
@@ -2027,7 +2062,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         popup = Popup(
             title='Invalid Metric Values', content=content, auto_dismiss=False,
             size_hint=(0.4, 0.4)
-            )
+        )
         content.ids.msg_label.text = str(msg)
         content.ids.dismissBtn.bind(on_press=popup.dismiss)
         popup.open()
@@ -2039,7 +2074,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         popup = Popup(
             title='No Grid Model', content=content, auto_dismiss=False,
             size_hint=(0.4, 0.4)
-            )
+        )
         content.ids.dismissBtn.bind(on_press=popup.dismiss)
         content.ids.mainScreenBtn.bind(on_press=popup.dismiss)
         content.ids.mainScreenBtn.bind(on_press=self._return_to_main_screen)
@@ -2107,16 +2142,16 @@ class RunSimulationScreen(SSimBaseScreen):
             final_tertiary_text = "\n".join(tertiary_detail_text)
 
             self.ids.config_list.add_widget(
-                    ListItemWithCheckbox(pk="pk",
-                                         text=f"Configuration {ctr}",
-                                         secondary_text=final_secondary_text,
-                                         tertiary_text=final_tertiary_text)
+                ListItemWithCheckbox(pk="pk",
+                                     text=f"Configuration {ctr}",
+                                     secondary_text=final_secondary_text,
+                                     tertiary_text=final_tertiary_text)
             )
             ctr += 1
 
     def _evaluate(self):
         # step 1: check the configurations that are currently selected
-        mdlist = self.ids.config_list # get reference to the configuration list
+        mdlist = self.ids.config_list  # get reference to the configuration list
         self.selected_configurations = []
         print('selected configurations are:')
         no_of_configurations = len(self.configurations)
@@ -2132,12 +2167,221 @@ class RunSimulationScreen(SSimBaseScreen):
         # run all the configurations
         for config in self.selected_configurations:
             print(config)
-            config.evaluate()
+            config.evaluate(basepath=self.project.base_dir)
             config.wait()
 
     def run_configurations(self):
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
+
+    def open_results_summary(self):
+        self.manager.current = "results-summary"
+
+    def open_visualize_results(self):
+        self.manager.current = "results-visualize"
+
+
+class ResultsVisualizeScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.project_results = ProjectResults(self.project)
+
+
+class ResultsSummaryScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.project_results = ProjectResults(self.project)
+
+    def on_enter(self):
+        self.draw_canvas()
+        for result in self.project_results.results():
+            print(result.config_dir)
+
+    def draw_canvas(self):
+        # sample plot for testing purposes
+        # TO DO: develop the backend for creating these plots
+        # x_data = [1, 2, 3, 4, 5]
+        # y_data = [1, 4, 9, 15, 25]
+        # fig, ax = plt.subplots()
+        # ax.plot(x_data, y_data)
+        # ax.set_xlabel('Configuration #')
+        # ax.set_ylabel('Aggregate Metics')
+
+        accumulated_metric_fig = self.project_results.plot_accumulated_metrics()
+
+        # Add Kivy widget to the canvas
+        self.ids.summary_canvas.clear_widgets()
+        self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
+
+    def open_results_compare(self):
+        self.manager.current = "results-compare"
+
+    def open_results_detail(self):
+        self.manager.current = "results-detail"
+
+
+class ResultsCompareScreen(SSimBaseScreen):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+class ResultsDetailScreen(SSimBaseScreen):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.configurations: List[Configuration] = []
+        self.selected_variables = {}
+        self.variables = {}
+        self.current_configuration = None
+        self.list_items = []
+        self.selected_list_items = {}
+        self.variable_data = pd.DataFrame()
+        self.figure = None
+
+    def on_enter(self):
+        # populated `selected_list_items` assuming no selection from dropdown
+        # menu
+        # TO DO: Replace with evaluated configurations
+        num_configs = len(list(self.project.configurations()))
+        for ctr in range(num_configs):
+            self.selected_list_items['Configuration ' + str(ctr + 1)] = []
+
+    def dismiss_popup(self):
+        self._popup.dismiss()
+
+    def _create_figure(self):
+        fig = plt.figure()
+        plt.clf()
+        project_results = self.project_results.results()
+        ctr = 1
+        for result in project_results:
+            _, data = result.storage_state()
+            config_key = 'Configuration ' + str(ctr)
+            # columns to plot
+            columns_to_plot = self.selected_list_items[config_key]
+            # select subset of data based on columns_to_plot
+            selected_data = data[columns_to_plot]
+            x_data = data.loc[:, 'time']
+            # add the selected columns to plot
+            for column in selected_data.keys():
+                plt.plot(x_data, selected_data[column], label=config_key + '-' + column)
+            ctr += 1
+
+        plt.xlabel('time')
+        if self.ids.detail_figure_ylabel.text is not None:
+            plt.ylabel(self.ids.detail_figure_ylabel.text)
+        plt.legend()
+        if self.ids.detail_figure_title is not None:
+            plt.title(self.ids.detail_figure_title.text)
+        else:
+            plt.title('Detail Plots')
+
+        return fig
+
+    def update_figure(self):
+        self.figure = self._create_figure()
+        Logger.debug("Figure update command issued from GUI ...")
+        Logger.debug(self.ids.detail_figure_title.text)
+        self.ids.detail_plot_canvas.clear_widgets()
+        self.ids.detail_plot_canvas.add_widget(
+            FigureCanvasKivyAgg(self.figure)
+        )
+
+    def save_figure_options(self):
+        '''Saves the current active figure.'''
+        chooser = SaveFigureDialog(
+            save=self.save_figure, cancel=self.dismiss_popup
+        )
+
+        self._popup = Popup(title="save figure options", content=chooser)
+        self._popup.open()
+
+    def save_figure(self, path, filename):
+        Logger.debug("Saving figure ... ")
+        Logger.debug(filename)
+        self.figure.savefig(filename + '.png', dpi=300)
+
+    def clear_figure(self):
+        self.ids.detail_plot_canvas.clear_widgets()
+
+    def drop_config_menu(self):
+        for config in self.project.configurations():
+            self.configurations.append(config)
+
+        # TO DO: Replace with evaluated configurations
+        num_configs = len(list(self.project.configurations()))
+        # num_configs = self.project.num_configurations()
+
+        menu_items = []
+        for ctr in range(num_configs):
+            display_text = "Configuration " + str(ctr + 1)
+            menu_items.append({
+                "viewclass": "OneLineListItem",
+                "text": display_text,
+                "on_release": lambda x=display_text: self.set_config(x)
+            })
+
+        self.menu = MDDropdownMenu(
+            caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+        )
+        self.menu.open()
+
+    def update_selected_variables(self):
+        print('Update selected variables called!')
+
+        # self.selected_list_items = {}
+        selected_items = []
+        for variable in self.ids.variable_list_detail.children:
+            if variable.selected:
+                selected_items.append(variable.text)
+
+        self.selected_list_items[self.current_configuration] = selected_items
+
+        print(self.current_configuration)
+        print(self.selected_list_items)
+
+    def set_config(self, value):
+
+        print(">>>>>>>>>>>>>>>>>>>>>>>>>")
+        print(value)
+
+        self.current_configuration = value
+
+        print(self.selected_variables)
+        # read the current selected configuration
+        self.ids.config_list_detail.text = value
+
+        # extract all results from all the configutations
+        project_results = self.project_results.results()
+        # obtain the index for the current selected configuration
+        # TODO: setup a proper mapping system between Results and Configuration
+        current_result_index = int(value[-1]) - 1
+        # extract the `current_result` based on selection from drop down menu
+        current_result = next(itertools.islice(project_results, current_result_index, None))
+
+        # extract the data
+        self.list_items, self.variable_data = current_result.storage_state()
+
+        self.x_data = list(self.variable_data.loc[:, 'time'])
+
+        self.ids.variable_list_detail.clear_widgets()
+        # add the list of variables in the selected configuration
+        # into the MDList
+
+        Logger.debug('>>> Current selection records: ')
+        Logger.debug(self.selected_list_items)
+
+        for item in self.list_items:
+            # do not add 'time' to the variable list
+            if item == 'time':
+                continue
+            else:
+                self.ids.variable_list_detail.add_widget(
+                    ResultsVariableListItemWithCheckbox(variable_name=item)
+                )
+
+        # close the drop-down menu
+        self.menu.dismiss()
 
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
@@ -2189,8 +2433,13 @@ class SaveSSIMTOMLDialog(FloatLayout):
             self.ids.filenamefield.text = os.path.basename(sel)
 
 
-class SSimScreen(SSimBaseScreen):
+class SaveFigureDialog(FloatLayout):
+    save = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+    text_input = ObjectProperty(None)
 
+
+class SSimScreen(SSimBaseScreen):
     grid_path = ObjectProperty(None)
 
     def on_kv_post(self, base_widget):
@@ -2210,7 +2459,12 @@ class SSimScreen(SSimBaseScreen):
         self.dismiss_popup()
 
     def reset_grid_model_label(self):
-        self.ids.grid_model_label.text = "Grid Model: " + self.project._grid_model_path
+        self.ids.grid_model_label.text = "Grid Model: " \
+ \
+        if self.project._grid_model_path:
+            self.ids.grid_model_label.text += self.project._grid_model_path
+        else:
+            self.ids.grid_model_label.text += "None"
 
     def reset_project_name_field(self):
         self.ids.project_name.text = self.project.name
@@ -2327,7 +2581,7 @@ class SSimScreen(SSimBaseScreen):
         dssdirect.Lines.Name(line)
         return [dssdirect.Lines.Bus1(), dssdirect.Lines.Bus2()]
 
-    #def plot_line(self, line):
+    # def plot_line(self, line):
     #    x, y = zip(*line_bus_coords(line))
     #    if (0 in x) and (0 in y):
     #        return
@@ -2373,7 +2627,6 @@ class SSimScreen(SSimBaseScreen):
     def changed_show_bus_labels(self, active_state):
         self.refresh_grid_plot()
 
-
     def refresh_grid_plot(self):
         gm = self.project.grid_model
         plt.clf()
@@ -2410,8 +2663,7 @@ class SSimScreen(SSimBaseScreen):
                 seg_busses[self.get_raw_bus_name(bus1)] = bc1
                 seg_busses[self.get_raw_bus_name(bus2)] = bc2
 
-
-            line_segments = [self.line_bus_coords(line)  for line in seg_lines]
+            line_segments = [self.line_bus_coords(line) for line in seg_lines]
 
             if len(line_segments) == 0:
                 self.ids.grid_diagram.display_plot_error(
@@ -2419,22 +2671,22 @@ class SSimScreen(SSimBaseScreen):
                 )
                 return
 
-            #line_widths = [num_phases(line) for line in lines[:-1]]
+            # line_widths = [num_phases(line) for line in lines[:-1]]
 
-            #substation_lat, substation_lon = self._get_substation_location()
-            #distance = functools.partial(self._distance_meters, substation_lat, substation_lon)
+            # substation_lat, substation_lon = self._get_substation_location()
+            # distance = functools.partial(self._distance_meters, substation_lat, substation_lon)
 
-            #distances = [min(distance(b1[1], b1[0]), distance(b2[1], b2[0]))  # / 2.0
+            # distances = [min(distance(b1[1], b1[0]), distance(b2[1], b2[0]))  # / 2.0
             #             for b1, b2 in line_segments]
 
-            #groups = [self.group(dist / max(distances)) for dist in distances]
+            # groups = [self.group(dist / max(distances)) for dist in distances]
 
             lc = LineCollection(
                 line_segments, norm=plt.Normalize(1, 3), cmap='tab10'
-                )  # , linewidths=line_widths)
+            )  # , linewidths=line_widths)
 
             lc.set_capstyle('round')
-            #lc.set_array(np.array(groups))
+            # lc.set_array(np.array(groups))
 
             fig, ax = plt.subplots()
             fig.tight_layout()
@@ -2469,13 +2721,13 @@ class SSimScreen(SSimBaseScreen):
                 loc = seg_busses[bus]
                 ax.annotate(bus, (loc[0], loc[1]))
 
-        #plt.title("Grid Layout")
+        # plt.title("Grid Layout")
 
-        #xlocs, xlabels = plt.xticks()
-        #ylocs, ylabels = plt.yticks()
-        #plt.xticks(ticks=xlocs, labels=[])
-        #plt.yticks(ticks=ylocs, labels=[])
-        #plt.grid()
+        # xlocs, xlabels = plt.xticks()
+        # ylocs, ylabels = plt.yticks()
+        # plt.xticks(ticks=xlocs, labels=[])
+        # plt.yticks(ticks=ylocs, labels=[])
+        # plt.grid()
         plt.xticks([])
         plt.yticks([])
 
@@ -2824,7 +3076,6 @@ def _make_xy_matlab_plot(mpb: MatlabPlotBox, xs: list, ys: list, xlabel: str, yl
 
 def _configure_fonts(exo_regular, exo_bold, exo_italic,
                      opensans_regular, opensans_bold, opensans_italic):
-
     # Configure the fonts use but the quest style
     LabelBase.register(
         name='Exo 2',
