@@ -1061,10 +1061,10 @@ class VoltVarVoltWattTabContent(BoxLayout):
 class StorageControlConfigurationScreen(SSimBaseScreen):
     """Configure the control strategy of a single energy storage device."""
 
-    def __init__(self, der_screen, project, *args, **kwargs):
+    def __init__(self, der_screen, project, options, *args, **kwargs):
         super().__init__(project, *args, **kwargs)
         self._der_screen = der_screen
-        self._options = args[0]
+        self._options = options
 
         self.ids.min_soc.text = str(self._options.min_soc * 100.0)
         self.ids.max_soc.text = str(self._options.max_soc * 100.0)
@@ -2459,8 +2459,8 @@ class SSimScreen(SSimBaseScreen):
         self.dismiss_popup()
 
     def reset_grid_model_label(self):
-        self.ids.grid_model_label.text = "Grid Model: " \
- \
+        self.ids.grid_model_label.text = "Grid Model: "
+
         if self.project._grid_model_path:
             self.ids.grid_model_label.text += self.project._grid_model_path
         else:
