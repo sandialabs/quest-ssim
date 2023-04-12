@@ -28,6 +28,31 @@ from ssim.metrics import MetricManager, MetricTimeAccumulator
 # 2. Add basic Configuration implementation
 # 3. Implement Configuration.evaluate()
 
+def __eq_maybe_none(v1, v2) -> bool:
+    """Compares two objects for equality where 0, 1, or both of the arguments
+    may be None.
+
+    Parameters
+    ----------
+    v1:
+        The first of two objects to compare.  This argument may be None.
+    v2:
+        The second of the two objects to compare.  This argument may be None.
+
+    Return
+    ------
+    bool:
+        True if both arguments are None.  False if 1 is None and the other is not.
+        Otherwise, the result of v1 == v2.
+    """
+    if v1 is None:
+        return v2 is None
+
+    if v2 is None:
+        return False # we already know v1 is not None.
+
+    return v1 == v2
+
 
 _DEFAULT_RELIABILITY = {
     # "seed": 1234567,
@@ -71,6 +96,51 @@ class Project:
         self.storage_devices = []
         self.pvsystems = []
         self._metricMgrs = {}
+
+    def __eq__(self, other):
+
+        # Should input file path be included?  Maybe not.
+        if self.name != other.name or \
+            not __eq_maybe_none(self._grid_model_path == other._grid_model_path):# or \
+            #not __eq_maybe_none(self._input_file_path == other._input_file_path):
+            return False;
+
+        if len(self.storage_devices) != len(other.storage_devices): return False
+        if len(self.pvsystems) != len(other.pvsystems): return False
+        if len(self._metricMgrs) != len(other._metricMgrs): return False
+
+        for so in self.storage_devices:
+            if not so in other.storage_devices: return False
+
+        for pv in self.pvsystems:
+            if not pv in other.pvsystems: return False
+
+        for k, v in self._metricMgrs:
+            if k not in other._metricMgrs: return False
+            if v != other._metricMgrs[k]: return False
+
+        return True
+
+    def __hash__(self):
+        hval = hash(self.name)
+
+        if self._grid_model_path is not None:
+            hval = hash((hval, self._grid_model_path))
+
+        #as with __eq__, skip the input file path.
+        #if self._input_file_path is not None:
+        #    hval = hash((hval, self._input_file_path))
+
+        for so in self.storage_devices.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
+
+        for pv in self.pvsystems.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
+
+        for k,v in sorted(self._metricMgrs.items()):
+            hval = hash((hval, k, v))
+
+        return hval
 
     def load_toml_file(self, filename: str):
         """Reads data for this Project from the supplied TOML file.
@@ -331,6 +401,29 @@ class StorageControl:
         self.mode = mode
         self.params = params
 
+    def __eq__(self, other):
+
+        if self.mode != other.mode: return False
+
+        smp = self.mode in self.params
+        omp = self.mode in other.params
+        if smp != omp: return False
+
+        # if it's not in 1, it's not in either and we are done and equal.
+        if not smp: return True
+
+        # if we're here, then there are params for the mode in each of self and other
+        # compare them now, only for the chosen mode.
+        return self.params[mode] == other.params[mode]
+
+    def __hash__(self):
+        hval = hash(self.mode)
+
+        if self.mode in self.params:
+            hval = hash(hval, self.params)
+
+        return hval
+
     def write_toml(self, name: str)->str:
         """Writes the properties of this class instance to a string in TOML
            format.
@@ -487,6 +580,28 @@ class StorageOptions:
         self.control = control or StorageControl('droop')
         self.soc_model = soc_model
         self.required = required
+
+    def __eq__(self, other):
+
+        return self.name == other.name and \
+            self.phases == other.phases and \
+            self.min_soc == other.min_soc and \
+            self.max_soc == other.max_soc and \
+            self.initial_soc == other.initial_soc and \
+            self.power == other.power and \
+            self.duration == other.duration and \
+            self.busses == other.busses and \
+            self.soc_model == other.soc_model and \
+            not __eq_maybe_none(self.control, other.control) and \
+            self.required == other.required
+
+    def __hash__(self):
+        hval = 0 if not self.control else hash(self.control)
+
+        return hash((
+            hval, self.name, self.phases, self.min_soc, self.max_soc, self.initial_soc, \
+            self.power, self.duration, self.busses, self.soc_model, self.required
+            ))
 
     def write_toml(self)->str:
         """Writes the properties of this class instance to a string in TOML format.
@@ -799,7 +914,7 @@ class MetricCongifuration:
        Only voltage metrics are supported at this time.
     """
 
-    def __init__(self, bus, objective, limit):
+    def __init__(self, bus, objective, lower_limit, upper_limit):
         """Constructs a new MetricConfiguration object.
 
         Parameters
@@ -809,12 +924,25 @@ class MetricCongifuration:
         objective
             The objective value for this metric configuration.  This is the target
             value which if achieved, results in full satisfaction.
-        limit
-            The worst acceptable value for this metric.
+        lower_limit
+            The worst acceptable value for this metric on the low side of the objective.
+        upper_limit
+            The worst acceptable value for this metric on the high side of the objective.
         """
         self.bus = bus
-        self.limit = limit
+        self.upper_limit = upper_limit
+        self.lower_limit = lower_limit
         self.objective = objective
+
+    def __eq__(self, other):
+        return __eq_maybe_none(self.bus, other.bus) and \
+            self.lower_limit == other.lower_limit and \
+            self.upper_limit == other.upper_limit and \
+            self.objective == other.objective
+
+    def __hash__(self):
+        hval = 0 if self.bus is None else hash(self.bus)
+        return hash((hval, self.upper_limit, self.lower_limit, self.objective))
 
     def to_dict(self):
         """Return a dict representation of this metric."""
@@ -840,6 +968,63 @@ class Configuration:
         self._federation_path = None
         self._proc = None
         self._workdir = Path(".")
+
+    def __eq__(self, other):
+        """Compares this instance of a Configuration to another for functional
+        equality.
+
+        Funcitonal equality means "effectively equal", not necessarily literaly equal.
+        As an example, in some cases, it may not matter if the order of some objects
+        in a collection be the same, as long as there is an equivalent object in each.
+
+        The intent is to ensure that if this returns true, then an analysis using this
+        object will result in the same answer as an analysis using the other.
+
+        Parameters
+        ----------
+        other:
+            The other configuration to compare to this one for equality.
+
+        Return
+        ------
+        bool:
+            True if the other is functionally equal to this and false otherwise.
+        """
+        if self.grid != other.grid or \
+            self.sim_duration != other.sim_duration or \
+            not __eq_maybe_none(self._grid_path, other._grid_path) or \
+            not __eq_maybe_none(self._federation_path, other._federation_path) or \
+            not __eq_maybe_none(self._workdir, other._workdir):
+            return False
+
+        if len(self.metrics) != len(other.metrics): return False
+        if len(self.pvsystems) != len(other.pvsystems): return False
+        if len(self.storage) != len(other.storage): return False
+
+        for k, v in self.metrics:
+            if k not in other.metrics: return False
+            if v != other._metricMgrs[k]: return False
+
+        for pv in self.pvsystems:
+            if not pv in other.pvsystems: return False
+
+        for ss in self.storage:
+            if not ss in other.storage: return False
+
+    def __hash__(self):
+        hVal = hash((
+            self.grid, self.sim_duration, self._grid_path,
+            self._federation_path, self._workdir
+            ))
+
+        for k,v in sorted(self._metricMgrs.items()):
+            hval = hash((hval, k, v))
+
+        for so in self.storage.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
+
+        for pv in self.pvsystems.sort(key=lambda x: x.name):
+            hval = hash((hval, so))
 
     @property
     def id(self):
@@ -1084,6 +1269,7 @@ class ProjectResults:
             plt.title('Comparison of Metric for Different Configurations')
             config_count += 1
             return fig
+
 
 _OPENDSS_ILLEGAL_CHARACTERS = "\t\n .="
 

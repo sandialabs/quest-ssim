@@ -180,7 +180,23 @@ class Metric:
         self._c = c
         self._g = g
         self._validate_inputs()
-                
+
+    def __eq__(self, other):
+        return self._lower_limit == other._lower_limit and \
+            self._upper_limit == other._upper_limit and \
+            self._objective == other._objective and \
+            self._imp_type == other._imp_type and \
+            self._a == other._a and \
+            self._b == other._b and \
+            self._c == other._c and \
+            self._g == other._g
+
+    def __hash__(self):
+        return hash((
+            self._lower_limit, self._upper_limit, self._objective, self._imp_type,
+            self._a, self._b, self._c, self._g
+            ))
+
     @property
     def lower_limit(self) -> float:
         """Allows access to the supplied lower limit value for this metric.
@@ -716,6 +732,12 @@ class MetricAccumulator:
         self._accumulated = 0.0
         self._total_time = 0.0
 
+    def __eq__(self, other):
+        return self._metric == other._metric
+
+    def __hash__(self):
+        return hash(self._metric)
+
     def accumulate(self, value: float, d_time: float) -> float:
         """Adds in normalized value weighted by the amount of time provided.
 
@@ -867,7 +889,13 @@ class MetricTimeAccumulator(MetricAccumulator):
     def __init__(self, m: Metric, init_time: float=0.0):
         MetricAccumulator.__init__(self, m)
         self._curr_time = init_time
-            
+
+    def __eq__(self, other):
+        return self._metric == other._metric
+
+    def __hash__(self):
+        return hash(self._metric)
+
     @staticmethod
     def read_toml(tomlData) -> MetricTimeAccumulator:
         """Reads the properties of a metric time accumulator class instance
@@ -923,6 +951,41 @@ class MetricManager:
     """A class used to manage a set of metric accumulators keyed on names."""
     def __init__(self):
         self._all_metrics = {}
+
+    def __eq__(self, other):
+        """Checks to see if this manager is functionally equivalent to another.
+
+        Functionally equivalent means that for the purpose of solving, this manager will
+        be effectively equivalent. An example of functionally equivalent but not strictly
+        equivalent would be if the metrics are the same but not in the same order in the
+        dictionary.
+
+        Parameters
+        ----------
+        other:
+            The other MetricManager to compare to this for functional equivalence.
+
+        Return
+        ------
+        bool:
+            True if the other is functionally equivalent to this and False otherwise.
+        """
+        if len(self._all_metrics) != len(other._all_metrics): return False
+
+        for mk, ma in self._all_metrics.items():
+            if mk not in other._all_metrics: return False
+            if ma != other._all_metrics[mk]: return False
+
+        return True
+
+    def __hash__(self):
+        hval = 0
+
+        # Iterate in sorted order to make a functional rather than literal hash.
+        for k,v in sorted(self._all_metrics.items()):
+            hval = hash((hval, k, v))
+
+        return hval
 
     def add_accumulator(self, name: str, accum: MetricTimeAccumulator):
         """ Adds a new time accumulator to this metric manager.
