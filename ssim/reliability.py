@@ -400,43 +400,67 @@ class GridReliabilityModel:
         with open(config_file) as f:
             config = json.load(f)
         self._model_params = config["reliability"]
-        seed = self._model_params.get("seed")
+        seed = self._model_params.get("seed", random.uniform(0, 1000000))
         if seed is not None:
             random.seed(seed)
         dssutil.load_model(config["dss_file"])
         lines = list(
             dssutil.iterate_properties(opendssdirect.Lines, ["IsSwitch"])
         )
-        self._lines = {
-            f"line.{line}": self._make_line_reliability_model()
-            for line, properties in lines if not properties.IsSwitch
-        }
-        self._switches = {
-            f"line.{switch}": self._make_switch_reliability_model(switch)
-            for switch, properties in lines if properties.IsSwitch
-        }
-        self._generators = {
-            f"generator.{generator}": self._make_generator_reliability_model(
-                generator
-            )
-            for generator in opendssdirect.Generators.AllNames()
-        }
+        self._lines = {}
+        if self._line_reliability_enabled:
+            self._lines = {
+                f"line.{line}": self._make_line_reliability_model()
+                for line, properties in lines if not properties.IsSwitch
+            }
+        self._switches = {}
+        if self._switch_reliability_enabled:
+            self._switches = {
+                f"line.{switch}": self._make_switch_reliability_model(switch)
+                for switch, properties in lines if properties.IsSwitch
+            }
+        self._generators = {}
+        if self._generator_reliability_enabled:
+            self._generators = {
+                f"generator.{generator}":
+                self._make_generator_reliability_model(
+                    generator
+                )
+                for generator in opendssdirect.Generators.AllNames()
+            }
+
+    def _model_enabled(self, model):
+        model = self._model_params.get(model, None)
+        if model is None:
+            return False
+        # if a model exists it is enabled by default
+        return model.get("enabled", True)
+
+    @property
+    def _line_reliability_enabled(self):
+        return self._model_enabled("line")
+
+    @property
+    def _switch_reliability_enabled(self):
+        return self._model_enabled("switch")
+
+    @property
+    def _generator_reliability_enabled(self):
+        return self._model_enabled("generator")
 
     def _make_generator_reliability_model(self, generator):
         rm = MultiModeReliabilityModel()
-        if "aging" in self._model_params["generator"]:
-            aging_params = self._model_params["generator"]["aging"]
-            rm.add_failure_mode(
-                AgingFailure(
-                    aging_params["mtbf"]*3600,
-                    aging_params["min_repair"]*3600,
-                    aging_params["max_repair"]*3600
-                )
-            )
+        self._make_generator_aging_model(rm)
+        self._make_generator_wearout_model(rm)
+        return rm
+
+    def _make_generator_wearout_model(self, rm):
         if "operating_wear_out" in self._model_params["generator"]:
             wearout_params = self._model_params["generator"][
                 "operating_wear_out"
             ]
+            if not wearout_params.get("enabled", True):
+                return
             rm.add_failure_mode(
                 OperatingWearOut(
                     wearout_params["mtbf"]*3600,
@@ -444,7 +468,19 @@ class GridReliabilityModel:
                     wearout_params["max_repair"]*3600
                 )
             )
-        return rm
+
+    def _make_generator_aging_model(self, rm):
+        if "aging" in self._model_params["generator"]:
+            aging_params = self._model_params["generator"]["aging"]
+            if not aging_params.get("enabled", True):
+                return
+            rm.add_failure_mode(
+                AgingFailure(
+                    aging_params["mtbf"]*3600,
+                    aging_params["min_repair"]*3600,
+                    aging_params["max_repair"]*3600
+                )
+            )
 
     def _make_line_reliability_model(self):
         """Construct a line reliability model"""
@@ -476,6 +512,8 @@ class GridReliabilityModel:
         return rm
 
     def peek(self):
+        if self._num_models == 0:
+            return np.inf
         return min(
             model.next_update() for model in self.all_models()
         )
@@ -493,12 +531,18 @@ class GridReliabilityModel:
             self._generators.items()
         )
 
+    @property
+    def _num_models(self):
+        return len(list(self.all_models()))
+
     def all_models(self):
         return itertools.chain(
             model for _, model in self._all_components()
         )
 
     def update(self, time, generator_status):
+        if self._num_models == 0:
+            return
         for model in itertools.chain(self._lines.values(),
                                      self._switches.values()):
             model.update(time)

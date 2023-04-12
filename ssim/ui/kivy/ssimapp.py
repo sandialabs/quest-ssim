@@ -1,6 +1,7 @@
 """Storage Sizing and Placement Kivy application"""
 from contextlib import ExitStack
 import itertools
+import math
 import os
 import re
 from threading import Thread
@@ -40,12 +41,13 @@ from kivy.uix.behaviors import FocusBehavior
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.button import MDFlatButton, MDRectangleFlatIconButton
 from kivymd.uix.list import OneLineListItem
-from kivymd.uix.tab import MDTabsBase
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleboxlayout import RecycleBoxLayout
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.scrollview import ScrollView
 from kivy.uix.textinput import TextInput
+from kivymd.uix.tab import MDTabsBase
+from kivymd.uix.gridlayout import MDGridLayout
 
 from kivymd.app import MDApp
 from kivymd.uix.list import (
@@ -196,6 +198,8 @@ class SSimApp(MDApp):
         screen_manager.add_widget(
             MetricConfigurationScreen(self.project, name="metric-config"))
         screen_manager.add_widget(
+            ReliabilityConfigurationScreen(self.project, name="reliability-config"))
+        screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
         screen_manager.current = "ssim"
 
@@ -325,25 +329,56 @@ class TextFieldMultiFloat(MDTextField):
 
 
 class TextFieldPositiveFloat(MDTextField):
-    POSITIVE_FLOAT = re.compile(r"\d*(\.\d*)?$")
+    """An input field that only accepts positive floating point numbers.
 
-    def __init__(self, *args, **kwargs):
+    Parameters
+    ----------
+    minimum : float, default 0.0
+        Impose a lower limit (inclusive) on the acceptable values.
+    maximum : float, default inf
+        Impose an upper limit (inclusive) on the acceptable values.
+    kwargs
+        Additional arguments for initializing the text field. See
+        :py:class:`MDTextField` for allowed parameters
+    """
+
+    POSITIVE_FLOAT = re.compile(r"((\d+(\.\d*)?)|(\d*(\.\d+)))$")
+
+    def __init__(self, minimum=0.0, maximum=math.inf, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper_text_mode = "on_focus"
         self.helper_text = "Input value and press enter"
+        if (minimum < 0.0) or (maximum < minimum):
+            raise ValueError(
+                "minimum and maximum must be non-negative "
+                "numbers with `minimum` <= `maximum`"
+            )
+        self.minimum = minimum
+        self.maximum = maximum
 
     def text_valid(self):
-        return TextFieldPositiveFloat.POSITIVE_FLOAT.match(self.text) is not None
+        if TextFieldPositiveFloat.POSITIVE_FLOAT.match(self.text) is None:
+            return False
+        value = float(self.text)
+        return self.minimum <= value <= self.maximum
 
     def set_text(self, instance, value):
         if value == "":
             return
         self.set_error_message()
 
+    @property
+    def _error_message(self):
+        if self.minimum == 0.0 and self.maximum == math.inf:
+            return "You must enter a non-negative number."
+        if self.maximum == math.inf:
+            return f"You must enter a number greater than {self.minimum}"
+        return f"You must enter a number between {self.minimum} and {self.maximum}"
+
     def set_error_message(self):
         if not self.text_valid():
             self.error = True
-            self.helper_text = "You must enter a non-negative number."
+            self.helper_text = self._error_message
         else:
             self.error = False
             self.helper_text = "Input value and press enter"
@@ -423,7 +458,9 @@ class EditableSetListItem(OneLineRightIconListItem):
     def __init__(self, item, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._value = item
-        self.ids.delete.bind(on_release=self._delete_item)
+        self.ids.delete.bind(
+            on_release=self._delete_item
+        )
 
     def _delete_item(self, item):
         self.parent.remove_item(self._value)
@@ -708,7 +745,7 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
     index: int = -1
 
     last_text: str = ""
-        
+
     @property
     def x_value(self):
         """Returns the current contents of the x value field of this row.
@@ -2049,7 +2086,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # store all the project configurations into a list
         for config in self.project.configurations():
             self.configurations.append(config)
-            print(config._id)
+            print(config.id)
 
         # populate the UI with the list of configurations
         ctr = 1
@@ -2185,7 +2222,15 @@ class SSimScreen(SSimBaseScreen):
         self.reset_grid_model_label()
         self.reset_project_name_field()
         self.refresh_grid_plot()
+        self.reset_reliability()
         self.dismiss_popup()
+
+    def reset_reliability(self):
+        """Notify the reliability form to reload the model parameters."""
+        Logger.debug(
+            f"Reseting reliability: {self.project.reliability_params}")
+        reliability = self.manager.get_screen("reliability-config")
+        reliability.load(self.project.reliability_params)
 
     def set_current_input_file(self, fullpath):
         self.project._input_file_path = fullpath
@@ -2253,6 +2298,9 @@ class SSimScreen(SSimBaseScreen):
 
     def open_metric_configuration(self):
         self.manager.current = "metric-config"
+
+    def open_reliability_configuration(self):
+        self.manager.current = "reliability-config"
 
     def do_run_simulation(self):
         self.manager.current = "run-sim"
@@ -2436,6 +2484,292 @@ class SSimScreen(SSimBaseScreen):
 
         dg = self.ids.grid_diagram
         dg.reset_plot()
+
+
+class ValidationError(Exception):
+    """Raised for parameter validation errors."""
+    pass
+
+
+class ReliabilityModelTab(MDGridLayout, MDTabsBase):
+    """Base class for tabs used to configure reliability models.
+
+    The property `model_name` should be set to the name the model is
+    saved as in the JSON grid configuration file.
+    """
+
+    def __init__(self, model_name="unnamed", *args, **kwargs):
+        self.model_name = model_name
+        super().__init__(*args, **kwargs)
+
+    def validate(self):
+        try:
+            self.to_dict()
+        except ValueError:
+            raise ValidationError(
+                f"Invalid or missing values in {self.model_name}"
+            )
+        return True
+
+    def to_dict(self):
+        raise NotImplementedError()
+
+    def load(self):
+        raise NotImplementedError()
+
+
+class LineReliabilityParams(ReliabilityModelTab):
+    """Parameters for the line reliability model."""
+
+    @property
+    def enabled(self):
+        """Return True if the line reliability model is enabled."""
+        return self.ids.enabled.active
+
+    def validate(self):
+        super().validate()
+        if not self.enabled:
+            return True
+        d = self.to_dict()
+        if d["min_repair"] <= d["max_repair"]:
+            return True
+        raise ValidationError(
+            f"{self.model_name}:\n\tMinimum repair time must be "
+            f"less than or equal to maximum repair time."
+        )
+
+    def to_dict(self):
+        """Return a dictionary of the model parameters."""
+        try:
+            return {
+                "enabled": self.enabled,
+                "mtbf": float(self.ids.line_mtbf.text),
+                "min_repair": float(self.ids.line_repair_min.text),
+                "max_repair": float(self.ids.line_repair_max.text)
+            }
+        except ValueError:
+            return {"enabled": self.enabled}
+
+    def load(self, params):
+        """Load model parameters from `params` into the form.
+
+        Parameters
+        ----------
+        params : dict
+            Distionary with optional keys 'enabled', 'mtbf', 'min_repair',
+            and 'max_repair'.
+        """
+        self.ids.enabled.active = params.get("enabled", False)
+        self.ids.line_mtbf.text = str(params.get("mtbf", ""))
+        self.ids.line_repair_min.text = str(params.get("min_repair", ""))
+        self.ids.line_repair_max.text = str(params.get("max_repair", ""))
+
+
+class SwitchReliabilityParams(ReliabilityModelTab):
+    """Parameters for the switch reliability model."""
+
+    @property
+    def enabled(self):
+        """Return True if the switch reliability mdoel is enabled."""
+        return self.ids.enabled.active
+
+    def validate(self):
+        if not super().validate():
+            return False
+        if not self.enabled:
+            return True
+        d = self.to_dict()
+        # XXX This will work, but we don't provide any useful error
+        #     message to the user.
+        repair_valid = d["min_repair"] <= d["max_repair"]
+        prob_valid = (d["p_open"] + d["p_closed"] + d["p_current"]) == 1.0
+        if repair_valid and prob_valid:
+            return True
+        message = f"{self.model_name}: "
+        if not repair_valid:
+            message += (
+                "\n\tMinimum repair time must be less than or equal "
+                "to maximum repair time"
+            )
+        if not prob_valid:
+            message += (
+                "\n\tp_open, p_closed, and p_current must sum to 1.0"
+            )
+        raise ValidationError(message)
+
+    def to_dict(self):
+        """Return a dictionary of the model parameters."""
+        try:
+            return {
+                "enabled": self.enabled,
+                "mtbf": float(self.ids.switch_mtbf.text),
+                "min_repair": float(self.ids.switch_repair_min.text),
+                "max_repair": float(self.ids.switch_repair_max.text),
+                "p_open": float(self.ids.switch_p_open.text),
+                "p_closed": float(self.ids.switch_p_closed.text),
+                "p_current": float(self.ids.switch_p_current.text)
+            }
+        except ValueError:
+            return {"enabled": self.enabled}
+
+    def load(self, params):
+        self.ids.enabled.active = params.get("enabled", False)
+        self.ids.switch_mtbf.text = str(params.get("mtbf", ""))
+        self.ids.switch_repair_min.text = str(params.get("min_repair", ""))
+        self.ids.switch_repair_max.text = str(params.get("max_repair", ""))
+        self.ids.switch_p_open.text = str(params.get("p_open", ""))
+        self.ids.switch_p_closed.text = str(params.get("p_closed", ""))
+        self.ids.switch_p_current.text = str(params.get("p_current", ""))
+
+
+class GeneratorReliabilityParams(ReliabilityModelTab):
+    """Parameters for the generator reliability model."""
+
+    @property
+    def enabled(self):
+        """Return True if either the aging or wearout models are enabled."""
+        return self.aging_enabled or self.wearout_enabled
+
+    @property
+    def aging_enabled(self):
+        """Return True if the generator aging model is enabled."""
+        return self.ids.aging_active.active
+
+    @property
+    def wearout_enabled(self):
+        """Return True if the generator wearout model is enabled."""
+        return self.ids.wearout_active.active
+
+    def validate(self):
+        super().validate()
+        # Validate relationships between parameters
+        valid = {
+            m: d["min_repair"] <= d["max_repair"]
+            for m, d in self.to_dict().items() if isinstance(d, dict)
+        }
+        if all(valid.values()):
+            return True
+        message = f"{self.model_name}: "
+        for m, isvalid in valid.items():
+            if isvalid:
+                continue
+            message += (
+                f"\n\t{m}: Minimum repair time must be less than or equal "
+                "to maximum repair time."
+            )
+        raise ValidationError(message)
+
+    def to_dict(self):
+        """Return a dictionary of the model parameters."""
+        model = {"enabled": self.enabled}
+        try:
+            model["aging"] = {
+                "enabled": self.aging_enabled,
+                "mtbf": float(self.ids.aging_mtbf.text),
+                "min_repair": float(self.ids.aging_repair_min.text),
+                "max_repair": float(self.ids.aging_repair_max.text)
+            }
+        except ValueError:
+            model["aging"] = {"enabled": self.aging_enabled}
+        try:
+            model["operating_wear_out"] = {
+                "enabled": self.wearout_enabled,
+                "mtbf": float(self.ids.wearout_mtbf.text),
+                "min_repair": float(self.ids.wearout_repair_min.text),
+                "max_repair": float(self.ids.wearout_repair_max.text)
+            }
+        except ValueError:
+            model["operating_wear_out"] = {"enabled": self.wearout_enabled}
+        return model
+
+    def _load_aging(self, aging):
+        self.ids.aging_mtbf.text = str(aging.get("mtbf", ""))
+        self.ids.aging_repair_min.text = str(aging.get("min_repair", ""))
+        self.ids.aging_repair_max.text = str(aging.get("max_repair", ""))
+        self.ids.aging_active.active = aging.get("enabled", False)
+
+    def _load_wearout(self, wearout):
+        self.ids.wearout_mtbf.text = str(wearout.get("mtbf", ""))
+        self.ids.wearout_repair_min.text = str(wearout.get("min_repair", ""))
+        self.ids.wearout_repair_max.text = str(wearout.get("max_repair", ""))
+        self.ids.wearout_active.active = wearout.get("enabled", False)
+
+    def load(self, params):
+        """Load the model params from a dict."""
+        if "aging" in params:
+            self._load_aging(params["aging"])
+        if "operating_wear_out" in params:
+            self._load_wearout(params["operating_wear_out"])
+
+
+class ReliabilityConfigurationScreen(SSimBaseScreen):
+    """Screen for configuring the reliability model."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.load(self.project.reliability_params)
+        self.ids.save.bind(
+            on_press=lambda x: self.save()
+        )
+
+    def _model_tabs(self):
+        return self.ids.reliability_models.get_slides()
+
+    def validate(self):
+        """Validate input for all enabled models."""
+        errors = []
+        error_messages = []
+        for tab in self._model_tabs():
+            if not tab.enabled:
+                continue
+            try:
+                tab.validate()
+            except ValidationError as e:
+                errors.append(tab.title)
+                error_messages.append(
+                    # Work around Kivy bug when displaying tabs
+                    # (see kivy issue #3477)
+                    str(e).replace("\t", "    ")
+                )
+        if errors == []:
+            return True
+        _show_error_popup(
+            f"Errors found in tabs: {', '.join(errors)}\n\n"
+            + "\n\n".join(error_messages)
+        )
+        return False
+
+    def load(self, params):
+        """Load parameters from `params` into the forms.
+
+        Parameters
+        ----------
+        params : dict
+            Dictionary of reliability model parameters.
+        """
+        for tab in self._model_tabs():
+            if tab.model_name not in params:
+                continue
+            tab.load(params[tab.model_name])
+
+    def save(self):
+        """Add reliability model parameters from to the Project."""
+        if not self.validate():
+            return
+        for tab in self._model_tabs():
+            Logger.debug(f"model_name: {tab.model_name}")
+            self.project.add_reliability_model(tab.model_name, tab.to_dict())
+
+
+def _show_error_popup(message):
+    content = MessagePopupContent()
+    content.ids.msg_label.text = message
+    popup = Popup(
+        title="Configuration error!",
+        content=content
+    )
+    content.ids.dismissBtn.bind(on_press=popup.dismiss)
+    popup.open()
 
 
 def _show_no_grid_popup(dismiss_screen=None, manager=None):

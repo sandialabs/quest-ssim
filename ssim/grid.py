@@ -185,6 +185,18 @@ class InvControlSpecification:
             params=params
         )
 
+    def to_dict(self):
+        params = {
+            "name": self.name,
+            "der_list": self.der_list,
+            "inv_control_mode": self.inv_control_mode,
+            "function_curve_1": _curve_to_dict(self.function_curve_1),
+            **self.params
+        }
+        if self.function_curve_2 is not None:
+            params["function_curve_2"] = _curve_to_dict(self.function_curve_2)
+        return params
+
 
 @dataclass
 class PVSpecification:
