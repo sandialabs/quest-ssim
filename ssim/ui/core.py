@@ -1,4 +1,5 @@
 """Core classes and functions for the user interface."""
+from copy import deepcopy
 import functools
 import hashlib
 import itertools
@@ -420,17 +421,17 @@ class StorageControl:
     _EXTERNAL_CONTROLS = {'droop'}
 
     _CURVE_NAME_X = {
-        "voltvar": ("volt_vals",),
-        "voltwatt": ("volt_vals",),
-        "varwatt": ("var_vals",),
-        "vv_vw": ("vv_volt_vals", "vw_volt_vals")
+        "voltvar": ("volts",),
+        "voltwatt": ("volts",),
+        "varwatt": ("vars",),
+        "vv_vw": ("vv_volts", "vw_volts")
     }
 
     _CURVE_NAME_Y = {
-        "voltvar": ("var_vals",),
-        "voltwatt": ("watt_vals",),
-        "varwatt": ("watt_vals",),
-        "vv_vw": ("var_vals", "watt_vals")
+        "voltvar": ("vars",),
+        "voltwatt": ("watts",),
+        "varwatt": ("watts",),
+        "vv_vw": ("vv_vars", "vw_watts")
     }
 
     _CURVE_DESC = {
@@ -440,9 +441,50 @@ class StorageControl:
         "vv_vw": "Volt-Var + Var-Watt"
     }
 
-    def __init__(self, mode, params: dict = {}):
+    # Required parameters for each control mode.
+    _MODE_PARAMS = {
+        "droop": {"p_droop", "q_droop"},
+        "voltvar": {"volts", "vars"},
+        "voltwatt": {"volts", "watts"},
+        "varwatt": {"vars", "watts"},
+        "vv_vw": {"vv_volts", "vv_vars", "vw_volts", "vw_watts"},
+        "constantpf": {"pf_val"}
+    }
+
+    _DEFAULT_PARAMS = {
+        "droop": {"p_droop": 500.0, "q_droop": -300.0},
+        "voltvar": {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                    "vars": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "voltwatt": {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                     "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "varwatt": {"vars": [0.5, 0.95, 1.0, 1.05, 1.5],
+                    "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "vv_vw": {"vv_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                  "vv_vars": [1.0, 1.0, 0.0, -1.0, -1.0],
+                  "vw_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                  "vw_watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "constantpf": {"pf_val": 0.99}
+    }
+
+    def __init__(self, mode, params=None):
         self.mode = mode
-        self.params = params
+        self.params = params or {mode: StorageControl.default_params(mode)}
+
+    @classmethod
+    def default_params(cls, mode):
+        """Return the default parameters for control mode `mode`.
+
+        Parameters
+        ----------
+        mode : str
+            Control mode for which to return defaults.
+
+        Returns
+        -------
+        dict
+            Dictionary of default control mode parameters.
+        """
+        return deepcopy(StorageControl._DEFAULT_PARAMS.get(mode, {}))
 
     @property
     def is_external(self):
@@ -485,7 +527,8 @@ class StorageControl:
         x_names = StorageControl._CURVE_NAME_X[self.mode]
         y_names = StorageControl._CURVE_NAME_Y[self.mode]
         curves = tuple(
-            tuple(zip(self.params[x], self.params[y]))
+            tuple(zip(self.active_params[x],
+                      self.active_params[y]))
             for x, y in zip(x_names, y_names)
         )
         return curves[0], curves[1] if len(curves) == 2 else None
@@ -500,15 +543,7 @@ class StorageControl:
             Dictionary of parameters thar are relevant the the
             currently active control mode.
         """
-        if self.mode in StorageControl._INVERTER_CONTROLS:
-            return {}
-        # This is trivial for now, since we only use droop or
-        # invcontrol; however, in the future it will need to be
-        # rewritten to handle additional control modes.
-        return {
-            "p_droop": self.params["p_droop"],
-            "q_droop": self.params["q_droop"]
-        }
+        return self.params[self.mode]
 
     def __eq__(self, other):
 
@@ -523,7 +558,7 @@ class StorageControl:
 
         # if we're here, then there are params for the mode in each of self and other
         # compare them now, only for the chosen mode.
-        return self.params[mode] == other.params[mode]
+        return self.active_params == other.active_params
 
     def __hash__(self):
         hval = hash(self.mode)
@@ -586,14 +621,14 @@ class StorageControl:
         names_y = StorageControl._CURVE_NAME_Y[self.mode]
         curvedesc = StorageControl._CURVE_DESC[self.mode]
         for name_x, name_y in zip(names_x, names_y):
-            if name_x not in self.params:
+            if name_x not in self.active_params:
                 return (f'Unable to find control param list named "{name_x}".'
                         '  This is an application error.')
-            if name_y not in self.params:
+            if name_y not in self.active_params:
                 return (f'Unable to find control param list named "{name_y}".'
                         '  This is an application error.')
-            xs = self.params[name_x]
-            ys = self.params[name_y]
+            xs = self.active_params[name_x]
+            ys = self.active_params[name_y]
             error = self._check_curve(curvedesc, xs, ys)
             if error is not None:
                 return error

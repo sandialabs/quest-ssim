@@ -46,6 +46,7 @@ from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
 from ssim.ui import (
     Configuration,
     Project,
+    StorageControl,
     StorageOptions,
     ProjectResults,
     is_valid_opendss_name
@@ -1185,8 +1186,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             The result of verifying the P and Q droop parameters.
         """
         return (
-            self.__verify_control_param("droop", "p_droop", 500),
-            self.__verify_control_param("droop", "q_droop", -300)
+            self.__verify_control_param("droop", "p_droop"),
+            self.__verify_control_param("droop", "q_droop")
         )
 
     def set_volt_var_mode(self):
@@ -1221,8 +1222,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             list of var values.
         """
         return (
-            self.__verify_control_param("voltvar", "volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("voltvar", "vars", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("voltvar", "volts"),
+            self.__verify_control_param("voltvar", "vars")
         )
 
     def set_volt_watt_mode(self):
@@ -1257,8 +1258,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             list of watt values.
         """
         return (
-            self.__verify_control_param("voltwatt", "volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("voltwatt", "watts", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("voltwatt", "volts"),
+            self.__verify_control_param("voltwatt", "watts")
         )
 
     def set_var_watt_mode(self):
@@ -1293,8 +1294,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             list of Watt values.
         """
         return (
-            self.__verify_control_param("varwatt", "vars", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("varwatt", "watts", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("varwatt", "vars"),
+            self.__verify_control_param("varwatt", "watts")
         )
 
     def set_volt_var_and_volt_watt_mode(self):
@@ -1335,10 +1336,10 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             finally, the fourth is the list of Watt Values of the Volt-Watt mode.
         """
         return (
-            self.__verify_control_param("vv_vw", "vv_volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("vv_vw", "vv_vars", [1.0, 1.0, 0.0, -1.0, -1.0]),
-            self.__verify_control_param("vv_vw", "vw_volts", [0.5, 0.95, 1.0, 1.05, 1.5]),
-            self.__verify_control_param("vv_vw", "vw_watts", [1.0, 1.0, 0.0, -1.0, -1.0])
+            self.__verify_control_param("vv_vw", "vv_volts"),
+            self.__verify_control_param("vv_vw", "vv_vars"),
+            self.__verify_control_param("vv_vw", "vw_volts"),
+            self.__verify_control_param("vv_vw", "vw_watts")
         )
 
     def set_const_power_factor_mode(self):
@@ -1370,9 +1371,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         float:
             The result of verifying the constant PF value parameter.
         """
-        return self.__verify_control_param("constantpf", "pf_val", 0.99)
+        return self.__verify_control_param("constantpf", "pf_val")
 
-    def __verify_control_param(self, mode: str, label: str, def_val):
+    def __verify_control_param(self, mode: str, label: str):
         """Verifies that there is a data value in the control parameters for the current
         storage element and puts the default value in if not.
 
@@ -1382,15 +1383,14 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             The control mode for which to store the default value for label
         label : str
             The key to check for in the current storage control parameters.
-        def_val
-            The value to put into the storage control parameters if a value is not found
-            using the supplied label (key).
         """
+        defaults = StorageControl.default_params(mode)
+
         if mode not in self._options.control.params:
             self._options.control.params[mode] = {}
 
         if label not in self._options.control.params[mode]:
-            self._options.control.params[mode][label] = def_val
+            self._options.control.params[mode][label] = defaults[label]
 
         return self._options.control.params[mode][label]
 
