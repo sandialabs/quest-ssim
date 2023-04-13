@@ -2890,7 +2890,8 @@ class GeneratorReliabilityParams(ReliabilityModelTab):
         # Validate relationships between parameters
         valid = {
             m: d["min_repair"] <= d["max_repair"]
-            for m, d in self.to_dict().items() if isinstance(d, dict)
+            for m, d in self.to_dict().items()
+            if (isinstance(d, dict) and d["enabled"])
         }
         if all(valid.values()):
             return True
@@ -3004,6 +3005,7 @@ class ReliabilityConfigurationScreen(SSimBaseScreen):
         for tab in self._model_tabs():
             Logger.debug(f"model_name: {tab.model_name}")
             self.project.add_reliability_model(tab.model_name, tab.to_dict())
+        self.manager.current = "ssim"
 
 
 def _show_error_popup(message):
