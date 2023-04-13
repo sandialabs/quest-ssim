@@ -1,4 +1,5 @@
 """Core classes and functions for the user interface."""
+from copy import deepcopy
 import functools
 import hashlib
 import itertools
@@ -450,9 +451,40 @@ class StorageControl:
         "constantpf": {"pf_val"}
     }
 
-    def __init__(self, mode, params: dict = {}):
+    _DEFAULT_PARAMS = {
+        "droop": {"p_droop": 500.0, "q_droop": -300.0},
+        "voltvar": {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                    "vars": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "voltwatt": {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                     "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "varwatt": {"vars": [0.5, 0.95, 1.0, 1.05, 1.5],
+                    "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "vv_vw": {"vv_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                  "vv_vars": [1.0, 1.0, 0.0, -1.0, -1.0],
+                  "vw_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                  "vw_watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        "constantpf": {"pf_val": 0.99}
+    }
+
+    def __init__(self, mode, params=None):
         self.mode = mode
-        self.params = params
+        self.params = params or {mode: StorageControl.default_params(mode)}
+
+    @classmethod
+    def default_params(cls, mode):
+        """Return the default parameters for control mode `mode`.
+
+        Parameters
+        ----------
+        mode : str
+            Control mode for which to return defaults.
+
+        Returns
+        -------
+        dict
+            Dictionary of default control mode parameters.
+        """
+        return deepcopy(StorageControl._DEFAULT_PARAMS.get(mode, {}))
 
     @property
     def is_external(self):
