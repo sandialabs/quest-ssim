@@ -214,7 +214,7 @@ class MatlabPlotBox(BoxLayout):
 
     def reset_plot(self):
         """Clears the current diagram widget and draws a new one using the current
-            figure (plt.gcf())"""
+         figure (plt.gcf())"""
         self.clear_widgets()
         self.add_widget(FigureCanvasKivyAgg(plt.gcf()))
 
@@ -870,6 +870,13 @@ class XYItemTextField(TextInput):
         This method checks to see if the contents of this text field are
         a floating point number and does nothing if so.  If not, then this
         sets the background color to "red".
+
+        Parameters
+        ----------
+        instance:
+            The text field that initiated this call.
+        text:
+            The current text content of the text field as of this call.
         """
         v = parse_float(text) is not None
         self.background_color = "red" if not v else self.def_back_color
@@ -877,7 +884,7 @@ class XYItemTextField(TextInput):
 
 class VoltVarTabContent(BoxLayout):
     """The class that stores the content for the Volt-Var tab in the storage
-     option control tabs"""
+     option control tabs."""
 
     def on_add_button(self):
         """A callback function for the button that adds a new value to the volt-var grid"""
@@ -1081,22 +1088,16 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             "varwatt": "Var-Watt", "vv_vw": "Volt-Var & Volt-Watt",
             "constantpf": "Constant Power Factor"
         })
+        
+        self._set_mode_dict = {
+            "droop": self.set_droop_mode, "voltvar": self.set_volt_var_mode,
+            "voltwatt": self.set_volt_watt_mode, "varwatt": self.set_var_watt_mode,
+            "vv_vw": self.set_volt_var_and_volt_watt_mode,
+            "constantpf": self.set_const_power_factor_mode
+        }
 
         if self._options is not None:
-            if self._options.control.mode == "droop":
-                self.set_droop_mode()
-            elif self._options.control.mode == "voltvar":
-                self.set_volt_var_mode()
-            elif self._options.control.mode == "voltwatt":
-                self.set_volt_watt_mode()
-            elif self._options.control.mode == "varwatt":
-                self.set_var_watt_mode()
-            elif self._options.control.mode == "vv_vw":
-                self.set_volt_var_and_volt_watt_mode()
-            elif self._options.control.mode == "constantpf":
-                self.set_const_power_factor_mode()
-            else:
-                self.set_droop_mode()
+            self.dispatch_set_mode(self._options.control.mode)
 
     def load_all_control_data(self):
         """Verifies the existence of all control mode parameters and then sets the
@@ -1146,21 +1147,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         that the new tab is in the correct state.
         """
         self.read_all_data()
-        if tab_text == "Droop":
-            self.set_droop_mode()
-        elif tab_text == "Volt-Var":
-            self.set_volt_var_mode()
-        elif tab_text == "Volt-Watt":
-            self.set_volt_watt_mode()
-        elif tab_text == "Var-Watt":
-            self.set_var_watt_mode()
-        elif tab_text == "Volt-Var & Volt-Watt":
-            self.set_volt_var_and_volt_watt_mode()
-        elif tab_text == "Constant Power Factor":
-            self.set_const_power_factor_mode()
-        else:
-            self.set_droop_mode()
-
+        self.dispatch_set_mode(self._mode_dict.inverse[tab_text])
         self.set_mode_label_text()
 
     def set_droop_mode(self):
@@ -1432,6 +1419,12 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         xs, ys = try_co_sort(xdat, ydat)
         grid.data = make_xy_grid_data(xs, ys)
         return grid.data
+
+    def dispatch_set_mode(self, mode):
+        if mode in self._set_mode_dict:
+            self._set_mode_dict[mode]()
+        else:
+            self.set_droop_mode()
 
     def set_mode(self, name: str, tab) -> bool:
         """Changes the current contorl mode for the current storage option to the supplied
@@ -2587,42 +2580,42 @@ class SSimScreen(SSimBaseScreen):
     #        return
     #    plt.plot(x, y, color='gray', solid_capstyle='round')
 
-    def _distance_meters(self, latitude1, longitude1, latitude2, longitude2):
-        """Return distance between two points in meters"""
-        # Use the mean latitude to get a reasonable approximation
-        latitude = (latitude1 + latitude2) / 2
-        m_per_degree_lat = 111132.92 - 559.82 * cos(2 * latitude) \
-                           + 1.175 * cos(4 * latitude) \
-                           - 0.0023 * cos(6 * latitude)
-        m_per_degree_lon = 111412.84 * cos(latitude) \
-                           - 93.5 * cos(3 * latitude) \
-                           + 0.118 * cos(5 * latitude)
-        y = (latitude1 - latitude2) * m_per_degree_lat
-        x = (longitude1 - longitude2) * m_per_degree_lon
-        return hypot(x, y)
+    #def _distance_meters(self, latitude1, longitude1, latitude2, longitude2):
+    #    """Return distance between two points in meters"""
+    #    # Use the mean latitude to get a reasonable approximation
+    #    latitude = (latitude1 + latitude2) / 2
+    #    m_per_degree_lat = 111132.92 - 559.82 * cos(2 * latitude) \
+    #                       + 1.175 * cos(4 * latitude) \
+    #                       - 0.0023 * cos(6 * latitude)
+    #    m_per_degree_lon = 111412.84 * cos(latitude) \
+    #                      - 93.5 * cos(3 * latitude) \
+    #                      + 0.118 * cos(5 * latitude)
+    #    y = (latitude1 - latitude2) * m_per_degree_lat
+    #    x = (longitude1 - longitude2) * m_per_degree_lon
+    #    return hypot(x, y)
 
-    def _get_substation_location(self):
-        """Return gps coordinates of the substation.
+    #def _get_substation_location(self):
+    #    """Return gps coordinates of the substation.
 
-        Returns
-        -------
-        latitude : float
-        longitude : float
-        """
-        if not dssdirect.Solution.Converged():
-            dssdirect.Solution.Solve()
-        busses = dssdirect.Circuit.AllBusNames()
-        distances = dssdirect.Circuit.AllBusDistances()
-        substation = sorted(zip(busses, distances), key=lambda x: x[1])[0][0]
-        dssdirect.Circuit.SetActiveBus(substation)
-        return dssdirect.Bus.Y(), dssdirect.Bus.X()
+    #    Returns
+    #    -------
+    #    latitude : float
+    #    longitude : float
+    #    """
+    #    if not dssdirect.Solution.Converged():
+    #        dssdirect.Solution.Solve()
+    #    busses = dssdirect.Circuit.AllBusNames()
+    #    distances = dssdirect.Circuit.AllBusDistances()
+    #    substation = sorted(zip(busses, distances), key=lambda x: x[1])[0][0]
+    #    dssdirect.Circuit.SetActiveBus(substation)
+    #    return dssdirect.Bus.Y(), dssdirect.Bus.X()
 
-    def group(self, x):
-        if x < 0.33:
-            return 1
-        if x < 0.66:
-            return 2
-        return 3
+    #def group(self, x):
+    #    if x < 0.33:
+    #        return 1
+    #    if x < 0.66:
+    #        return 2
+    #    return 3
 
     def changed_show_bus_labels(self, active_state):
         self.refresh_grid_plot()
