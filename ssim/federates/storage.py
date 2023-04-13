@@ -280,7 +280,7 @@ def _get_controller(device):
     if device.controller == 'external':
         return ExternalController(device)
     if device.controller is None:
-        return NoController(device)
+        return NoController()
     else:
         raise ValueError(f"Unknown controller: '{device.controller}'")
 
