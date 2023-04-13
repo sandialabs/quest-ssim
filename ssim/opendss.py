@@ -30,6 +30,10 @@ def _parse_control_event(event_record: str) -> ControlEvent:
                  r"Element=(?P<element>[a-zA-Z0-9.]+), "
                  r"([a-zA-Z0-9.]+, )?Action=(?P<action>.*)",
                  event_record)
+    if m is None:
+        logging.error("Could not parse control event record: '%s'",
+                      event_record)
+        return None
     hours = float(m.group("hour"))
     seconds = float(m.group("sec"))
     time = hours * 3600 + seconds
@@ -49,10 +53,11 @@ class ControlLog:
         """Add any new control actions to the control log."""
         event_log = dssdirect.Solution.EventLog()
         while self._log_index < len(event_log):
-            self.events.append(
-                _parse_control_event(event_log[self._log_index])
-            )
+            event = _parse_control_event(event_log[self._log_index])
             self._log_index += 1
+            if event is None:
+                continue
+            self.events.append(event)
 
     def to_csv(self, output_file):
         """Save the control log to a CSV file.
