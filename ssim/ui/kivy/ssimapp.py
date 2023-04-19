@@ -1731,6 +1731,7 @@ class RightCheckbox(IRightBodyTouch, MDCheckbox):
 
 
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
+
     def toggle_configuration_check(self, check):
         print(check)
         if check.active:
@@ -1745,26 +1746,36 @@ class MetricConfigurationScreen(SSimBaseScreen):
 
     _def_btn_color = '#005376'
 
-    def __reset_checked_bus_list(self):
-        self._selBusses.clear()
-        for wid in self.ids.interlist.children:
-            if isinstance(wid, BusListItemWithCheckbox):
-                if wid.ids.check.active:
-                    self._selBusses.append(wid.ids.check)
-
     def on_kv_post(self, base_widget):
+        """Implemented to manage the states of the upper limit, lower limit, and objective
+         fields.
+
+         This schedules calls to "_refocus_field" on each text box.  See that method for
+         details.
+
+         Parameters
+         ----------
+         base_widget:
+            The base-most widget whose instantiation triggered the kv rules.
+         """
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.objectiveText), 0.05)
 
-    def _refocus_field(self, textfield):
-        textfield.focus = True
+    def _refocus_field(self, field):
+        """Sets the focus of the supplied field.
 
-    def set_sense(self, value):
-        self.ids.caller.text = value
-        self.menu.dismiss()
+        For some field types, this has the effect of putting it into an editable state which
+        can change its appearance even if it is subsequently un-focused.
+        """
+        field.focus = True
 
     def manage_store_button_enabled_state(self):
+        """Enables or disables the "Store" button depending on how many busses are currently
+        selected.
+
+        If no busses are selected, the button is disabled.  Otherwise, it is enabled.
+        """
         self.ids.btnStore.disabled = len(self._selBusses) == 0
 
     def reload_metric_values(self):
@@ -1841,6 +1852,14 @@ class MetricConfigurationScreen(SSimBaseScreen):
             self.__active_sense_button(common_sense)
 
     def __active_sense_button(self, sense: ImprovementType):
+        """Sets the proper sense based on the provided sense argument.
+
+        Parameters
+        ----------
+        sense: ImprovementType
+            The improvement type to set as the currently active sense for any
+            metrics to be created.
+        """
         if sense == ImprovementType.Minimize:
             self.set_minimize_sense()
         elif sense == ImprovementType.Maximize:
@@ -1943,16 +1962,29 @@ class MetricConfigurationScreen(SSimBaseScreen):
                 "Defined \"" + self._currentMetricCategory + "\" Metrics"
 
     def manage_selection_buttons_enabled_state(self):
+        """Enables or disables the buttons for select all and deselect all based
+        on whether or not there are any entries in the middle list of the form.
+
+        If there are items in the list, the buttons are enabled.  If there are no
+        items in the list, the buttons are disabled.
+        """
         numCldrn = len(self.ids.interlist.children) == 0
         self.ids.btnSelectAll.disabled = numCldrn
         self.ids.btnDeselectAll.disabled = numCldrn
 
     def deselect_all_metric_objects(self):
+        """Deselects all the items in the middle list on this form.
+        """
         for wid in self.ids.interlist.children:
             if isinstance(wid, BusListItemWithCheckbox):
                 wid.ids.check.active = False
 
     def select_all_metric_objects(self):
+        """Selects all the items in the middle list on this form.
+
+        This clears the currently selected busses and then appends each
+        back into the list of selected busses as the checks are set.
+        """
         self._selBusses.clear()
         for wid in self.ids.interlist.children:
             if isinstance(wid, BusListItemWithCheckbox):
@@ -2008,6 +2040,21 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.reload_metric_values()
 
     def on_item_check_changed(self, ckb, value):
+        """A callback function for the list items to use when their check state changes.
+
+        This method looks at teh current check state (value) and either adds the
+        text of the check box into the list of currently selected busses if value
+        is true and removes it if value is false.
+
+        This results in a resetting of the metric values and the associated fields.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box (true = checked, false = unchecked).
+        """
         bus = ckb.listItem.text
         if value:
             self._selBusses.append(bus)
@@ -2020,7 +2067,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
     def configure_voltage_metrics(self):
         self._currentMetricCategory = "Bus Voltage"
         self.ids.interlabel.text = "Busses"
-        self.load_bussed_into_list()
+        self.load_busses_into_list()
         self.reload_metric_list()
         self.reload_metric_values()
         self.manage_selection_buttons_enabled_state()
@@ -2033,9 +2080,13 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.reload_metric_list()
         self.reload_metric_values()
         self.manage_selection_buttons_enabled_state()
-        print("I'm passing on the other issue...")
 
     def _return_to_main_screen(self, dt):
+        """Sets the current kivy screen to the main ssim screen.
+
+        This is used as a callback for the popup menu that offers a user the
+        action of returning to the main screen.
+        """
         self.manager.current = "ssim"
 
     def __show_missing_metric_value_popup(self):
@@ -2047,9 +2098,18 @@ class MetricConfigurationScreen(SSimBaseScreen):
         )
         content.ids.dismissBtn.bind(on_press=popup.dismiss)
         popup.open()
-        return
 
-    def __show_invalid_metric_value_popup(self, msg):
+    def __show_invalid_metric_value_popup(self, msg: str):
+        """Displays the popup box indicating that the values input to the metric values fields
+         (limits, objective, and sense) are not usable.
+
+         The text displayed is the supplied msg.  The popup content is the MessagePopupContent.
+
+         Parameter
+         ---------
+         msg: str
+            The message that is to be the primary content of the popup.
+         """
         content = MessagePopupContent()
 
         popup = Popup(
@@ -2059,9 +2119,13 @@ class MetricConfigurationScreen(SSimBaseScreen):
         content.ids.msg_label.text = str(msg)
         content.ids.dismissBtn.bind(on_press=popup.dismiss)
         popup.open()
-        return
 
     def __show_no_grid_model_popup(self):
+        """Displays the popup box indicating that there is no grid model so metrics cannot
+            be defined.
+
+        This uses the MetricsNoGridPopupContent.
+        """
         content = MetricsNoGridPopupContent()
 
         popup = Popup(
@@ -2072,9 +2136,15 @@ class MetricConfigurationScreen(SSimBaseScreen):
         content.ids.mainScreenBtn.bind(on_press=popup.dismiss)
         content.ids.mainScreenBtn.bind(on_press=self._return_to_main_screen)
         popup.open()
-        return
 
-    def load_bussed_into_list(self):
+    def load_busses_into_list(self):
+        """Purposes the middle list in the form for busses and loads it with newly
+        created BusListItemWithCheckbox instances for each bus in the grid model.
+
+        This method clears any current selected busses, clears any contents of the
+        center list, and then reloads the list.  If there is no currently selected
+        grid model, then __show_no_grid_model_popup is called and the method is aborted.
+        """
         self._selBusses.clear()
         list = self.ids.interlist
         list.clear_widgets()
