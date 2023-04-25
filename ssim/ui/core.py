@@ -123,10 +123,12 @@ class Project:
         # if self._input_file_path is not None:
         #    hval = hash((hval, self._input_file_path))
 
-        for so in self.storage_devices.sort(key=lambda x: x.name):
+        self.storage_devices.sort(key=lambda x: x.name)
+        for so in self.storage_devices:
             hval = hash((hval, so))
 
-        for pv in self.pvsystems.sort(key=lambda x: x.name):
+        self.pvsystems.sort(key=lambda x: x.name)
+        for pv in self.pvsystems:
             hval = hash((hval, so))
 
         for k, v in sorted(self._metricMgrs.items()):
@@ -564,7 +566,8 @@ class StorageControl:
         hval = hash(self.mode)
 
         if self.mode in self.params:
-            hval = hash(hval, self.params)
+            for k, v in sorted(self.params[self.mode].items()):
+                hval = hash((hval, k, v))
 
         return hval
 
@@ -725,11 +728,12 @@ class StorageOptions:
             self.required == other.required
 
     def __hash__(self):
-        hval = 0 if not self.control else hash(self.control)
+        hVal = 0 if not self.control else hash(self.control)
 
         return hash((
-            hval, self.name, self.phases, self.min_soc, self.max_soc, self.initial_soc, \
-            self.power, self.duration, self.busses, self.soc_model, self.required
+            hVal, self.name, self.phases, self.min_soc, self.max_soc, self.initial_soc,
+            self.soc_model, self.required, tuple(sorted(self.power)),
+            tuple(sorted(self.duration)), tuple(sorted(self.busses))
         ))
 
     def write_toml(self) -> str:
