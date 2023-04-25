@@ -1973,7 +1973,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.ids.btnDeselectAll.disabled = numCldrn
 
     def deselect_all_metric_objects(self):
-        """Deselects all the items in the middle list on this form.
+        """Deselects all the items in the middle list on this form by setting
+        the check box active values to False.
         """
         for wid in self.ids.interlist.children:
             if isinstance(wid, BusListItemWithCheckbox):
@@ -2034,6 +2035,11 @@ class MetricConfigurationScreen(SSimBaseScreen):
         list.active = True
 
     def on_delete_metric(self, data):
+        """A callback function for the delete button of existing metric items.
+
+        This method removes an existing metric from the current category and key
+        identified by the data member in the metrics list item.
+        """
         bus = data.listItem.bus
         self.project.remove_metric(self._currentMetricCategory, bus)
         self.reload_metric_list()
@@ -2065,6 +2071,12 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.manage_store_button_enabled_state()
 
     def configure_voltage_metrics(self):
+        """Sets this form up for the creation, management, etc. of bus voltage
+        metrics.
+
+        This includes loading all necesary lists, setting the labels to indicate
+        busses, and setting the enables state of the selection buttons appropriately.
+        """
         self._currentMetricCategory = "Bus Voltage"
         self.ids.interlabel.text = "Busses"
         self.load_busses_into_list()
@@ -2073,6 +2085,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.manage_selection_buttons_enabled_state()
 
     def configure_some_other_metrics(self):
+        """This method is a placeholder for future supported metrics.  It's not currently useful.
+        """
         self._currentMetricCategory = "Unassigned"
         self._selBusses.clear()
         self.ids.interlist.clear_widgets()
@@ -2090,6 +2104,11 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.manager.current = "ssim"
 
     def __show_missing_metric_value_popup(self):
+        """Displays the popup box indicating that there is a missing defining value
+        for metrics.
+
+        This uses the MissingMetricValuesPopupContent.
+        """
         content = MissingMetricValuesPopupContent()
 
         popup = Popup(
