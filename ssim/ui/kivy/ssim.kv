@@ -1263,13 +1263,12 @@
                     text: "View Saved Results"
 
                 Button:
-                    text: "View Summary"
-                    on_press: root.open_results_summary()
-                Button:
                     text: "Visualize Results"
                     on_release: root.open_visualize_results()
+
                 Button:
                     text: "Resume"
+
                 Button:
                     text: "Run Selected Configurations"
                     on_press: root.run_configurations()
@@ -1385,36 +1384,6 @@
             Button:
                 text: "Pass"
 
-<ResultsVisualizeScreen>:
-    name: "results-visualize"
-    BoxLayout:
-        orientation: "vertical"
-
-        MDTabs:
-            id: visualization_screens
-
-            ResultsVisualizationTab:
-                id: summary
-                title: "Summary"
-
-                ResultsSummary:
-                    id: summary_page
-
-            ResultsVisualizationTab:
-                id: details
-                title: "Details"
-
-                ResultsDetail:
-                    id: details_page
-
-        BoxLayout:
-            orientation: "horizontal"
-            Button:
-                text: "back"
-                on_press: root.manager.current = "ssim"
-                size_hint_y: None
-
-
 <ResultsDetailScreen>:
     name: "results-detail"
     BoxLayout:
@@ -1489,10 +1458,10 @@
         Button:
             text: "back"
             size_hint_y: None
-            on_press: root.manager.current = 'results-summary'
+            on_press: root.manager.current = 'results-visualize'
 
-<ResultsSummaryScreen>:
-    name: "results-summary"
+<ResultsVisualizeScreen>:
+    name: "results-visualize"
 
     BoxLayout:
         orientation: "vertical"
@@ -1624,7 +1593,7 @@
         Button:
             text: "back"
             size_hint_y: None
-            on_press: root.manager.current = 'results-summary'
+            on_press: root.manager.current = 'results-visualize'
 
 
 <EditableSetListItem>:

@@ -180,10 +180,8 @@ class SSimApp(MDApp):
             ReliabilityConfigurationScreen(self.project, name="reliability-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
-        # screen_manager.add_widget(
-        #     ResultsVisualizeScreen(self.project, name="results-visualize"))
         screen_manager.add_widget(
-            ResultsSummaryScreen(self.project, name="results-summary"))
+            ResultsVisualizeScreen(self.project, name="results-visualize"))
         screen_manager.add_widget(
             ResultsCompareScreen(self.project, name="results-compare"))
         screen_manager.add_widget(
@@ -2237,20 +2235,11 @@ class RunSimulationScreen(SSimBaseScreen):
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
 
-    def open_results_summary(self):
-        self.manager.current = "results-summary"
-
     def open_visualize_results(self):
         self.manager.current = "results-visualize"
 
 
 class ResultsVisualizeScreen(SSimBaseScreen):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.project_results = ProjectResults(self.project)
-
-
-class ResultsSummaryScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_results = ProjectResults(self.project)
