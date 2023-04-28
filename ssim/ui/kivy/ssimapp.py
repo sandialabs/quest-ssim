@@ -2307,13 +2307,29 @@ class ResultsDetailScreen(SSimBaseScreen):
         project_results = self.project_results.results()
         ctr = 1
         for result in project_results:
-            _, data = result.storage_state()
+            # obtain pandas dataframe for storage states
+            _, data_storage_state = result.storage_state()
+            # obtain pandas dataframe for storage voltage, 'time' column is 
+            # dropped to avoid duplication 
+            _, data_storage_voltage = result.storage_voltages()
+            data_storage_voltage.drop(['time'], axis=1, inplace=True)
+
+            # rename the 'data_storage_voltage' by appending '_voltage' to each header
+            new_col_names = [item + '_voltage' for item in data_storage_voltage.columns]
+            data_storage_voltage.columns = new_col_names
+
+            # combine all data into a single dataframe
+            data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
             config_key = 'Configuration ' + str(ctr)
+            
             # columns to plot
             columns_to_plot = self.selected_list_items[config_key]
+
             # select subset of data based on columns_to_plot
             selected_data = data[columns_to_plot]
+            Logger.debug(selected_data)
             x_data = data.loc[:, 'time']
+            
             # add the selected columns to plot
             for column in selected_data.keys():
                 plt.plot(x_data, selected_data[column], label=config_key + '-' + column)
@@ -2379,7 +2395,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.menu.open()
 
     def update_selected_variables(self):
-        print('Update selected variables called!')
+        Logger.debug('Update selected variables called!')
 
         # self.selected_list_items = {}
         selected_items = []
@@ -2389,17 +2405,17 @@ class ResultsDetailScreen(SSimBaseScreen):
 
         self.selected_list_items[self.current_configuration] = selected_items
 
-        print(self.current_configuration)
-        print(self.selected_list_items)
+        Logger.debug(self.current_configuration)
+        Logger.debug(self.selected_list_items)
 
     def set_config(self, value):
 
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>")
-        print(value)
+        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>")
+        Logger.debug(value)
 
         self.current_configuration = value
 
-        print(self.selected_variables)
+        Logger.debug(self.selected_variables)
         # read the current selected configuration
         self.ids.config_list_detail.text = value
 
@@ -2412,7 +2428,22 @@ class ResultsDetailScreen(SSimBaseScreen):
         current_result = next(itertools.islice(project_results, current_result_index, None))
 
         # extract the data
-        self.list_items, self.variable_data = current_result.storage_state()
+        storage_state_headers, storage_state_data = current_result.storage_state()
+        storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
+        
+        # remove 'time' from the header list and pandas data frame to prevent
+        # duplication
+        if storage_voltage_headers is not None: 
+            storage_voltage_headers.pop(0)
+        storage_voltage_data.drop(['time'], axis=1, inplace=True)
+
+        # 'storage_voltage_headers' have no indication that these labels
+        # represent voltage, append string '_voltage' to each label
+        storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]                                                                                                                            
+        
+        self.list_items = [storage_state_headers, storage_voltage_headers]
+        self.list_items = storage_state_headers + storage_voltage_headers
+        self.variable_data = pd.concat([storage_state_data, storage_voltage_data], axis=1)
 
         self.x_data = list(self.variable_data.loc[:, 'time'])
 
