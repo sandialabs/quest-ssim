@@ -183,8 +183,6 @@ class SSimApp(MDApp):
         screen_manager.add_widget(
             ResultsVisualizeScreen(self.project, name="results-visualize"))
         screen_manager.add_widget(
-            ResultsCompareScreen(self.project, name="results-compare"))
-        screen_manager.add_widget(
             ResultsDetailScreen(self.project, name="results-detail"))
         screen_manager.current = "ssim"
 
@@ -2270,11 +2268,6 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
     def open_results_detail(self):
         self.manager.current = "results-detail"
-
-
-class ResultsCompareScreen(SSimBaseScreen):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
 
 class ResultsDetailScreen(SSimBaseScreen):

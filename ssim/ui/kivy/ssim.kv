@@ -1491,11 +1491,15 @@
                             orientation: "vertical"
                             Label:
                                 size_hint_y: 0.1
-                                text: "Select y-Display:"
+                                text: "Select Configuration:"
                                 color: 0,0,0,1
+                            MDRaisedButton:
+                                id: config_list_detail_metrics
+                                text: "Select Configuration ... "
+                                size_hint_x: 1.0
                             Label:
                                 size_hint_y: 0.1
-                                text: "Aggregate Metric:"
+                                text: "Select Metric(s) to Plot:"
                                 color: 0,0,0,1
 
                             ScrollView:
@@ -1507,93 +1511,26 @@
                                         width: 2
                                         rectangle: self.x, self.y, self.width, self.height
                                 MDList:
-                                    id: metric_list_summary
-
-                        BoxLayout:
-                            orientation: "vertical"
-                            Label:
-                                size_hint_y: 0.1
-                                text: "Select x-Display:"
-                                color: 0,0,0,1
-                            Label:
-                                size_hint_y: 0.1
-                                text: "Configuration Number:"
-                                color: 0,0,0,1
-
-                            ScrollView:
-                                size_hint_y: 0.8
-                                canvas.before:
-                                    Color:
-                                        rgba: .5, .5, .5, 1
-                                    Line:
-                                        width: 2
-                                        rectangle: self.x, self.y, self.width, self.height
-                                MDList:
-                                    id: config_list_summary
-
+                                    id: metric_list
+  
                 BoxLayout:
                     orientation: "vertical"
                     padding: 5
                     spacing: 5
                     Button:
-                        text: "View Details"
-                        on_press: root.open_results_detail()
+                        text: "Update Figure"
                     Button:
-                        text: "Compare"
-                        on_press: root.open_results_compare()
+                        text: "Clear Figure"
                     Button:
                         text: "Save Figure"
+                    Button:
+                        text: "View Details"
+                        on_press: root.open_results_detail()
 
         Button:
             text: "back"
             size_hint_y: None
             on_press: root.manager.current = 'run-sim'
-
-<ResultsCompareScreen>:
-    name: "results-compare"
-    BoxLayout:
-        orientation: "vertical"
-
-        BoxLayout:
-            orientation: "horizontal"
-            padding: 5
-
-            BoxLayout:
-                id: compare_canvas
-                size_hint_x: 1.5
-                orientation: "vertical"
-                padding: 5
-                spacing: 5
-                Label:
-                    text: "Comparison Plot Displayed Here!"
-                    color: 0, 0, 0, 1
-
-            BoxLayout:
-                orientation: "vertical"
-                Label:
-                    size_hint_y: 0.1
-                    text: "Configurations to Compare:"
-                    color: 0,0,0,1
-
-                ScrollView:
-                    size_hint_y: 0.8
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
-                    MDList:
-                        id: config_list_compare
-
-                Button:
-                    size_hint_y: 0.1
-                    text: "Save Figure"
-
-        Button:
-            text: "back"
-            size_hint_y: None
-            on_press: root.manager.current = 'results-visualize'
 
 
 <EditableSetListItem>:
