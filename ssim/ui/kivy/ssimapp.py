@@ -1679,6 +1679,20 @@ class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
         return self.ids.selected.active
 
 
+class ResultsMetricsListItemWithCheckbox(TwoLineAvatarIconListItem):
+    def __init__(self, variable_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.text = variable_name
+
+    # TO DO: Check if there is a more concise of implementing this
+    def toggle_selection(self):
+        self.parent.parent.parent.parent.parent.parent.parent.parent.parent.update_selected_metrics()
+    
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
+
 class VariableListItem(TwoLineAvatarIconListItem):
     def __init__(self, pk=None, **kwargs):
         super().__init__(**kwargs)
@@ -2241,12 +2255,15 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_results = ProjectResults(self.project)
+        self.configurations: List[Configuration] = []
+        self.selected_metrics = {}
+        self.selected_metric_items = {}
+        self.current_configuration = None
 
     def on_enter(self):
+        # populate the configurations list
         self.draw_canvas()
-        for result in self.project_results.results():
-            print(result.config_dir)
-
+        
     def draw_canvas(self):
         # sample plot for testing purposes
         # TO DO: develop the backend for creating these plots
@@ -2263,8 +2280,78 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.ids.summary_canvas.clear_widgets()
         self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
 
-    def open_results_compare(self):
-        self.manager.current = "results-compare"
+    def drop_config_menu_metrics(self):
+        for config in self.project.configurations():
+            self.configurations.append(config)
+        
+        # TO DO: replace this length of configurations that have been evaluated
+        num_configs = len(list(self.project.configurations()))
+
+        menu_items = []
+        for ctr in range(num_configs):
+            display_text = "Configuration " + str(ctr + 1)
+            menu_items.append({
+                "viewclass": "OneLineListItem",
+                "text": display_text,
+                "on_release": lambda x=display_text: self.set_config(x)
+            })
+
+        self.menu = MDDropdownMenu(
+            caller=self.ids.config_list_detail_metrics, items=menu_items, width_mult=5
+        )
+        self.menu.open()
+
+    def set_config(self, value):
+        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        Logger.debug(value)
+
+        self.current_configuration = value
+        Logger.debug(self.selected_metrics)
+
+        # read the current selected configuration
+        self.ids.config_list_detail_metrics.text = value
+
+        # extract all results from all the configurations
+        project_results = self.project_results.results()
+        # obtain the index for the current selected configuration
+        # TODO: setup a proper mapping system between Results and Configuration
+        current_result_index = int(value[-1]) - 1
+        # extract the `current_result` based on selection from drop down menu
+        current_result = next(itertools.islice(project_results, current_result_index, None))
+
+        # extract the data
+        metrics_headers, metrics_accumulated, metrics_data = current_result.metrics_log()
+        
+        # add the list of metrics in the selected configuration into the MDList
+        # clear the variable list
+        self.ids.metrics_list.clear_widgets()
+        Logger.debug(">>> Current metrics selected:")
+        Logger.debug(self.selected_metric_items)
+
+        for item in metrics_headers:
+            # do not add 'time' to the variable list
+            if item == 'time':
+                continue
+            else:
+                self.ids.metrics_list.add_widget(
+                    ResultsMetricsListItemWithCheckbox(variable_name=item)
+                )
+
+        # close the drop-down menu
+        self.menu.dismiss()
+
+    def update_selected_metrics(self):
+        Logger.debug("Update selected metrics called")
+
+        selected_metrics = []
+        for metric in self.ids.metrics_list.children:
+            if metric.selected:
+                selected_metrics.append(metric.text)
+        
+        self.selected_metric_items[self.current_configuration] = selected_metrics
+
+        Logger.debug(self.current_configuration)
+        Logger.debug(self.selected_metric_items)
 
     def open_results_detail(self):
         self.manager.current = "results-detail"
@@ -2434,7 +2521,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         # represent voltage, append string '_voltage' to each label
         storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]                                                                                                                            
         
-        self.list_items = [storage_state_headers, storage_voltage_headers]
         self.list_items = storage_state_headers + storage_voltage_headers
         self.variable_data = pd.concat([storage_state_data, storage_voltage_data], axis=1)
 

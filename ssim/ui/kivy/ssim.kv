@@ -196,6 +196,15 @@
         active: False
         on_release: root.toggle_selection()
 
+<ResultsMetricsListItemWithCheckbox>:
+    id: results_metrics_list
+    markup: True
+
+    LeftCheckBox:
+        id: selected
+        active: False
+        on_release: root.toggle_selection()
+
 <PVListitem>:
 
 
@@ -1497,6 +1506,7 @@
                                 id: config_list_detail_metrics
                                 text: "Select Configuration ... "
                                 size_hint_x: 1.0
+                                on_release: root.drop_config_menu_metrics()
                             Label:
                                 size_hint_y: 0.1
                                 text: "Select Metric(s) to Plot:"
@@ -1511,19 +1521,32 @@
                                         width: 2
                                         rectangle: self.x, self.y, self.width, self.height
                                 MDList:
-                                    id: metric_list
+                                    id: metrics_list
   
                 BoxLayout:
                     orientation: "vertical"
                     padding: 5
                     spacing: 5
+                    MDTextField:
+                        id: detail_figure_title
+                        hint_text: 'Enter custom title ...'
+                    MDTextField:
+                        id: detail_figure_ylabel
+                        hint_text: 'Enter custom Y-axis label ...'
                     Button:
+                        size_hint_y: 0.1
                         text: "Update Figure"
+                        on_release: root.update_metrics_figure()
                     Button:
+                        size_hint_y: 0.1
                         text: "Clear Figure"
+                        on_release: root.clear_metrics_figure()
                     Button:
+                        size_hint_y: 0.1
                         text: "Save Figure"
+                        on_release: root.save_figure_options_metrics()
                     Button:
+                        size_hint_y: 0.1
                         text: "View Details"
                         on_press: root.open_results_detail()
 
