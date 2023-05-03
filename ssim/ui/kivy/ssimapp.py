@@ -2259,12 +2259,14 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.selected_metrics = {}
         self.selected_metric_items = {}
         self.current_configuration = None
+        self.metrics_figure = None
 
     def on_enter(self):
         # populate the configurations list
         self.draw_canvas()
         
     def draw_canvas(self):
+        pass
         # sample plot for testing purposes
         # TO DO: develop the backend for creating these plots
         # x_data = [1, 2, 3, 4, 5]
@@ -2274,11 +2276,65 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # ax.set_xlabel('Configuration #')
         # ax.set_ylabel('Aggregate Metics')
 
-        accumulated_metric_fig = self.project_results.plot_accumulated_metrics()
+        # accumulated_metric_fig = self.project_results.plot_accumulated_metrics()
 
         # Add Kivy widget to the canvas
+        # self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
+
+    def _create_metrics_figure(self):
+        metrics_fig = plt.figure()
+        plt.clf()
+        ctr = 1
+        for result in self.project_results.results():
+            # obtain accumulated metric values and times-series 
+            # data in a pandas dataframe for metrics
+            _, accumulated_metric, data_metrics = result.metrics_log()
+            config_key = 'Configuration ' + str(ctr)
+
+            # columns to plot
+            columns_to_plot = self.selected_metric_items[config_key]
+
+            # select the susbset of data based on 'columns_to_plot'
+            selected_data = data_metrics[columns_to_plot]
+            Logger.debug(selected_data)
+            x_data = data_metrics.loc[:, 'time']
+
+            # add the selected columns to the plot
+            for column in selected_data.keys():
+                plt.plot(x_data, selected_data[column], 
+                         label=config_key + '-' + column + ' :' + str(accumulated_metric))
+
+            ctr += 1
+        
+        # x-axis label will always be time
+        plt.xlabel('time')
+        # update y-axis label based on user input
+        if self.ids.detail_figure_ylabel.text is not None:
+            plt.ylabel(self.ids.detail_figure_ylabel.text)
+        plt.legend()
+        # update the title based on user input
+        if self.ids.detail_figure_title.text is not None:
+            plt.title(self.ids.detail_figure_title.text)
+        else:
+            plt.title('Metrics Plots')
+
+        return metrics_fig
+
+    def update_metrics_figure(self):
+        self.metrics_figure = self._create_metrics_figure()
+        Logger.debug("Metrics figure update command issued from GUI ...")
+        Logger.debug(self.ids.detail_figure_title.text)
+        # Add kivy widget to the canvas
         self.ids.summary_canvas.clear_widgets()
-        self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
+        self.ids.summary_canvas.add_widget(
+            FigureCanvasKivyAgg(self.metrics_figure)
+        )
+
+    def clear_metrics_figure(self):
+        self.ids.summary_canvas.clear_widgets()
+
+    def save_figure_options_metrics(self):
+        pass
 
     def drop_config_menu_metrics(self):
         for config in self.project.configurations():
@@ -2311,13 +2367,11 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # read the current selected configuration
         self.ids.config_list_detail_metrics.text = value
 
-        # extract all results from all the configurations
-        project_results = self.project_results.results()
         # obtain the index for the current selected configuration
         # TODO: setup a proper mapping system between Results and Configuration
         current_result_index = int(value[-1]) - 1
         # extract the `current_result` based on selection from drop down menu
-        current_result = next(itertools.islice(project_results, current_result_index, None))
+        current_result = next(itertools.islice(self.project_results.results(), current_result_index, None))
 
         # extract the data
         metrics_headers, metrics_accumulated, metrics_data = current_result.metrics_log()
