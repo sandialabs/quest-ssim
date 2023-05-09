@@ -1715,6 +1715,10 @@ class NoGridPopupContent(BoxLayout):
     pass
 
 
+class NoFigurePopupContent(BoxLayout):
+    pass
+
+
 class MissingMetricValuesPopupContent(BoxLayout):
     pass
 
@@ -2264,6 +2268,9 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def on_enter(self):
         # populate the configurations list
         self.draw_canvas()
+
+    def dismiss_popup(self):
+        self._popup.dismiss()
         
     def draw_canvas(self):
         pass
@@ -2334,7 +2341,44 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.ids.summary_canvas.clear_widgets()
 
     def save_figure_options_metrics(self):
-        pass
+        if self.metrics_figure is None:
+            self.__show_no_figure_popup('No Figure to Plot. Please create a plot before saving.')
+        else:
+            chooser = SaveFigureDialog(
+                save=self.save_figure, cancel=self.dismiss_popup
+            )
+
+            self._popup = Popup(title="Save figure options", content=chooser)
+            self._popup.open()
+
+    def save_figure(self, selection, filename):
+        fullpath = selection[0]
+
+        split = os.path.splitext(filename)
+        if split[1].lower() != ".png":
+            filename = filename + ".png"
+
+        if os.path.isdir(fullpath):
+            fullpath = os.path.join(fullpath, filename)
+        else:
+            fullpath = os.path.join(os.path.dirname(fullpath), filename)
+
+        Logger.debug("saving figure %s", fullpath)
+
+        self.metrics_figure.savefig(fullpath, dpi=300)
+        self.dismiss_popup()
+
+    def __show_no_figure_popup(self, msg):
+        content = MessagePopupContent()
+
+        popup = Popup(
+            title='No Figure to Plot', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+        )
+        content.ids.msg_label.text = str(msg)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
 
     def drop_config_menu_metrics(self):
         for config in self.project.configurations():
@@ -2491,18 +2535,46 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def save_figure_options(self):
         '''Saves the current active figure.'''
-        chooser = SaveFigureDialog(
-            save=self.save_figure, cancel=self.dismiss_popup
+        
+        if self.figure is None:
+            self.__show_no_figure_popup('No Figure to Plot. Please create a plot before saving.')
+        else:
+            chooser = SaveFigureDialog(
+                save=self.save_figure, cancel=self.dismiss_popup
+            )
+
+            self._popup = Popup(title="Save figure options", content=chooser)
+            self._popup.open()
+
+    def save_figure(self, selection, filename):
+        fullpath = selection[0]
+
+        split = os.path.splitext(filename)
+        if split[1].lower() != ".png":
+            filename = filename + ".png"
+
+        if os.path.isdir(fullpath):
+            fullpath = os.path.join(fullpath, filename)
+        else:
+            fullpath = os.path.join(os.path.dirname(fullpath), filename)
+
+        Logger.debug("saving figure %s", fullpath)
+
+        self.figure.savefig(fullpath, dpi=300)
+        self.dismiss_popup()
+
+    def __show_no_figure_popup(self, msg):
+        content = MessagePopupContent()
+
+        popup = Popup(
+            title='No Figure to Plot', content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
         )
-
-        self._popup = Popup(title="save figure options", content=chooser)
-        self._popup.open()
-
-    def save_figure(self, path, filename):
-        Logger.debug("Saving figure ... ")
-        Logger.debug(filename)
-        self.figure.savefig(filename + '.png', dpi=300)
-
+        content.ids.msg_label.text = str(msg)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+    
     def clear_figure(self):
         self.ids.detail_plot_canvas.clear_widgets()
 
@@ -2652,7 +2724,13 @@ class SaveSSIMTOMLDialog(FloatLayout):
 class SaveFigureDialog(FloatLayout):
     save = ObjectProperty(None)
     cancel = ObjectProperty(None)
-    text_input = ObjectProperty(None)
+    
+    def manage_filename_field(self):
+        sel = self.ids.filechooser.selection[0]
+        if os.path.isdir(sel):
+            self.ids.filenamefield.text = ""
+        else:
+            self.ids.filenamefield.text = os.path.basename(sel)
 
 
 class SSimScreen(SSimBaseScreen):
