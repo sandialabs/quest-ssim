@@ -2266,28 +2266,16 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.metrics_figure = None
 
     def on_enter(self):
-        # populate the configurations list
-        self.draw_canvas()
+        # populate `selected_list_items` assuming no selection 
+        # from dropdown menu
+        # TO DO: Replace with evaluated configurations
+        num_configs = len(list(self.project.configurations()))
+        for ctr in range(num_configs):
+            self.selected_metric_items['Configuration ' + str(ctr + 1)] = []
 
     def dismiss_popup(self):
         self._popup.dismiss()
         
-    def draw_canvas(self):
-        pass
-        # sample plot for testing purposes
-        # TO DO: develop the backend for creating these plots
-        # x_data = [1, 2, 3, 4, 5]
-        # y_data = [1, 4, 9, 15, 25]
-        # fig, ax = plt.subplots()
-        # ax.plot(x_data, y_data)
-        # ax.set_xlabel('Configuration #')
-        # ax.set_ylabel('Aggregate Metics')
-
-        # accumulated_metric_fig = self.project_results.plot_accumulated_metrics()
-
-        # Add Kivy widget to the canvas
-        # self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
-
     def _create_metrics_figure(self):
         metrics_fig = plt.figure()
         plt.clf()
@@ -2328,21 +2316,26 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         return metrics_fig
 
     def update_metrics_figure(self):
-        self.metrics_figure = self._create_metrics_figure()
-        Logger.debug("Metrics figure update command issued from GUI ...")
-        Logger.debug(self.ids.detail_figure_title.text)
-        # Add kivy widget to the canvas
-        self.ids.summary_canvas.clear_widgets()
-        self.ids.summary_canvas.add_widget(
-            FigureCanvasKivyAgg(self.metrics_figure)
-        )
+        if self._check_metrics_list_selection():
+            self._show_error_popup('No Metrics(s) Selected!', 
+                                   'Please select metrics(s) from the dropdown menu to update the plot.')
+        else:
+            self.metrics_figure = self._create_metrics_figure()
+            Logger.debug("Metrics figure update command issued from GUI ...")
+            Logger.debug(self.ids.detail_figure_title.text)
+            # Add kivy widget to the canvas
+            self.ids.summary_canvas.clear_widgets()
+            self.ids.summary_canvas.add_widget(
+                FigureCanvasKivyAgg(self.metrics_figure)
+            )
 
     def clear_metrics_figure(self):
         self.ids.summary_canvas.clear_widgets()
 
     def save_figure_options_metrics(self):
         if self.metrics_figure is None:
-            self.__show_no_figure_popup('No Figure to Plot. Please create a plot before saving.')
+            self._show_error_popup('No Figure to Plot', 
+                                   'Please create a plot before saving.')
         else:
             chooser = SaveFigureDialog(
                 save=self.save_figure, cancel=self.dismiss_popup
@@ -2368,11 +2361,11 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.metrics_figure.savefig(fullpath, dpi=300)
         self.dismiss_popup()
 
-    def __show_no_figure_popup(self, msg):
+    def _show_error_popup(self, title_str, msg):
         content = MessagePopupContent()
 
         popup = Popup(
-            title='No Figure to Plot', content=content, auto_dismiss=False,
+            title=title_str, content=content, auto_dismiss=False,
             size_hint=(0.4, 0.4)
         )
         content.ids.msg_label.text = str(msg)
@@ -2380,6 +2373,14 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         popup.open()
         return
 
+    def _check_metrics_list_selection(self):
+        """Checks if at least one of the variables is selected."""
+        for _, config_variables in self.selected_metric_items.items():
+            if config_variables != []:
+                # at least one variable is selected, not empty
+                return False
+        return True
+        
     def drop_config_menu_metrics(self):
         for config in self.project.configurations():
             self.configurations.append(config)
@@ -2469,8 +2470,8 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.figure = None
 
     def on_enter(self):
-        # populated `selected_list_items` assuming no selection from dropdown
-        # menu
+        # populate `selected_list_items` assuming no selection 
+        # from dropdown menu
         # TO DO: Replace with evaluated configurations
         num_configs = len(list(self.project.configurations()))
         for ctr in range(num_configs):
@@ -2525,13 +2526,20 @@ class ResultsDetailScreen(SSimBaseScreen):
         return fig
 
     def update_figure(self):
-        self.figure = self._create_figure()
-        Logger.debug("Figure update command issued from GUI ...")
-        Logger.debug(self.ids.detail_figure_title.text)
-        self.ids.detail_plot_canvas.clear_widgets()
-        self.ids.detail_plot_canvas.add_widget(
-            FigureCanvasKivyAgg(self.figure)
-        )
+        Logger.debug("************************************")
+        Logger.debug(self.selected_list_items)
+        Logger.debug("************************************")
+        if self._check_list_selection():
+            self._show_error_popup('No Variable(s) Selected!', 
+                                   'Please select variable(s) from the dropdown menu to update the plot.')
+        else:
+            self.figure = self._create_figure()
+            Logger.debug("Figure update command issued from GUI ...")
+            Logger.debug(self.ids.detail_figure_title.text)
+            self.ids.detail_plot_canvas.clear_widgets()
+            self.ids.detail_plot_canvas.add_widget(
+                FigureCanvasKivyAgg(self.figure)
+            )
 
     def save_figure_options(self):
         '''Saves the current active figure.'''
@@ -2563,11 +2571,11 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.figure.savefig(fullpath, dpi=300)
         self.dismiss_popup()
 
-    def __show_no_figure_popup(self, msg):
+    def _show_error_popup(self, title_str, msg):
         content = MessagePopupContent()
 
         popup = Popup(
-            title='No Figure to Plot', content=content, auto_dismiss=False,
+            title=title_str, content=content, auto_dismiss=False,
             size_hint=(0.4, 0.4)
         )
         content.ids.msg_label.text = str(msg)
@@ -2575,6 +2583,14 @@ class ResultsDetailScreen(SSimBaseScreen):
         popup.open()
         return
     
+    def _check_list_selection(self):
+        """Checks if at least one of the variables is selected."""
+        for _, config_variables in self.selected_list_items.items():
+            if config_variables != []:
+                # at least one variable is selected, not empty
+                return False
+        return True
+
     def clear_figure(self):
         self.ids.detail_plot_canvas.clear_widgets()
 
