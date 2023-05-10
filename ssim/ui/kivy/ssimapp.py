@@ -2242,6 +2242,9 @@ class RunSimulationScreen(SSimBaseScreen):
                 self.selected_configurations.append(self.configurations[ctr])
             ctr = ctr - 1
         # run all the configurations
+        Logger.debug("===================================")
+        Logger.debug(parse_float(self.ids.simulation_runtime.text))
+        Logger.debug("===================================")
         for config in self.selected_configurations:
             print(config)
             config.evaluate(basepath=self.project.base_dir)

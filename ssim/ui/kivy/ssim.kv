@@ -1278,6 +1278,12 @@
                 Button:
                     text: "Resume"
 
+                TextFieldPositiveFloat:
+                    hint_text: "Enter Simulation Time (in hours)"
+                    size_hint_y: None
+                    height: 25
+                    id: simulation_runtime    
+
                 Button:
                     text: "Run Selected Configurations"
                     on_press: root.run_configurations()
