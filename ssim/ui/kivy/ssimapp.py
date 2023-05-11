@@ -204,6 +204,8 @@ class SSimBaseScreen(Screen):
     def __init__(self, project, *args, **kwargs):
         self.project = project
         self.project_results = ProjectResults(self.project)
+        self.configurations: List[Configuration] = []
+        self.simulation_configurations = {}
         super().__init__(*args, **kwargs)
 
 
@@ -2183,6 +2185,7 @@ class RunSimulationScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.configurations: List[Configuration] = []
+        self.temp_config_ids = []
         self.selected_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
         self._run_thread = None
@@ -2191,17 +2194,21 @@ class RunSimulationScreen(SSimBaseScreen):
         # # clear the MDList every time the RunSimulationScreen is opened
         # # TO DO: Keep track of selected configs
         self.ids.config_list.clear_widgets()
-        self.configurations: List[Configuration] = []
+        # self.configurations: List[Configuration] = []
         self.populate_configurations()
 
     def populate_configurations(self):
         # store all the project configurations into a list
+        ctr = 1
+        # rest the configurations list everytime before populating
+        # to avoid duplications
+        self.configurations = []
         for config in self.project.configurations():
             self.configurations.append(config)
-            print(config.id)
+            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            ctr += 1
 
         # populate the UI with the list of configurations
-        ctr = 1
         for config in self.configurations:
             secondary_detail_text = []
             tertiary_detail_text = []
@@ -2210,7 +2217,6 @@ class RunSimulationScreen(SSimBaseScreen):
 
             for storage in config.storage:
                 if storage is not None:
-                    # print(storage)
                     secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
                     tertiary_detail_text.append(f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
                 else:
@@ -2218,19 +2224,23 @@ class RunSimulationScreen(SSimBaseScreen):
             final_secondary_text = "\n".join(secondary_detail_text)
             final_tertiary_text = "\n".join(tertiary_detail_text)
 
+            # self.ids.config_list.add_widget(
+            #     ListItemWithCheckbox(pk="pk",
+            #                          text=self.simulation_configurations[config.id],
+            #                          secondary_text=final_secondary_text,
+            #                          tertiary_text=final_tertiary_text)
+            # )
             self.ids.config_list.add_widget(
                 ListItemWithCheckbox(pk="pk",
-                                     text=f"Configuration {ctr}",
-                                     secondary_text=final_secondary_text,
+                                     text=self.simulation_configurations[config.id],
+                                     secondary_text=str(config.id),
                                      tertiary_text=final_tertiary_text)
             )
-            ctr += 1
 
     def _evaluate(self):
         # step 1: check the configurations that are currently selected
         mdlist = self.ids.config_list  # get reference to the configuration list
         self.selected_configurations = []
-        print('selected configurations are:')
         no_of_configurations = len(self.configurations)
         ctr = no_of_configurations - 1
         for wid in mdlist.children:
@@ -2243,10 +2253,15 @@ class RunSimulationScreen(SSimBaseScreen):
             ctr = ctr - 1
         # run all the configurations
         Logger.debug("===================================")
-        Logger.debug(parse_float(self.ids.simulation_runtime.text))
+        Logger.debug('Selected Configurations:')
+        Logger.debug(self.selected_configurations)
         Logger.debug("===================================")
+
         for config in self.selected_configurations:
-            print(config)
+            Logger.debug("Currently Running configuration:")
+            Logger.debug(config.id)
+            Logger.debug(self.simulation_configurations[config.id])
+            Logger.debug("===================================")
             config.evaluate(basepath=self.project.base_dir)
             config.wait()
 
@@ -2262,7 +2277,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_results = ProjectResults(self.project)
-        self.configurations: List[Configuration] = []
+        # self.configurations: List[Configuration] = []
         self.selected_metrics = {}
         self.selected_metric_items = {}
         self.current_configuration = None
@@ -2272,9 +2287,14 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # populate `selected_list_items` assuming no selection 
         # from dropdown menu
         # TO DO: Replace with evaluated configurations
-        num_configs = len(list(self.project.configurations()))
-        for ctr in range(num_configs):
-            self.selected_metric_items['Configuration ' + str(ctr + 1)] = []
+        ctr = 1
+        for config in self.project.configurations():
+            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            self.selected_metric_items['Configuration ' + str(ctr)] = []
+            ctr += 1
+        Logger.debug('Simulation configuration in Metrics Screen:')
+        Logger.debug(self.simulation_configurations)
+        Logger.debug("============================================================")
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2284,10 +2304,14 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         plt.clf()
         ctr = 1
         for result in self.project_results.results():
+            Logger.debug("<><><><><><><><><><><><><><><><><><><><><>")
+            Logger.debug(result.config_dir)
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
+            Logger.debug("<><><><><><><><><><><><><><><><><><><><><>")
             # obtain accumulated metric values and times-series 
             # data in a pandas dataframe for metrics
             _, accumulated_metric, data_metrics = result.metrics_log()
-            config_key = 'Configuration ' + str(ctr)
+            config_key = self.simulation_configurations[config_dir]
 
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
@@ -2385,19 +2409,13 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         return True
         
     def drop_config_menu_metrics(self):
-        for config in self.project.configurations():
-            self.configurations.append(config)
-        
-        # TO DO: replace this length of configurations that have been evaluated
-        num_configs = len(list(self.project.configurations()))
-
         menu_items = []
-        for ctr in range(num_configs):
-            display_text = "Configuration " + str(ctr + 1)
+        for config_id, config_ui_id in self.simulation_configurations.items():
+            display_text = config_ui_id
             menu_items.append({
                 "viewclass": "OneLineListItem",
                 "text": display_text,
-                "on_release": lambda x=display_text: self.set_config(x)
+                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
             })
 
         self.menu = MDDropdownMenu(
@@ -2405,21 +2423,26 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         )
         self.menu.open()
 
-    def set_config(self, value):
-        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        Logger.debug(value)
-
-        self.current_configuration = value
+    def set_config(self, value_id, value_ui_id):
+ 
+        self.current_configuration = value_ui_id
+        
         Logger.debug(self.selected_metrics)
 
         # read the current selected configuration
-        self.ids.config_list_detail_metrics.text = value
+        self.ids.config_list_detail_metrics.text = value_ui_id
 
-        # obtain the index for the current selected configuration
-        # TODO: setup a proper mapping system between Results and Configuration
-        current_result_index = int(value[-1]) - 1
+         # put the 'Result' objects in a dict with configuration ids
+        # this will allows the results to be mapped with 
+        # corresponding configurations
+        simulation_results = {}
+        for result in self.project_results.results():
+            # configuraiton directory of the result
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
+            simulation_results[config_dir] = result
+
         # extract the `current_result` based on selection from drop down menu
-        current_result = next(itertools.islice(self.project_results.results(), current_result_index, None))
+        current_result = simulation_results[value_id]
 
         # extract the data
         metrics_headers, metrics_accumulated, metrics_data = current_result.metrics_log()
@@ -2463,7 +2486,7 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.configurations: List[Configuration] = []
+        # self.configurations: List[Configuration] = []
         self.selected_variables = {}
         self.variables = {}
         self.current_configuration = None
@@ -2476,9 +2499,14 @@ class ResultsDetailScreen(SSimBaseScreen):
         # populate `selected_list_items` assuming no selection 
         # from dropdown menu
         # TO DO: Replace with evaluated configurations
-        num_configs = len(list(self.project.configurations()))
-        for ctr in range(num_configs):
-            self.selected_list_items['Configuration ' + str(ctr + 1)] = []
+        ctr = 1
+        for config in self.project.configurations():
+            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            self.selected_list_items['Configuration ' + str(ctr)] = []
+            ctr += 1
+        Logger.debug('Simulation configuration in Details Screen:')
+        Logger.debug(self.simulation_configurations)
+        Logger.debug("============================================================")
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2502,7 +2530,8 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             # combine all data into a single dataframe
             data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
-            config_key = 'Configuration ' + str(ctr)
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
+            config_key = self.simulation_configurations[config_dir]
             
             # columns to plot
             columns_to_plot = self.selected_list_items[config_key]
@@ -2529,9 +2558,9 @@ class ResultsDetailScreen(SSimBaseScreen):
         return fig
 
     def update_figure(self):
-        Logger.debug("************************************")
+        Logger.debug("***********************************************************************")
         Logger.debug(self.selected_list_items)
-        Logger.debug("************************************")
+        Logger.debug("***********************************************************************")
         if self._check_list_selection():
             self._show_error_popup('No Variable(s) Selected!', 
                                    'Please select variable(s) from the dropdown menu to update the plot.')
@@ -2598,20 +2627,14 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.ids.detail_plot_canvas.clear_widgets()
 
     def drop_config_menu(self):
-        for config in self.project.configurations():
-            self.configurations.append(config)
-
-        # TO DO: Replace with evaluated configurations
-        num_configs = len(list(self.project.configurations()))
-        # num_configs = self.project.num_configurations()
 
         menu_items = []
-        for ctr in range(num_configs):
-            display_text = "Configuration " + str(ctr + 1)
+        for config_id, config_ui_id in self.simulation_configurations.items():
+            display_text = config_ui_id
             menu_items.append({
                 "viewclass": "OneLineListItem",
                 "text": display_text,
-                "on_release": lambda x=display_text: self.set_config(x)
+                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
             })
 
         self.menu = MDDropdownMenu(
@@ -2633,25 +2656,27 @@ class ResultsDetailScreen(SSimBaseScreen):
         Logger.debug(self.current_configuration)
         Logger.debug(self.selected_list_items)
 
-    def set_config(self, value):
+    def set_config(self, value_id, value_ui_id):
 
-        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>")
-        Logger.debug(value)
-
-        self.current_configuration = value
-
+        self.current_configuration = value_ui_id
+        
         Logger.debug(self.selected_variables)
+        
         # read the current selected configuration
-        self.ids.config_list_detail.text = value
+        self.ids.config_list_detail.text = value_ui_id
+        
+        # put the 'Result' objects in a dict with configuration ids
+        # this will allows the results to be mapped with 
+        # corresponding configurations
+        simulation_results = {}
+        for result in self.project_results.results():
+            # configuraiton directory of the result
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
+            simulation_results[config_dir] = result
 
-        # extract all results from all the configutations
-        project_results = self.project_results.results()
-        # obtain the index for the current selected configuration
-        # TODO: setup a proper mapping system between Results and Configuration
-        current_result_index = int(value[-1]) - 1
         # extract the `current_result` based on selection from drop down menu
-        current_result = next(itertools.islice(project_results, current_result_index, None))
-
+        current_result = simulation_results[value_id]
+    
         # extract the data
         storage_state_headers, storage_state_data = current_result.storage_state()
         storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
