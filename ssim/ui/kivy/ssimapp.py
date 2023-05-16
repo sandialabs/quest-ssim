@@ -2194,7 +2194,6 @@ class RunSimulationScreen(SSimBaseScreen):
         # # clear the MDList every time the RunSimulationScreen is opened
         # # TO DO: Keep track of selected configs
         self.ids.config_list.clear_widgets()
-        # self.configurations: List[Configuration] = []
         self.populate_configurations()
 
     def populate_configurations(self):
@@ -2224,16 +2223,10 @@ class RunSimulationScreen(SSimBaseScreen):
             final_secondary_text = "\n".join(secondary_detail_text)
             final_tertiary_text = "\n".join(tertiary_detail_text)
 
-            # self.ids.config_list.add_widget(
-            #     ListItemWithCheckbox(pk="pk",
-            #                          text=self.simulation_configurations[config.id],
-            #                          secondary_text=final_secondary_text,
-            #                          tertiary_text=final_tertiary_text)
-            # )
             self.ids.config_list.add_widget(
                 ListItemWithCheckbox(pk="pk",
                                      text=self.simulation_configurations[config.id],
-                                     secondary_text=str(config.id),
+                                     secondary_text=final_secondary_text,
                                      tertiary_text=final_tertiary_text)
             )
 
@@ -2274,10 +2267,10 @@ class RunSimulationScreen(SSimBaseScreen):
 
 
 class ResultsVisualizeScreen(SSimBaseScreen):
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_results = ProjectResults(self.project)
-        # self.configurations: List[Configuration] = []
         self.selected_metrics = {}
         self.selected_metric_items = {}
         self.current_configuration = None
@@ -2292,9 +2285,10 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
             self.selected_metric_items['Configuration ' + str(ctr)] = []
             ctr += 1
-        Logger.debug('Simulation configuration in Metrics Screen:')
-        Logger.debug(self.simulation_configurations)
-        Logger.debug("============================================================")
+        
+        Logger.debug(">" * 50)
+        Logger.debug(self.selected_metric_items)
+        Logger.debug("<" * 50)
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2304,10 +2298,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         plt.clf()
         ctr = 1
         for result in self.project_results.results():
-            Logger.debug("<><><><><><><><><><><><><><><><><><><><><>")
-            Logger.debug(result.config_dir)
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
-            Logger.debug("<><><><><><><><><><><><><><><><><><><><><>")
+
             # obtain accumulated metric values and times-series 
             # data in a pandas dataframe for metrics
             _, accumulated_metric, data_metrics = result.metrics_log()
@@ -2318,7 +2310,6 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
             # select the susbset of data based on 'columns_to_plot'
             selected_data = data_metrics[columns_to_plot]
-            Logger.debug(selected_data)
             x_data = data_metrics.loc[:, 'time']
 
             # add the selected columns to the plot
@@ -2348,8 +2339,6 @@ class ResultsVisualizeScreen(SSimBaseScreen):
                                    'Please select metrics(s) from the dropdown menu to update the plot.')
         else:
             self.metrics_figure = self._create_metrics_figure()
-            Logger.debug("Metrics figure update command issued from GUI ...")
-            Logger.debug(self.ids.detail_figure_title.text)
             # Add kivy widget to the canvas
             self.ids.summary_canvas.clear_widgets()
             self.ids.summary_canvas.add_widget(
@@ -2427,8 +2416,6 @@ class ResultsVisualizeScreen(SSimBaseScreen):
  
         self.current_configuration = value_ui_id
         
-        Logger.debug(self.selected_metrics)
-
         # read the current selected configuration
         self.ids.config_list_detail_metrics.text = value_ui_id
 
@@ -2450,8 +2437,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # add the list of metrics in the selected configuration into the MDList
         # clear the variable list
         self.ids.metrics_list.clear_widgets()
-        Logger.debug(">>> Current metrics selected:")
-        Logger.debug(self.selected_metric_items)
+
 
         for item in metrics_headers:
             # do not add 'time' to the variable list
@@ -2474,9 +2460,10 @@ class ResultsVisualizeScreen(SSimBaseScreen):
                 selected_metrics.append(metric.text)
         
         self.selected_metric_items[self.current_configuration] = selected_metrics
-
-        Logger.debug(self.current_configuration)
+        
+        Logger.debug(">" * 50)
         Logger.debug(self.selected_metric_items)
+        Logger.debug("<" * 50)
 
     def open_results_detail(self):
         self.manager.current = "results-detail"
@@ -2499,14 +2486,16 @@ class ResultsDetailScreen(SSimBaseScreen):
         # populate `selected_list_items` assuming no selection 
         # from dropdown menu
         # TO DO: Replace with evaluated configurations
+
         ctr = 1
         for config in self.project.configurations():
             self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
             self.selected_list_items['Configuration ' + str(ctr)] = []
             ctr += 1
-        Logger.debug('Simulation configuration in Details Screen:')
-        Logger.debug(self.simulation_configurations)
-        Logger.debug("============================================================")
+        
+        Logger.debug(">" * 50)
+        Logger.debug(self.selected_list_items)
+        Logger.debug("<" * 50)
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2538,7 +2527,6 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             # select subset of data based on columns_to_plot
             selected_data = data[columns_to_plot]
-            Logger.debug(selected_data)
             x_data = data.loc[:, 'time']
             
             # add the selected columns to plot
@@ -2558,9 +2546,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         return fig
 
     def update_figure(self):
-        Logger.debug("***********************************************************************")
-        Logger.debug(self.selected_list_items)
-        Logger.debug("***********************************************************************")
         if self._check_list_selection():
             self._show_error_popup('No Variable(s) Selected!', 
                                    'Please select variable(s) from the dropdown menu to update the plot.')
@@ -2643,25 +2628,21 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.menu.open()
 
     def update_selected_variables(self):
-        Logger.debug('Update selected variables called!')
-
-        # self.selected_list_items = {}
+       
         selected_items = []
         for variable in self.ids.variable_list_detail.children:
             if variable.selected:
                 selected_items.append(variable.text)
 
         self.selected_list_items[self.current_configuration] = selected_items
-
-        Logger.debug(self.current_configuration)
+        Logger.debug(">" * 50)
         Logger.debug(self.selected_list_items)
+        Logger.debug("<" * 50)
 
     def set_config(self, value_id, value_ui_id):
 
         self.current_configuration = value_ui_id
-        
-        Logger.debug(self.selected_variables)
-        
+               
         # read the current selected configuration
         self.ids.config_list_detail.text = value_ui_id
         
@@ -2699,9 +2680,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.ids.variable_list_detail.clear_widgets()
         # add the list of variables in the selected configuration
         # into the MDList
-
-        Logger.debug('>>> Current selection records: ')
-        Logger.debug(self.selected_list_items)
 
         for item in self.list_items:
             # do not add 'time' to the variable list
