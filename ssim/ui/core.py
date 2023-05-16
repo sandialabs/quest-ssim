@@ -369,7 +369,7 @@ class Project:
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
         for storage_configuration in self._storage_configurations():
-            storage_devices, inv_controls = zip(*storage_configuration)
+            storage_devices, inv_controls = _safe_unzip(storage_configuration)
             inv_controls = list(
                 filter(lambda ic: ic is not None, inv_controls)
             )
@@ -383,6 +383,7 @@ class Project:
             )
 
     def _storage_configurations(self):
+        print(f"Project._storage_configurations() - device list: {self.storage_devices}")
         return itertools.product(
             *(storage_options.configurations()
               for storage_options in self.storage_devices)
@@ -1368,6 +1369,12 @@ def _federate_spec(name, cmd, directory=".", host="localhost"):
         "name": name,
         "exec": cmd
     }
+
+
+def _safe_unzip(xs):
+    if len(xs) == 0:
+        return [], []
+    return zip(*xs)
 
 
 def _get_federate_config(federate):
