@@ -1574,10 +1574,10 @@
     markup: True
 
     LeftCheckbox:
-        id: check
+        id: selected
         active: True
         on_release:
-            self.toggle_configuration_check(check)
+            root.toggle_selection()
 
     IconRightWidget:
         icon: 'trash-can-outline'

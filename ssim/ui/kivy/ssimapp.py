@@ -205,7 +205,8 @@ class SSimBaseScreen(Screen):
         self.project = project
         self.project_results = ProjectResults(self.project)
         self.configurations: List[Configuration] = []
-        self.simulation_configurations = {}
+        self.selected_configurations: List[Configuration] = []
+        self.simulation_configurations= {}
         super().__init__(*args, **kwargs)
 
 
@@ -1747,12 +1748,7 @@ class RightCheckbox(IRightBodyTouch, MDCheckbox):
 
 
 class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
-
-    def toggle_configuration_check(self, check):
-        print(check)
-        if check.active:
-            print('Configuration checked')
-        print("selection made")
+    pass
 
 
 class MetricConfigurationScreen(SSimBaseScreen):
@@ -2184,9 +2180,7 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.configurations: List[Configuration] = []
         self.temp_config_ids = []
-        self.selected_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
         self._run_thread = None
 
@@ -2201,14 +2195,23 @@ class RunSimulationScreen(SSimBaseScreen):
         ctr = 1
         # rest the configurations list everytime before populating
         # to avoid duplications
-        self.configurations = []
+        configs = []
         for config in self.project.configurations():
-            self.configurations.append(config)
+            configs.append(config)
+            # establish the mappings between config id and confif UI_ids
             self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
             ctr += 1
 
+        self.configurations = configs
+
+        Logger.debug(">" * 50)
+        Logger.debug(self.selected_configurations)
+        Logger.debug(self.simulation_configurations)
+        Logger.debug("<" * 50)
+
+        ctr = 1
         # populate the UI with the list of configurations
-        for config in self.configurations:
+        for config in self.project.configurations():
             secondary_detail_text = []
             tertiary_detail_text = []
             final_secondary_text = []
@@ -2224,20 +2227,35 @@ class RunSimulationScreen(SSimBaseScreen):
             final_tertiary_text = "\n".join(tertiary_detail_text)
 
             self.ids.config_list.add_widget(
-                ListItemWithCheckbox(pk="pk",
-                                     text=self.simulation_configurations[config.id],
-                                     secondary_text=final_secondary_text,
-                                     tertiary_text=final_tertiary_text)
+                ListItemWithCheckbox(text=self.simulation_configurations[config.id],
+                                     sec_text=config.id,
+                                     tert_text=final_tertiary_text)
             )
 
-    def _evaluate(self):
-        # step 1: check the configurations that are currently selected
-        mdlist = self.ids.config_list  # get reference to the configuration list
-        self.selected_configurations = []
+            # if config in self.selected_configurations:
+            #     self.ids.config_list.children.selected.active = True 
+            # else:
+            #     self.ids.config_list.children.selected.active = False 
+
+
+    def update_selected_configurations(self):
+
+        Logger.debug('!' * 50)
+        Logger.debug('update_selected_configurations')
+        Logger.debug('!' * 50)
+
+        Logger.debug(self.configurations)
+        debug_ids = []
+        for config  in self.configurations:
+            debug_ids.append(config.id)
+        Logger.debug(debug_ids)
+
         no_of_configurations = len(self.configurations)
         ctr = no_of_configurations - 1
-        for wid in mdlist.children:
-            if wid.ids.check.active:
+        # self.selected_configurations = []
+        self.selected_configurations = []
+        for wid in self.ids.config_list.children:
+            if wid.selected:
                 print('*' * 20)
                 print(wid.text)
                 print('*' * 20)
@@ -2245,11 +2263,21 @@ class RunSimulationScreen(SSimBaseScreen):
                 self.selected_configurations.append(self.configurations[ctr])
             ctr = ctr - 1
         # run all the configurations
-        Logger.debug("===================================")
-        Logger.debug('Selected Configurations:')
-        Logger.debug(self.selected_configurations)
-        Logger.debug("===================================")
+        # Logger.debug("===================================")
+        # Logger.debug('Selected Configurations:')
+        # Logger.debug(self.selected_configurations)
+        debug_ids = []
+        for config  in self.selected_configurations:
+            debug_ids.append(config.id)
+        Logger.debug(debug_ids)
+        # Logger.debug(self.simulation_configurations)
+        # Logger.debug("===================================")
 
+    def _evaluate(self):
+        # # step 1: check the configurations that are currently selected 
+        # self._update_selected_configurations()
+        
+        # step 2: evaluate the selected configurations
         for config in self.selected_configurations:
             Logger.debug("Currently Running configuration:")
             Logger.debug(config.id)
@@ -2399,6 +2427,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         
     def drop_config_menu_metrics(self):
         menu_items = []
+        Logger.debug(self.simulation_configurations)
         for config_id, config_ui_id in self.simulation_configurations.items():
             display_text = config_ui_id
             menu_items.append({
@@ -2656,69 +2685,84 @@ class ResultsDetailScreen(SSimBaseScreen):
             simulation_results[config_dir] = result
 
         # extract the `current_result` based on selection from drop down menu
-        current_result = simulation_results[value_id]
-    
-        # extract the data
-        storage_state_headers, storage_state_data = current_result.storage_state()
-        storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
         
-        # remove 'time' from the header list and pandas data frame to prevent
-        # duplication
-        if storage_voltage_headers is not None: 
-            storage_voltage_headers.pop(0)
-        storage_voltage_data.drop(['time'], axis=1, inplace=True)
+        if value_id in simulation_results:
+            current_result = simulation_results[value_id]
+          
+            # extract the data
+            storage_state_headers, storage_state_data = current_result.storage_state()
+            storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
+            
+            # remove 'time' from the header list and pandas data frame to prevent
+            # duplication
+            if storage_voltage_headers is not None: 
+                storage_voltage_headers.pop(0)
+            storage_voltage_data.drop(['time'], axis=1, inplace=True)
 
-        # 'storage_voltage_headers' have no indication that these labels
-        # represent voltage, append string '_voltage' to each label
-        storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]                                                                                                                            
-        
-        self.list_items = storage_state_headers + storage_voltage_headers
-        self.variable_data = pd.concat([storage_state_data, storage_voltage_data], axis=1)
+            # 'storage_voltage_headers' have no indication that these labels
+            # represent voltage, append string '_voltage' to each label
+            storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]                                                                                                                            
+            
+            self.list_items = storage_state_headers + storage_voltage_headers
+            self.variable_data = pd.concat([storage_state_data, storage_voltage_data], axis=1)
 
-        self.x_data = list(self.variable_data.loc[:, 'time'])
+            self.x_data = list(self.variable_data.loc[:, 'time'])
 
-        self.ids.variable_list_detail.clear_widgets()
-        # add the list of variables in the selected configuration
-        # into the MDList
+            self.ids.variable_list_detail.clear_widgets()
+            # add the list of variables in the selected configuration
+            # into the MDList
 
-        for item in self.list_items:
-            # do not add 'time' to the variable list
-            if item == 'time':
-                continue
-            else:
-                self.ids.variable_list_detail.add_widget(
-                    ResultsVariableListItemWithCheckbox(variable_name=item)
-                )
+            for item in self.list_items:
+                # do not add 'time' to the variable list
+                if item == 'time':
+                    continue
+                else:
+                    self.ids.variable_list_detail.add_widget(
+                        ResultsVariableListItemWithCheckbox(variable_name=item)
+                    )
 
-        # close the drop-down menu
-        self.menu.dismiss()
+            # close the drop-down menu
+            self.menu.dismiss()
+
+        else:
+
+            Logger.debug('This configuration has not been evaluated')
 
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
-    def __init__(self, pk=None, **kwargs):
-        super().__init__(**kwargs)
-        self.pk = pk
+    def __init__(self, text, sec_text, tert_text, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.text = text
+        self.secondary_text = sec_text
+        self.tertiary_text = tert_text
 
     def delete_item(self, the_list_item):
         print("Delete icon was button was pressed")
         print(the_list_item)
         self.parent.remove_widget(the_list_item)
+    
+    def toggle_selection(self):
+        self.parent.parent.parent.parent.parent.parent.update_selected_configurations()
+    
+    @property
+    def selected(self):
+        return self.ids.selected.active
 
 
-class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
-    '''Custom left container'''
+# class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
+#     '''Custom left container'''
 
-    def __init__(self, pk=None, **kwargs):
-        super().__init__(**kwargs)
-        self.pk = pk
+#     def __init__(self, pk=None, **kwargs):
+#         super().__init__(**kwargs)
+#         self.pk = pk
 
-    def toggle_configuration_check(self, check):
-        # print(check)
-        # if check.active:
-        #     print('Configuration checked')
-        # print("selection made")
-        pass
+#     def toggle_configuration_check(self, check):
+#         # print(check)
+#         # if check.active:
+#         #     print('Configuration checked')
+#         # print("selection made")
+#         pass
 
 
 class SelectGridDialog(FloatLayout):
