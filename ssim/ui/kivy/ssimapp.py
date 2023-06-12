@@ -12,7 +12,6 @@ import kivy
 import matplotlib.pyplot as plt
 import opendssdirect as dssdirect
 import pandas as pd
-from bidict import bidict
 from importlib_resources import files, as_file
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
@@ -83,8 +82,8 @@ def make_xy_grid_data(xs: list, ys: list) -> list:
     -------
     list:
         A list of dictionaries of the form
-        [{x: x1, y: y1}, {x: x2, y: y2}, ..., {x: xn, y: yn}] which is what's required
-        by an XY grid..
+        [{x: x1, y: y1}, {x: x2, y: y2}, ..., {x: xn, y: yn}] which is what's
+        required by an XY grid.
     """
     return [{'x': xs[i], 'y': ys[i]} for i in range(len(xs))]
 
@@ -116,7 +115,8 @@ def parse_float_or_str(strval):
     """A utility method to parse a string into a floating point value or
      leave it as is if the cast fails.
 
-    This used parse_float and if that fails, this returns the supplied input string.
+    This used parse_float and if that fails, this returns the supplied input
+    string.
 
     Parameters
     ----------
@@ -142,16 +142,18 @@ def try_co_sort(xl: list, yl: list) -> (list, list):
     Parameters
     ----------
     xl : list
-        The list of "x" values in this grid view to be sorted and treated as the index.
+        The list of "x" values in this grid view to be sorted and treated as
+        the index.
     yl: list
-        The list of "y" values in this grid view to be sorted in accordance with the x-list.
+        The list of "y" values in this grid view to be sorted in accordance
+        with the x-list.
 
     Returns
     -------
     tuple:
-        If the two lists can be co-sorted, then the co-sorted versions of them will be
-        returned.  If they cannot b/c an exception occurs, then they are returned
-        unmodified.
+        If the two lists can be co-sorted, then the co-sorted versions of them
+        will be returned.  If they cannot b/c an exception occurs, then they
+        are returned unmodified.
     """
     if len(xl) < 2: return (xl, yl)
 
@@ -214,19 +216,20 @@ class SSimBaseScreen(Screen):
 class MatlabPlotBox(BoxLayout):
 
     def reset_plot(self):
-        """Clears the current diagram widget and draws a new one using the current
-         figure (plt.gcf())"""
+        """Clears the current diagram widget and draws a new one using the
+        current figure (plt.gcf())"""
         self.clear_widgets()
         self.add_widget(FigureCanvasKivyAgg(plt.gcf()))
 
     def display_plot_error(self, msg):
-        """Puts a label with a supplied message in place of the diagram when there is a
-            reason a diagram can't be displayed.
+        """Puts a label with a supplied message in place of the diagram when
+        there is a reason a diagram can't be displayed.
 
         Parameters
         ----------
         msg : str
-            The message to show in place of the diagram when one can't be displayed.
+            The message to show in place of the diagram when one can't be
+            displayed.
         """
         self.clear_widgets()
         self.add_widget(MDLabel(text=msg))
@@ -541,8 +544,19 @@ class StorageConfigurationScreen(SSimBaseScreen):
         else:
             textfield.set_error_message()
 
-    def _refocus_field(self, textfield):
-        textfield.focus = True
+    def _refocus_field(self, field):
+        """A method that does nothing more than set the focus property of the
+        supplied widget to true.
+        
+        This is often scheduled for call to manage the focus state of widgets
+        as a form is being initialized.
+
+        Parameters
+        ----------
+        field
+            The widget to set the focus value of.
+        """
+        field.focus = True
 
     def _add_device_duration(self, textfield):
         self._add_option(self.ids.duration_list, textfield)
@@ -597,6 +611,15 @@ class StorageConfigurationScreen(SSimBaseScreen):
             )
 
     def __show_invalid_input_values_popup(self, msg):
+        """Displays the popup box that indicates some invalid input for 
+        a storage configuration.
+
+        Parameters
+        ----------
+        msg
+            The message to be shown.  Whatever it is, it must be convertible to
+            a string using the str() function.
+        """
         content = MessagePopupContent()
 
         popup = Popup(
@@ -658,7 +681,7 @@ class XYGridView(RecycleView):
 
     def delete_item(self, index: int):
         self.data.pop(index)
-        Clock.schedule_once(lambda dt: self.__raise_value_changed(), 0.05)
+        Clock.schedule_once(lambda dt: self.__raise_deleted_item(), 0.05)
 
     def x_value_changed(self, index: int, value):
         self.__on_value_changed(index, "x", value)
@@ -679,7 +702,9 @@ class XYGridView(RecycleView):
     def on_item_deleted(self):
         pass
 
-    def __on_deleted_item(self):
+    def __raise_deleted_item(self):
+        """Dispatches the on_item_deleted method to anything bound to it.
+        """
         self.dispatch("on_item_deleted")
 
     def extract_data_lists(self, sorted: bool = True) -> (list, list):
@@ -1084,11 +1109,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         self.load_all_control_data()
 
-        self._mode_dict = bidict({
+        self._mode_dict = {
             "droop": "Droop", "voltvar": "Volt-Var", "voltwatt": "Volt-Watt",
             "varwatt": "Var-Watt", "vv_vw": "Volt-Var & Volt-Watt",
             "constantpf": "Constant Power Factor"
-        })
+        }
         
         self._set_mode_dict = {
             "droop": self.set_droop_mode, "voltvar": self.set_volt_var_mode,
@@ -1101,11 +1126,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             self.dispatch_set_mode(self._options.control.mode)
 
     def load_all_control_data(self):
-        """Verifies the existence of all control mode parameters and then sets the
-        contents of the controls used to display and modify them.
+        """Verifies the existence of all control mode parameters and then sets
+        the contents of the controls used to display and modify them.
 
-        This uses the individual "set...data" methods for each control mode.  See those
-        methods for more details of each.
+        This uses the individual "set...data" methods for each control mode. 
+        See those methods for more details of each.
         """
         self.set_droop_data()
         self.set_volt_var_data()
@@ -1116,12 +1141,24 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
     @staticmethod
     def __set_focus_clear_sel(widget, value=True):
+        """Sets the focus of the supplied widget to the supplied value and
+        schedules a call to widget.cancel_selection().
+        
+        Parameters
+        ----------
+        widget:
+            The widget whose focus is to be set to the supplied value and on
+            whom selection is to be canceled.
+        value:
+            True if the widget is to receive focus and false otherwise.
+        """
         widget.focus = value
         Clock.schedule_once(lambda dt: widget.cancel_selection(), 0.05)
 
     def set_mode_label_text(self):
-        """ Adds the current device name to the label that informs a user to select
-        a current control model."""
+        """ Adds the current device name to the label that informs a user to
+        select a current control model.
+        """
         txt = f"Select a control mode for this storage asset: [b]{self.device_name}[/b]"
         if self._options.control.mode:
             pName = self._mode_dict[self._options.control.mode]
@@ -1142,27 +1179,46 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return "" if self._options is None else self._options.name
 
     def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
-        """A callback function used by the control mode tab to notify of tab changes
+        """A callback function used by the control mode tab to notify of tab
+        changes
 
-        This extracts and stores any data that was input on the previous tab and then esnures
-        that the new tab is in the correct state.
+        This extracts and stores any data that was input on the previous tab
+        and then ensures that the new tab is in the correct state.
+
+        Parameters
+        ----------
+        instance_tabs:
+            The tab control that issued this call.
+        instance_tab:
+            The newly selected tab in the calling tab control.
+        instance_tab_label:
+            The label object of the newly selected tab.
+        tab_text:
+            The text or name icon of the newly selected tab.
         """
         self.read_all_data()
-        self.dispatch_set_mode(self._mode_dict.inverse[tab_text])
+        self.dispatch_set_mode(self.__find_inv_mode__(tab_text))
         self.set_mode_label_text()
 
-    def set_droop_mode(self):
-        """Changes the current contorl mode for the current storage option to droop.
+    def __find_inv_mode__(self, txt: str) -> str:
+        for k,v in self._mode_dict.items():
+            if v == txt: return k
+        return None
 
-        This ensures control parameters for the droop mode, registers the fields for data
-        extraction, and sets focus on the two fields to put them into editing mode.
+    def set_droop_mode(self):
+        """Changes the current contorl mode for the current storage option to
+        droop.
+
+        This ensures control parameters for the droop mode, registers the
+        fields for data extraction, and sets focus on the two fields to put
+        them into editing mode.
         """
         self.set_mode("droop", self.ids.droop_tab)
         self.set_droop_data()
 
     def set_droop_data(self):
-        """Verifies the existence of droop parameters and then sets the contents of
-        the controls used to display and modify them.
+        """Verifies the existence of droop parameters and then sets the
+        contents of the controls used to display and modify them.
         """
         pval, qval = self.verify_droop_params()
         pfield = self.ids.droop_tab_content.ids.p_value
@@ -1175,10 +1231,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(qfield), 0.05)
 
     def verify_droop_params(self) -> (float, float):
-        """ Checks to see if there is a recorded set of droop parameters in the current
-        control parameters list and installs them as default values if they are missing.
-
-        Default P is 500, and default Q is -300.
+        """ Checks to see if there is a recorded set of droop parameters in the
+        current control parameters list and installs them as default values if
+        they are missing.
 
         Returns
         -------
@@ -1191,25 +1246,27 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def set_volt_var_mode(self):
-        """Changes the current contorl mode for the current storage option to volt-var.
+        """Changes the current contorl mode for the current storage option to
+        volt-var.
 
-        This ensures control parameters for the volt-var mode and loads the volt-var
-        data into the xy grid.
+        This ensures control parameters for the volt-var mode and loads the
+        volt-var data into the xy grid.
         """
         self.set_mode("voltvar", self.ids.vv_tab)
         self.set_volt_var_data()
 
     def set_volt_var_data(self):
-        """Verifies the existence of Volt-Var parameters and then sets the contents of
-        the controls used to display and modify them.
+        """Verifies the existence of Volt-Var parameters and then sets the
+        contents of the controls used to display and modify them.
         """
         vvs, var = self.verify_volt_var_params()
         self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
         self.ids.vv_tab_content.rebuild_plot()
 
     def verify_volt_var_params(self) -> (list, list):
-        """ Checks to see if there is a recorded set of Volt-Var parameters in the current
-        control parameters list and installs them as default values if they are missing.
+        """ Checks to see if there is a recorded set of Volt-Var parameters in
+        the current control parameters list and installs them as default values
+        if they are missing.
 
         Default volts are [0.5, 0.95, 1.0, 1.05, 1.5] and default VARs are
         [1.0, 1.0, 0.0, -1.0, -1.0].
@@ -1217,9 +1274,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Returns
         -------
         tuple:
-            The result of verifying the volt and var lists in the control parameters.
-            The first member of the tuple will be the volts list and the second is the
-            list of var values.
+            The result of verifying the volt and var lists in the control
+            parameters. The first member of the tuple will be the volts list
+            and the second is the list of var values.
         """
         return (
             self.__verify_control_param("voltvar", "volts"),
@@ -1227,35 +1284,34 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def set_volt_watt_mode(self):
-        """Changes the current contorl mode for the current storage option to volt-watt.
+        """Changes the current contorl mode for the current storage option to
+        volt-watt.
 
-        This ensures control parameters for the volt-var mode and loads the volt-watt
-        data into the xy grid.
+        This ensures control parameters for the volt-var mode and loads the
+        volt-watt data into the xy grid.
         """
         self.set_mode("voltwatt", self.ids.vw_tab)
         self.set_volt_watt_data()
 
     def set_volt_watt_data(self):
-        """Verifies the existence of Volt-Watt parameters and then sets the contents of
-        the controls used to display and modify them.
+        """Verifies the existence of Volt-Watt parameters and then sets the
+        contents of the controls used to display and modify them.
         """
         vvs, wvs = self.verify_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
         self.ids.vw_tab_content.rebuild_plot()
 
     def verify_volt_watt_params(self) -> (list, list):
-        """ Checks to see if there is a recorded set of Volt-Watt parameters in the current
-        control parameters list and installs them as default values if they are missing.
-
-        Default volts are [0.5, 0.95, 1.0, 1.05, 1.5] and default watts are
-        [1.0, 1.0, 0.0, -1.0, -1.0].
+        """ Checks to see if there is a recorded set of Volt-Watt parameters in
+        the current control parameters list and installs them as default values
+        if they are missing.
 
         Returns
         -------
         tuple:
-            The result of verifying the volt and watt lists in the control parameters.
-            The first member of the tuple will be the volts list and the second is the
-            list of watt values.
+            The result of verifying the volt and watt lists in the control
+            parameters. The first member of the tuple will be the volts list
+            and the second is the list of watt values.
         """
         return (
             self.__verify_control_param("voltwatt", "volts"),
@@ -1263,35 +1319,34 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def set_var_watt_mode(self):
-        """Changes the current contorl mode for the current storage option to var-watt.
+        """Changes the current contorl mode for the current storage option to
+        var-watt.
 
-        This ensures control parameters for the volt-var mode and loads the var-watt
-        data into the xy grid.
+        This ensures control parameters for the volt-var mode and loads the
+        var-watt data into the xy grid.
         """
         self.set_mode("varwatt", self.ids.var_watt_tab)
         self.set_var_watt_data()
 
     def set_var_watt_data(self):
-        """Verifies the existence of Var-Watt parameters and then sets the contents of
-        the controls used to display and modify them.
+        """Verifies the existence of Var-Watt parameters and then sets the
+        contents of the controls used to display and modify them.
         """
         vvs, wvs = self.verify_var_watt_params()
         self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
         self.ids.var_watt_tab_content.rebuild_plot()
 
     def verify_var_watt_params(self) -> (list, list):
-        """ Checks to see if there is a recorded set of Var-Watt parameters in the current
-        control parameters list and installs them as default values if they are missing.
-
-        Default VARs are [0.5, 0.95, 1.0, 1.05, 1.5] and default Watts are
-        [1.0, 1.0, 0.0, -1.0, -1.0].
+        """ Checks to see if there is a recorded set of Var-Watt parameters in
+        the current control parameters list and installs them as default values
+        if they are missing.
 
         Returns
         -------
         tuple:
-            The result of verifying the VAR and Watt lists in the control parameters.
-            The first member of the tuple will be the VARs list and the second is the
-            list of Watt values.
+            The result of verifying the VAR and Watt lists in the control
+            parameters. The first member of the tuple will be the VARs list
+            and the second is the list of Watt values.
         """
         return (
             self.__verify_control_param("varwatt", "vars"),
@@ -1299,18 +1354,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def set_volt_var_and_volt_watt_mode(self):
-        """Changes the current contorl mode for the current storage option to volt-var &
-            var-watt.
+        """Changes the current contorl mode for the current storage option to
+        volt-var & var-watt.
 
-        This ensures control parameters for the volt-var mode and loads the volt-var &
-        var-watt data into the xy grid.
+        This ensures control parameters for the volt-var mode and loads the
+        volt-var & var-watt data into the xy grid.
         """
         self.set_mode("vv_vw", self.ids.vv_vw_tab)
         self.set_volt_var_and_volt_watt_data()
 
     def set_volt_var_and_volt_watt_data(self):
-        """Verifies the existence of Volt-Var & Volt-Watt parameters and then sets the contents of
-        the controls used to display and modify them.
+        """Verifies the existence of Volt-Var & Volt-Watt parameters and then
+        sets the contents of the controls used to display and modify them.
         """
         vvvs, vars, vwvs, watts = self.verify_volt_var_and_volt_watt_params()
         self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
@@ -1318,22 +1373,18 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.ids.vv_vw_tab_content.rebuild_plot()
 
     def verify_volt_var_and_volt_watt_params(self) -> (list, list, list, list):
-        """ Checks to see if there is a recorded set of Volt-Var and Volt_Watt parameters
-        in the current control parameters list and installs them as default values if they
-        are missing.
-
-        Default Volts for Volt-Var are [0.5, 0.95, 1.0, 1.05, 1.5], default VARs for
-        Volt-Var are [1.0, 1.0, 0.0, -1.0, -1.0], default Volts for Volt-Watt are
-        [0.5, 0.95, 1.0, 1.05, 1.5], and default Watts for Volt-Watt are
-        [1.0, 1.0, 0.0, -1.0, -1.0].
+        """ Checks to see if there is a recorded set of Volt-Var and Volt_Watt
+        parameters in the current control parameters list and installs them as
+        default values if they are missing.
 
         Returns
         -------
         tuple:
-            The result of verifying the Volt-Var and Volt-Watt lists in the control parameters.
-            The first member of the tuple will be the Volt-Var Volts.  The second is the
-            list of Volt-Var Var values.  The third is the list of Volt-Watt Volt values and
-            finally, the fourth is the list of Watt Values of the Volt-Watt mode.
+            The result of verifying the Volt-Var and Volt-Watt lists in the
+            control parameters. The first member of the tuple will be the
+            Volt-Var Volts.  The second is the list of Volt-Var Var values. 
+            The third is the list of Volt-Watt Volt values and finally, the
+            fourth is the list of Watt Values of the Volt-Watt mode.
         """
         return (
             self.__verify_control_param("vv_vw", "vv_volts"),
@@ -1343,17 +1394,19 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def set_const_power_factor_mode(self):
-        """Changes the current contorl mode for the current storage option to const PF.
+        """Changes the current contorl mode for the current storage option to
+        const PF.
 
-        This ensures control parameters for the const PF mode, registers the fields for data
-        extraction, and sets focus on the two fields to put them into editing mode.
+        This ensures control parameters for the const PF mode, registers the
+        fields for data extraction, and sets focus on the two fields to put
+        them into editing mode.
         """
         self.set_mode("constantpf", self.ids.const_pf_tab)
         self.set_const_power_factor_data()
 
     def set_const_power_factor_data(self):
-        """Verifies the existence of the Constant Power Factor parameters and then sets the
-        contents of the controls used to display and modify them.
+        """Verifies the existence of the Constant Power Factor parameters and
+        then sets the contents of the controls used to display and modify them.
         """
         cpf = self.verify_const_pf_params()
         pffield = self.ids.const_pf_tab_content.ids.pf_value
@@ -1361,10 +1414,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pffield), 0.05)
 
     def verify_const_pf_params(self) -> float:
-        """ Checks to see if there is a recorded constant power factor parameter in the current
-        control parameters list and installs it as the default value if it is missing.
-
-        Default PF is 0.99.
+        """ Checks to see if there is a recorded constant power factor
+        parameter in the current control parameters list and installs it as the
+        default value if it is missing.
 
         Returns
         -------
@@ -1374,8 +1426,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return self.__verify_control_param("constantpf", "pf_val")
 
     def __verify_control_param(self, mode: str, label: str):
-        """Verifies that there is a data value in the control parameters for the current
-        storage element and puts the default value in if not.
+        """Verifies that there is a data value in the control parameters for
+        the current storage element and puts the default value in if not.
 
         Parameters
         ----------
@@ -1383,6 +1435,12 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             The control mode for which to store the default value for label
         label : str
             The key to check for in the current storage control parameters.
+
+        Return
+        ------
+        parameters:
+            The current parameters of the supplied mode.  The data type will
+            depend on which control mode is supplied.
         """
         defaults = StorageControl.default_params(mode)
 
@@ -1395,10 +1453,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         return self._options.control.params[mode][label]
 
     def __set_xy_grid_data(self, grid: XYGridView, xdat: list, ydat: list) -> list:
-        """Converts the supplied lists into a dictionary appropriately keyed to be assigned
-        as the data for the supplied grid and assignes it.
+        """Converts the supplied lists into a dictionary appropriately keyed to
+        be assigned as the data for the supplied grid and assignes it.
 
-        This performs a try-co-sort of the lists prior to assignment to the grid data.
+        This performs a try-co-sort of the lists prior to assignment to the
+        grid data.
 
         Parameters
         ----------
@@ -1412,9 +1471,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Return
         ------
         list:
-            The list of dictionaries that was craeted from the xdat and ydat. See the
-            make_xy_grid_data function documentation for more details on the format of
-            the returned list.
+            The list of dictionaries that was craeted from the xdat and ydat.
+            See the make_xy_grid_data function documentation for more details
+            on the format of the returned list.
         """
         xs, ys = try_co_sort(xdat, ydat)
         grid.data = make_xy_grid_data(xs, ys)
@@ -1427,11 +1486,11 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             self.set_droop_mode()
 
     def set_mode(self, name: str, tab) -> bool:
-        """Changes the current contorl mode for the current storage option to the supplied
-        one and sets the current tab.
+        """Changes the current contorl mode for the current storage option to
+        the supplied one and sets the current tab.
 
-        If the current control mode is the supplied one, then the only thing this does
-        is set the supplied tab if it is not correct.
+        If the current control mode is the supplied one, then the only thing
+        this does is set the supplied tab if it is not correct.
 
         Parameters
         ----------
@@ -1443,9 +1502,9 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         Returns
         -------
         bool:
-            True if this method goes so far as to actually change the mode and False if the
-            the mode is already the requested one.  Regardless, this method will set the
-            current tab if needed.
+            True if this method goes so far as to actually change the mode
+            and False if the the mode is already the requested one. 
+            Regardless, this method will set the current tab if needed.
         """
         if self.ids.control_tabs.get_current_tab() is not tab:
             self.ids.control_tabs.switch_tab(tab.tab_label_text)
@@ -1461,8 +1520,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
     def read_all_data(self):
         """Reads all entered data out of the controls for all control modes.
 
-        This uses the individual "read...data" methods for each mode.  See them for
-        more information about each.
+        This uses the individual "read...data" methods for each mode.  See them
+        for more information about each.
         """
         self._options.min_soc = self.ids.min_soc.fraction()
         self._options.max_soc = self.ids.max_soc.fraction()
@@ -1484,7 +1543,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         droop_map["q_droop"] = parse_float(self.ids.droop_tab_content.ids.q_value.text)
 
     def read_const_pf_data(self):
-        """Reads and stores the entered data out of the controls for constant power factor mode.
+        """Reads and stores the entered data out of the controls for constant
+        power factor mode.
 
         The data is stored in the options control parameters.
         """
@@ -1492,7 +1552,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         constpf_map["pf_val"] = parse_float(self.ids.const_pf_tab_content.ids.pf_value.text)
 
     def read_voltvar_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Var mode.
+        """Reads and stores the entered data out of the controls for Volt-Var
+        mode.
 
         The data is stored in the options control parameters.
         """
@@ -1501,7 +1562,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def read_voltwatt_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Watt mode.
+        """Reads and stores the entered data out of the controls for Volt-Watt
+        mode.
 
         The data is stored in the options control parameters.
         """
@@ -1510,7 +1572,8 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def read_varwatt_data(self):
-        """Reads and stores the entered data out of the controls for Var-Watt mode.
+        """Reads and stores the entered data out of the controls for Var-Watt
+        mode.
 
         The data is stored in the options control parameters.
         """
@@ -1519,23 +1582,26 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         )
 
     def read_voltvar_and_voltwatt_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Var & Volt-Watt mode.
+        """Reads and stores the entered data out of the controls for Volt-Var &
+        Volt-Watt mode.
 
         The data is stored in the options control parameters.
         """
         self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vv_grid, "vv_vw", "vv_volts", "vv_vars"
+            self.ids.vv_vw_tab_content.ids.vv_grid,
+           "vv_vw", "vv_volts", "vv_vars"
         )
 
         self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vw_grid, "vv_vw", "vw_volts", "vw_watts"
+            self.ids.vv_vw_tab_content.ids.vw_grid,
+           "vv_vw", "vw_volts", "vw_watts"
         )
 
     def cancel(self):
         """Returns to the "configure-storage" form.
 
-        This does not do anything with data.  It does not save any input data nor does it roll back
-        any previously saved data.
+        This does not do anything with data.  It does not save any input data
+        nor does it roll back any previously saved data.
 
         This is called when the user presses the "back" button.
         """
@@ -1544,17 +1610,17 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.manager.remove_widget(self)
 
     def _extract_and_store_data_lists(self, xyc: XYGridView, mode: str, l1name: str, l2name: str):
-        """Reads the x and y data from the supplied grid and stores them in the control
-        parameters using the supplied list keys.
+        """Reads the x and y data from the supplied grid and stores them in the
+        control parameters using the supplied list keys.
 
         Parameters
         ----------
         l1name : str
-            The key by which to store the "x" values read out of the grid into the
-            control parameters
+            The key by which to store the "x" values read out of the grid into
+            the control parameters
         l2name : str
-            The key by which to store the "y" values read out of the grid into the
-            control parameters
+            The key by which to store the "y" values read out of the grid into
+            the control parameters
         """
         xl, yl = xyc.extract_data_lists()
         param_map = self._options.control.params[mode]
@@ -1747,17 +1813,17 @@ class MetricConfigurationScreen(SSimBaseScreen):
     _def_btn_color = '#005376'
 
     def on_kv_post(self, base_widget):
-        """Implemented to manage the states of the upper limit, lower limit, and objective
-         fields.
+        """Implemented to manage the states of the upper limit, lower limit,
+        and objective fields.
 
-         This schedules calls to "_refocus_field" on each text box.  See that method for
-         details.
+        This schedules calls to "_refocus_field" on each text box.  See that
+        method for details.
 
-         Parameters
-         ----------
-         base_widget:
-            The base-most widget whose instantiation triggered the kv rules.
-         """
+        Parameters
+        ----------
+        base_widget:
+           The base-most widget whose instantiation triggered the kv rules.
+        """
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
         Clock.schedule_once(lambda dt: self._refocus_field(self.ids.objectiveText), 0.05)
@@ -1765,16 +1831,18 @@ class MetricConfigurationScreen(SSimBaseScreen):
     def _refocus_field(self, field):
         """Sets the focus of the supplied field.
 
-        For some field types, this has the effect of putting it into an editable state which
-        can change its appearance even if it is subsequently un-focused.
+        For some field types, this has the effect of putting it into an
+        editable state which can change its appearance even if it is
+        subsequently un-focused.
         """
         field.focus = True
 
     def manage_store_button_enabled_state(self):
-        """Enables or disables the "Store" button depending on how many busses are currently
-        selected.
+        """Enables or disables the "Store" button depending on how many busses
+        are currently selected.
 
-        If no busses are selected, the button is disabled.  Otherwise, it is enabled.
+        If no busses are selected, the button is disabled.  Otherwise, it is
+        enabled.
         """
         self.ids.btnStore.disabled = len(self._selBusses) == 0
 
@@ -1962,11 +2030,12 @@ class MetricConfigurationScreen(SSimBaseScreen):
                 "Defined \"" + self._currentMetricCategory + "\" Metrics"
 
     def manage_selection_buttons_enabled_state(self):
-        """Enables or disables the buttons for select all and deselect all based
-        on whether or not there are any entries in the middle list of the form.
+        """Enables or disables the buttons for select all and deselect all
+        based on whether or not there are any entries in the middle list of the
+        form.
 
-        If there are items in the list, the buttons are enabled.  If there are no
-        items in the list, the buttons are disabled.
+        If there are items in the list, the buttons are enabled.  If there are
+        no items in the list, the buttons are disabled.
         """
         numCldrn = len(self.ids.interlist.children) == 0
         self.ids.btnSelectAll.disabled = numCldrn
@@ -2037,8 +2106,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
     def on_delete_metric(self, data):
         """A callback function for the delete button of existing metric items.
 
-        This method removes an existing metric from the current category and key
-        identified by the data member in the metrics list item.
+        This method removes an existing metric from the current category and
+        key identified by the data member in the metrics list item.
         """
         bus = data.listItem.bus
         self.project.remove_metric(self._currentMetricCategory, bus)
@@ -2046,20 +2115,23 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.reload_metric_values()
 
     def on_item_check_changed(self, ckb, value):
-        """A callback function for the list items to use when their check state changes.
+        """A callback function for the list items to use when their check state
+        changes.
 
-        This method looks at teh current check state (value) and either adds the
-        text of the check box into the list of currently selected busses if value
-        is true and removes it if value is false.
+        This method looks at teh current check state (value) and either adds
+        the text of the check box into the list of currently selected busses
+        if value is true and removes it if value is false.
 
-        This results in a resetting of the metric values and the associated fields.
+        This results in a resetting of the metric values and the associated
+        fields.
 
         Parameters
         ----------
         ckb:
             The check box whose check state has changed.
         value:
-            The current check state of the check box (true = checked, false = unchecked).
+            The current check state of the check box
+            (true = checked, false = unchecked).
         """
         bus = ckb.listItem.text
         if value:
@@ -2074,8 +2146,9 @@ class MetricConfigurationScreen(SSimBaseScreen):
         """Sets this form up for the creation, management, etc. of bus voltage
         metrics.
 
-        This includes loading all necesary lists, setting the labels to indicate
-        busses, and setting the enables state of the selection buttons appropriately.
+        This includes loading all necesary lists, setting the labels to
+        indicate busses, and setting the enables state of the selection buttons
+        appropriately.
         """
         self._currentMetricCategory = "Bus Voltage"
         self.ids.interlabel.text = "Busses"
@@ -2085,7 +2158,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.manage_selection_buttons_enabled_state()
 
     def configure_some_other_metrics(self):
-        """This method is a placeholder for future supported metrics.  It's not currently useful.
+        """This method is a placeholder for future supported metrics.  It's not
+        currently useful.
         """
         self._currentMetricCategory = "Unassigned"
         self._selBusses.clear()
@@ -2104,8 +2178,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.manager.current = "ssim"
 
     def __show_missing_metric_value_popup(self):
-        """Displays the popup box indicating that there is a missing defining value
-        for metrics.
+        """Displays the popup box indicating that there is a missing defining
+        value for metrics.
 
         This uses the MissingMetricValuesPopupContent.
         """
@@ -2119,16 +2193,17 @@ class MetricConfigurationScreen(SSimBaseScreen):
         popup.open()
 
     def __show_invalid_metric_value_popup(self, msg: str):
-        """Displays the popup box indicating that the values input to the metric values fields
-         (limits, objective, and sense) are not usable.
+        """Displays the popup box indicating that the values input to the
+        metric values fields (limits, objective, and sense) are not usable.
 
-         The text displayed is the supplied msg.  The popup content is the MessagePopupContent.
+        The text displayed is the supplied msg.  The popup content is the
+        MessagePopupContent.
 
-         Parameter
-         ---------
-         msg: str
-            The message that is to be the primary content of the popup.
-         """
+        Parameter
+        ---------
+        msg: str
+           The message that is to be the primary content of the popup.
+        """
         content = MessagePopupContent()
 
         popup = Popup(
@@ -2140,8 +2215,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         popup.open()
 
     def __show_no_grid_model_popup(self):
-        """Displays the popup box indicating that there is no grid model so metrics cannot
-            be defined.
+        """Displays the popup box indicating that there is no grid model so
+        metrics cannot be defined.
 
         This uses the MetricsNoGridPopupContent.
         """
@@ -2157,12 +2232,14 @@ class MetricConfigurationScreen(SSimBaseScreen):
         popup.open()
 
     def load_busses_into_list(self):
-        """Purposes the middle list in the form for busses and loads it with newly
-        created BusListItemWithCheckbox instances for each bus in the grid model.
+        """Purposes the middle list in the form for busses and loads it with
+        newly created BusListItemWithCheckbox instances for each bus in the
+        grid model.
 
-        This method clears any current selected busses, clears any contents of the
-        center list, and then reloads the list.  If there is no currently selected
-        grid model, then __show_no_grid_model_popup is called and the method is aborted.
+        This method clears any current selected busses, clears any contents of
+        the center list, and then reloads the list.  If there is no currently
+        selected grid model, then __show_no_grid_model_popup is called and the
+        method is aborted.
         """
         self._selBusses.clear()
         list = self.ids.interlist
