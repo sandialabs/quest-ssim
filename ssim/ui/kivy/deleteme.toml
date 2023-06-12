@@ -1,0 +1,115 @@
+[Project]
+name = 'IEEE 13'
+grid_model_path = 'C:\Users\jpeddy\storage-sim\examples\ieee13demo\IEEE13Nodeckt.dss'
+
+
+[storage-options."etyerty"]
+phases = 3
+required = false
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['692','646','645','671']
+power = [90.0, 234.0, 68.0, 654.0]
+duration = [34.0, 76.0, 5.0]
+
+
+[storage-options."etyerty".control-params]
+mode = 'droop'
+
+
+[storage-options."etyerty".control-params.droop]
+"p_droop" = 200.0
+"q_droop" = -200.0
+
+
+[storage-options."etyerty".control-params.voltvar]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vars" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."etyerty".control-params.voltwatt]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.2]
+
+
+[storage-options."etyerty".control-params.varwatt]
+"vars" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."etyerty".control-params.vv_vw]
+"vv_volts" = [0.5, 1.0, 1.05]
+"vv_vars" = [1.0, 0.0, -1.0]
+"vw_volts" = [0.5, 0.95, 1.0]
+"vw_watts" = [1.0, 1.0, 0.0]
+
+
+[storage-options."etyerty".control-params.constantpf]
+"pf_val" = 0.97
+
+
+[storage-options."erqwer"]
+phases = 3
+required = false
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['634','633','rg60','650']
+power = [56.0, 45.0, 78.0, 7.0]
+duration = [1.0, 2.0, 3.0]
+
+
+[storage-options."erqwer".control-params]
+mode = 'droop'
+
+
+[storage-options."erqwer".control-params.droop]
+"p_droop" = 200.0
+"q_droop" = -200.0
+
+
+[storage-options."erqwer".control-params.voltvar]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vars" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."erqwer".control-params.voltwatt]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.2]
+
+
+[storage-options."erqwer".control-params.varwatt]
+"vars" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."erqwer".control-params.vv_vw]
+"vv_volts" = [0.5, 1.0, 1.05]
+"vv_vars" = [1.0, 0.0, -1.0]
+"vw_volts" = [0.5, 0.95, 1.0]
+"vw_watts" = [1.0, 1.0, 0.0]
+
+
+[storage-options."erqwer".control-params.constantpf]
+"pf_val" = 0.97
+
+
+[metrics."Bus Voltage"]
+values=[{name="684", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="680", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="632", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="670", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="652", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="611", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="675", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="692", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="646", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="645", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="671", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="634", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="633", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="rg60", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="650", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+{name="sourcebus", lower_limit = 0.95, upper_limit = 1.03, objective = 1.0, sense = "SeekValue"},
+]

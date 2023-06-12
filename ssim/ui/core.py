@@ -43,8 +43,8 @@ def __eq_maybe_none(v1, v2) -> bool:
     Return
     ------
     bool:
-        True if both arguments are None.  False if 1 is None and the other is not.
-        Otherwise, the result of v1 == v2.
+        True if both arguments are None.  False if 1 is None and the other is
+        not. Otherwise, the result of v1 == v2.
     """
     if v1 is None:
         return v2 is None
@@ -63,16 +63,15 @@ _DEFAULT_RELIABILITY = {
     "switch": {
         "enabled": False
     },
-    "generator":
-        {
-            "enabled": False,
-            "aging": {
-                "enabled": False
-            },
-            "operating_wear_out": {
-                "enabled": False
-            }
+    "generator": {
+        "enabled": False,
+        "aging": {
+            "enabled": False
+        },
+        "operating_wear_out": {
+            "enabled": False
         }
+    }
 }
 
 
@@ -93,7 +92,7 @@ class Project:
 
         # Should input file path be included?  Maybe not.
         if self.name != other.name or \
-                not __eq_maybe_none(self._grid_model_path == other._grid_model_path):  # or \
+            not __eq_maybe_none(self._grid_model_path == other._grid_model_path):  # or \
             # not __eq_maybe_none(self._input_file_path == other._input_file_path):
             return False;
 
@@ -114,27 +113,35 @@ class Project:
         return True
 
     def __hash__(self):
-        hval = hash(self.name)
+        """Produces a hash value for this instance of a Project.
 
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
+        m = hashlib.sha256()
+
+        m.update(self.name.encode())
         if self._grid_model_path is not None:
-            hval = hash((hval, self._grid_model_path))
-
-        # as with __eq__, skip the input file path.
-        # if self._input_file_path is not None:
-        #    hval = hash((hval, self._input_file_path))
-
+            m.update(self._grid_model_path.encode())
+                
         self.storage_devices.sort(key=lambda x: x.name)
         for so in self.storage_devices:
-            hval = hash((hval, so))
+            m.update(repr(hash(so)).encode())
 
         self.pvsystems.sort(key=lambda x: x.name)
         for pv in self.pvsystems:
-            hval = hash((hval, so))
+            m.update(repr(hash(pv)).encode())
 
         for k, v in sorted(self._metricMgrs.items()):
-            hval = hash((hval, k, v))
-
-        return hval
+            m.update(k.encode())
+            m.update(repr(hash(v)).encode())
+            
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
 
     def load_toml_file(self, filename: str):
         """Reads data for this Project from the supplied TOML file.
@@ -221,14 +228,14 @@ class Project:
 
         return ret
 
-    def read_toml(self, tomlData):
+    def read_toml(self, tomlData: dict):
         """Reads the properties of this class instance from a TOML formated dictionary.
 
         Parameters
         -------
         tomlData
-            A TOML formatted dictionary from which to read the properties of this class
-            instance.
+            A TOML formatted dictionary from which to read the properties of
+            this class instance.
         """
         projdict = tomlData["Project"]
         self.name = projdict["name"]
@@ -247,8 +254,20 @@ class Project:
             "reliability",
             _DEFAULT_RELIABILITY
         )
+        
+    def __read_metric_map(self, mdict: dict):
+        """Reads the metrics information out of the supplied dictionary.
 
-    def __read_metric_map(self, mdict):
+        The dictionary keys should be manager names and the values shoudl be
+        the dictionaries that can be passed to the MetricManager.read_toml
+        method.
+                
+        Parameters
+        -------
+        mdict: dict
+            A TOML formatted dictionary from which to read the properties of
+            the metric managers to be contined in this class.
+        """
         for ckey in mdict:
             cat_mgr = self.get_manager(ckey)
             if cat_mgr is None:
@@ -361,6 +380,13 @@ class Project:
         return self._metricMgrs.get(category)
 
     def remove_storage_option(self, storage_options):
+        """Removes the supplied storage option from this project if found.
+        
+        Parameters
+        ----------
+        storage_options
+            The storage option object to be removed.
+        """
         self.storage_devices.remove(storage_options)
 
     def add_storage_option(self, storage_options):
@@ -564,14 +590,27 @@ class StorageControl:
         return self.active_params == other.active_params
 
     def __hash__(self):
-        hval = hash(self.mode)
+        """Produces a hash value for this instance of a StorageControl.
 
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
+        m = hashlib.sha256()
+        m.update(self.mode.encode())
+
+        # Iterate in sorted order to make a functional rather than literal hash.
         if self.mode in self.params:
             for k, v in sorted(self.params[self.mode].items()):
-                hval = hash((hval, k, v))
+                m.update(k.encode())
+                m.update(repr(v).encode())
 
-        return hval
-
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
+    
     def write_toml(self, name: str) -> str:
         """Writes the properties of this class instance to a string in TOML
            format.
@@ -729,13 +768,32 @@ class StorageOptions:
             self.required == other.required
 
     def __hash__(self):
-        hVal = 0 if not self.control else hash(self.control)
+        """Produces a hash value for this instance of a StorageOptions.
 
-        return hash((
-            hVal, self.name, self.phases, self.min_soc, self.max_soc, self.initial_soc,
-            self.soc_model, self.required, tuple(sorted(self.power)),
-            tuple(sorted(self.duration)), tuple(sorted(self.busses))
-        ))
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """        
+        m = hashlib.sha256()
+        
+        if self.control is not None:
+           m.update(repr(hash(self.control)).encode())
+
+        m.update(repr(self.name).encode())
+        m.update(repr(self.phases).encode())
+        m.update(repr(self.min_soc).encode())
+        m.update(repr(self.max_soc).encode())
+        m.update(repr(self.initial_soc).encode())
+        m.update(repr(self.soc_model).encode())
+        m.update(repr(self.required).encode())
+        m.update(repr(sorted(self.power)).encode())
+        m.update(repr(sorted(self.duration)).encode())
+        m.update(repr(sorted(self.busses)).encode())
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
 
     def write_toml(self) -> str:
         """Writes the properties of this class instance to a string in TOML format.
@@ -1092,8 +1150,25 @@ class MetricCongifuration:
             self.objective == other.objective
 
     def __hash__(self):
-        hval = 0 if self.bus is None else hash(self.bus)
-        return hash((hval, self.upper_limit, self.lower_limit, self.objective))
+        """Produces a hash value for this instance of a MetricCongifuration.
+
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
+        m = hashlib.sha256()
+
+        if self.bus is not None:
+            m.update(self.bus.encode())
+
+        m.update(repr(self.upper_limit).encode())
+        m.update(repr(self.lower_limit).encode())
+        m.update(repr(self.objective).encode())
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
 
     def to_dict(self):
         """Return a dict representation of this metric."""
@@ -1167,19 +1242,43 @@ class Configuration:
             if not ss in other.storage: return False
 
     def __hash__(self):
-        hVal = hash((
-            self.grid, self.sim_duration, self._grid_path,
-            self._federation_path, self._workdir
-        ))
+        """Produces a hash value for this instance of a Configuration.
 
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
+        m = hashlib.sha256()
+
+        if self.grid is not None:
+            m.update(self.grid.encode())
+
+        m.update(repr(self.sim_duration).encode())
+        
+        if self._grid_path is not None:
+            m.update(self._grid_path.encode())
+            
+        if self._federation_path is not None:
+            m.update(self._federation_path.encode())
+    
+        if self._workdir is not None:
+            m.update(self._workdir.encode())
+    
         for k, v in sorted(self._metricMgrs.items()):
-            hval = hash((hval, k, v))
-
+            m.update(k.encode())
+            m.update(repr(hash(v)).encode())
+            
         for so in self.storage.sort(key=lambda x: x.name):
-            hval = hash((hval, so))
-
+            m.update(repr(hash(so)).encode())
+            
         for pv in self.pvsystems.sort(key=lambda x: x.name):
-            hval = hash((hval, so))
+            m.update(repr(hash(pv)).encode())
+
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
 
     @property
     def id(self):
