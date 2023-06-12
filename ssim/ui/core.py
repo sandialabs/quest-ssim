@@ -369,7 +369,7 @@ class Project:
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
         for storage_configuration in self._storage_configurations():
-            storage_devices, inv_controls = zip(*storage_configuration)
+            storage_devices, inv_controls = _safe_unzip(storage_configuration)
             inv_controls = list(
                 filter(lambda ic: ic is not None, inv_controls)
             )
@@ -383,6 +383,7 @@ class Project:
             )
 
     def _storage_configurations(self):
+        print(f"Project._storage_configurations() - device list: {self.storage_devices}")
         return itertools.product(
             *(storage_options.configurations()
               for storage_options in self.storage_devices)
@@ -1370,6 +1371,12 @@ def _federate_spec(name, cmd, directory=".", host="localhost"):
     }
 
 
+def _safe_unzip(xs):
+    if len(xs) == 0:
+        return [], []
+    return zip(*xs)
+
+
 def _get_federate_config(federate):
     """Return the path to the configuration file for the federate type.
 
@@ -1506,7 +1513,7 @@ class Results:
     def storage_voltages(self):
         """Returns name of the columns (buses) where storage is placed and
         voltages at those buses as a pandas dataframe"""
-        storage_voltages_file = Path(self.config_dir / "storage_voltages.csv")
+        storage_voltages_file = Path(self.config_dir / "storage_voltage.csv")
         if storage_voltages_file.is_file():
             storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
         else:

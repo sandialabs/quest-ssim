@@ -180,12 +180,8 @@ class SSimApp(MDApp):
             ReliabilityConfigurationScreen(self.project, name="reliability-config"))
         screen_manager.add_widget(
             RunSimulationScreen(self.project, name="run-sim"))
-        # screen_manager.add_widget(
-        #     ResultsVisualizeScreen(self.project, name="results-visualize"))
         screen_manager.add_widget(
-            ResultsSummaryScreen(self.project, name="results-summary"))
-        screen_manager.add_widget(
-            ResultsCompareScreen(self.project, name="results-compare"))
+            ResultsVisualizeScreen(self.project, name="results-visualize"))
         screen_manager.add_widget(
             ResultsDetailScreen(self.project, name="results-detail"))
         screen_manager.current = "ssim"
@@ -208,6 +204,8 @@ class SSimBaseScreen(Screen):
     def __init__(self, project, *args, **kwargs):
         self.project = project
         self.project_results = ProjectResults(self.project)
+        self.configurations: List[Configuration] = []
+        self.simulation_configurations = {}
         super().__init__(*args, **kwargs)
 
 
@@ -1683,6 +1681,20 @@ class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
         return self.ids.selected.active
 
 
+class ResultsMetricsListItemWithCheckbox(TwoLineAvatarIconListItem):
+    def __init__(self, variable_name, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.text = variable_name
+
+    # TO DO: Check if there is a more concise of implementing this
+    def toggle_selection(self):
+        self.parent.parent.parent.parent.parent.parent.parent.parent.parent.update_selected_metrics()
+    
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
+
 class VariableListItem(TwoLineAvatarIconListItem):
     def __init__(self, pk=None, **kwargs):
         super().__init__(**kwargs)
@@ -1702,6 +1714,10 @@ class MetricsNoGridPopupContent(BoxLayout):
 
 
 class NoGridPopupContent(BoxLayout):
+    pass
+
+
+class NoFigurePopupContent(BoxLayout):
     pass
 
 
@@ -2188,6 +2204,7 @@ class RunSimulationScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.configurations: List[Configuration] = []
+        self.temp_config_ids = []
         self.selected_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
         self._run_thread = None
@@ -2196,17 +2213,20 @@ class RunSimulationScreen(SSimBaseScreen):
         # # clear the MDList every time the RunSimulationScreen is opened
         # # TO DO: Keep track of selected configs
         self.ids.config_list.clear_widgets()
-        self.configurations: List[Configuration] = []
         self.populate_configurations()
 
     def populate_configurations(self):
         # store all the project configurations into a list
+        ctr = 1
+        # rest the configurations list everytime before populating
+        # to avoid duplications
+        self.configurations = []
         for config in self.project.configurations():
             self.configurations.append(config)
-            print(config.id)
+            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            ctr += 1
 
         # populate the UI with the list of configurations
-        ctr = 1
         for config in self.configurations:
             secondary_detail_text = []
             tertiary_detail_text = []
@@ -2215,7 +2235,6 @@ class RunSimulationScreen(SSimBaseScreen):
 
             for storage in config.storage:
                 if storage is not None:
-                    # print(storage)
                     secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
                     tertiary_detail_text.append(f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
                 else:
@@ -2225,17 +2244,15 @@ class RunSimulationScreen(SSimBaseScreen):
 
             self.ids.config_list.add_widget(
                 ListItemWithCheckbox(pk="pk",
-                                     text=f"Configuration {ctr}",
+                                     text=self.simulation_configurations[config.id],
                                      secondary_text=final_secondary_text,
                                      tertiary_text=final_tertiary_text)
             )
-            ctr += 1
 
     def _evaluate(self):
         # step 1: check the configurations that are currently selected
         mdlist = self.ids.config_list  # get reference to the configuration list
         self.selected_configurations = []
-        print('selected configurations are:')
         no_of_configurations = len(self.configurations)
         ctr = no_of_configurations - 1
         for wid in mdlist.children:
@@ -2247,8 +2264,16 @@ class RunSimulationScreen(SSimBaseScreen):
                 self.selected_configurations.append(self.configurations[ctr])
             ctr = ctr - 1
         # run all the configurations
+        Logger.debug("===================================")
+        Logger.debug('Selected Configurations:')
+        Logger.debug(self.selected_configurations)
+        Logger.debug("===================================")
+
         for config in self.selected_configurations:
-            print(config)
+            Logger.debug("Currently Running configuration:")
+            Logger.debug(config.id)
+            Logger.debug(self.simulation_configurations[config.id])
+            Logger.debug("===================================")
             config.evaluate(basepath=self.project.base_dir)
             config.wait()
 
@@ -2256,62 +2281,218 @@ class RunSimulationScreen(SSimBaseScreen):
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
 
-    def open_results_summary(self):
-        self.manager.current = "results-summary"
-
     def open_visualize_results(self):
         self.manager.current = "results-visualize"
 
 
 class ResultsVisualizeScreen(SSimBaseScreen):
+    
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_results = ProjectResults(self.project)
-
-
-class ResultsSummaryScreen(SSimBaseScreen):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.project_results = ProjectResults(self.project)
+        self.selected_metrics = {}
+        self.selected_metric_items = {}
+        self.current_configuration = None
+        self.metrics_figure = None
 
     def on_enter(self):
-        self.draw_canvas()
+        # populate `selected_list_items` assuming no selection 
+        # from dropdown menu
+        # TO DO: Replace with evaluated configurations
+        ctr = 1
+        for config in self.project.configurations():
+            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            self.selected_metric_items['Configuration ' + str(ctr)] = []
+            ctr += 1
+        
+        Logger.debug(">" * 50)
+        Logger.debug(self.selected_metric_items)
+        Logger.debug("<" * 50)
+
+    def dismiss_popup(self):
+        self._popup.dismiss()
+        
+    def _create_metrics_figure(self):
+        metrics_fig = plt.figure()
+        plt.clf()
+        ctr = 1
         for result in self.project_results.results():
-            print(result.config_dir)
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
 
-    def draw_canvas(self):
-        # sample plot for testing purposes
-        # TO DO: develop the backend for creating these plots
-        # x_data = [1, 2, 3, 4, 5]
-        # y_data = [1, 4, 9, 15, 25]
-        # fig, ax = plt.subplots()
-        # ax.plot(x_data, y_data)
-        # ax.set_xlabel('Configuration #')
-        # ax.set_ylabel('Aggregate Metics')
+            # obtain accumulated metric values and times-series 
+            # data in a pandas dataframe for metrics
+            _, accumulated_metric, data_metrics = result.metrics_log()
+            config_key = self.simulation_configurations[config_dir]
 
-        accumulated_metric_fig = self.project_results.plot_accumulated_metrics()
+            # columns to plot
+            columns_to_plot = self.selected_metric_items[config_key]
 
-        # Add Kivy widget to the canvas
+            # select the susbset of data based on 'columns_to_plot'
+            selected_data = data_metrics[columns_to_plot]
+            x_data = data_metrics.loc[:, 'time']
+
+            # add the selected columns to the plot
+            for column in selected_data.keys():
+                plt.plot(x_data, selected_data[column], 
+                         label=config_key + '-' + column + ' :' + str(accumulated_metric))
+
+            ctr += 1
+        
+        # x-axis label will always be time
+        plt.xlabel('time')
+        # update y-axis label based on user input
+        if self.ids.detail_figure_ylabel.text is not None:
+            plt.ylabel(self.ids.detail_figure_ylabel.text)
+        plt.legend()
+        # update the title based on user input
+        if self.ids.detail_figure_title.text is not None:
+            plt.title(self.ids.detail_figure_title.text)
+        else:
+            plt.title('Metrics Plots')
+
+        return metrics_fig
+
+    def update_metrics_figure(self):
+        if self._check_metrics_list_selection():
+            self._show_error_popup('No Metrics(s) Selected!', 
+                                   'Please select metrics(s) from the dropdown menu to update the plot.')
+        else:
+            self.metrics_figure = self._create_metrics_figure()
+            # Add kivy widget to the canvas
+            self.ids.summary_canvas.clear_widgets()
+            self.ids.summary_canvas.add_widget(
+                FigureCanvasKivyAgg(self.metrics_figure)
+            )
+
+    def clear_metrics_figure(self):
         self.ids.summary_canvas.clear_widgets()
-        self.ids.summary_canvas.add_widget(FigureCanvasKivyAgg(accumulated_metric_fig))
 
-    def open_results_compare(self):
-        self.manager.current = "results-compare"
+    def save_figure_options_metrics(self):
+        if self.metrics_figure is None:
+            self._show_error_popup('No Figure to Plot', 
+                                   'Please create a plot before saving.')
+        else:
+            chooser = SaveFigureDialog(
+                save=self.save_figure, cancel=self.dismiss_popup
+            )
+
+            self._popup = Popup(title="Save figure options", content=chooser)
+            self._popup.open()
+
+    def save_figure(self, selection, filename):
+        fullpath = selection[0]
+
+        split = os.path.splitext(filename)
+        if split[1].lower() != ".png":
+            filename = filename + ".png"
+
+        if os.path.isdir(fullpath):
+            fullpath = os.path.join(fullpath, filename)
+        else:
+            fullpath = os.path.join(os.path.dirname(fullpath), filename)
+
+        Logger.debug("saving figure %s", fullpath)
+
+        self.metrics_figure.savefig(fullpath, dpi=300)
+        self.dismiss_popup()
+
+    def _show_error_popup(self, title_str, msg):
+        content = MessagePopupContent()
+
+        popup = Popup(
+            title=title_str, content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+        )
+        content.ids.msg_label.text = str(msg)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+
+    def _check_metrics_list_selection(self):
+        """Checks if at least one of the variables is selected."""
+        for _, config_variables in self.selected_metric_items.items():
+            if config_variables != []:
+                # at least one variable is selected, not empty
+                return False
+        return True
+        
+    def drop_config_menu_metrics(self):
+        menu_items = []
+        for config_id, config_ui_id in self.simulation_configurations.items():
+            display_text = config_ui_id
+            menu_items.append({
+                "viewclass": "OneLineListItem",
+                "text": display_text,
+                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
+            })
+
+        self.menu = MDDropdownMenu(
+            caller=self.ids.config_list_detail_metrics, items=menu_items, width_mult=5
+        )
+        self.menu.open()
+
+    def set_config(self, value_id, value_ui_id):
+ 
+        self.current_configuration = value_ui_id
+        
+        # read the current selected configuration
+        self.ids.config_list_detail_metrics.text = value_ui_id
+
+         # put the 'Result' objects in a dict with configuration ids
+        # this will allows the results to be mapped with 
+        # corresponding configurations
+        simulation_results = {}
+        for result in self.project_results.results():
+            # configuraiton directory of the result
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
+            simulation_results[config_dir] = result
+
+        # extract the `current_result` based on selection from drop down menu
+        current_result = simulation_results[value_id]
+
+        # extract the data
+        metrics_headers, metrics_accumulated, metrics_data = current_result.metrics_log()
+        
+        # add the list of metrics in the selected configuration into the MDList
+        # clear the variable list
+        self.ids.metrics_list.clear_widgets()
+
+
+        for item in metrics_headers:
+            # do not add 'time' to the variable list
+            if item == 'time':
+                continue
+            else:
+                self.ids.metrics_list.add_widget(
+                    ResultsMetricsListItemWithCheckbox(variable_name=item)
+                )
+
+        # close the drop-down menu
+        self.menu.dismiss()
+
+    def update_selected_metrics(self):
+        Logger.debug("Update selected metrics called")
+
+        selected_metrics = []
+        for metric in self.ids.metrics_list.children:
+            if metric.selected:
+                selected_metrics.append(metric.text)
+        
+        self.selected_metric_items[self.current_configuration] = selected_metrics
+        
+        Logger.debug(">" * 50)
+        Logger.debug(self.selected_metric_items)
+        Logger.debug("<" * 50)
 
     def open_results_detail(self):
         self.manager.current = "results-detail"
-
-
-class ResultsCompareScreen(SSimBaseScreen):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
 
 class ResultsDetailScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.configurations: List[Configuration] = []
+        # self.configurations: List[Configuration] = []
         self.selected_variables = {}
         self.variables = {}
         self.current_configuration = None
@@ -2321,12 +2502,19 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.figure = None
 
     def on_enter(self):
-        # populated `selected_list_items` assuming no selection from dropdown
-        # menu
+        # populate `selected_list_items` assuming no selection 
+        # from dropdown menu
         # TO DO: Replace with evaluated configurations
-        num_configs = len(list(self.project.configurations()))
-        for ctr in range(num_configs):
-            self.selected_list_items['Configuration ' + str(ctr + 1)] = []
+
+        ctr = 1
+        for config in self.project.configurations():
+            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            self.selected_list_items['Configuration ' + str(ctr)] = []
+            ctr += 1
+        
+        Logger.debug(">" * 50)
+        Logger.debug(self.selected_list_items)
+        Logger.debug("<" * 50)
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2337,13 +2525,29 @@ class ResultsDetailScreen(SSimBaseScreen):
         project_results = self.project_results.results()
         ctr = 1
         for result in project_results:
-            _, data = result.storage_state()
-            config_key = 'Configuration ' + str(ctr)
+            # obtain pandas dataframe for storage states
+            _, data_storage_state = result.storage_state()
+            # obtain pandas dataframe for storage voltage, 'time' column is 
+            # dropped to avoid duplication 
+            _, data_storage_voltage = result.storage_voltages()
+            data_storage_voltage.drop(['time'], axis=1, inplace=True)
+
+            # rename the 'data_storage_voltage' by appending '_voltage' to each header
+            new_col_names = [item + '_voltage' for item in data_storage_voltage.columns]
+            data_storage_voltage.columns = new_col_names
+
+            # combine all data into a single dataframe
+            data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
+            config_key = self.simulation_configurations[config_dir]
+            
             # columns to plot
             columns_to_plot = self.selected_list_items[config_key]
+
             # select subset of data based on columns_to_plot
             selected_data = data[columns_to_plot]
             x_data = data.loc[:, 'time']
+            
             # add the selected columns to plot
             for column in selected_data.keys():
                 plt.plot(x_data, selected_data[column], label=config_key + '-' + column)
@@ -2361,46 +2565,80 @@ class ResultsDetailScreen(SSimBaseScreen):
         return fig
 
     def update_figure(self):
-        self.figure = self._create_figure()
-        Logger.debug("Figure update command issued from GUI ...")
-        Logger.debug(self.ids.detail_figure_title.text)
-        self.ids.detail_plot_canvas.clear_widgets()
-        self.ids.detail_plot_canvas.add_widget(
-            FigureCanvasKivyAgg(self.figure)
-        )
+        if self._check_list_selection():
+            self._show_error_popup('No Variable(s) Selected!', 
+                                   'Please select variable(s) from the dropdown menu to update the plot.')
+        else:
+            self.figure = self._create_figure()
+            Logger.debug("Figure update command issued from GUI ...")
+            Logger.debug(self.ids.detail_figure_title.text)
+            self.ids.detail_plot_canvas.clear_widgets()
+            self.ids.detail_plot_canvas.add_widget(
+                FigureCanvasKivyAgg(self.figure)
+            )
 
     def save_figure_options(self):
         '''Saves the current active figure.'''
-        chooser = SaveFigureDialog(
-            save=self.save_figure, cancel=self.dismiss_popup
+        
+        if self.figure is None:
+            self.__show_no_figure_popup('No Figure to Plot. Please create a plot before saving.')
+        else:
+            chooser = SaveFigureDialog(
+                save=self.save_figure, cancel=self.dismiss_popup
+            )
+
+            self._popup = Popup(title="Save figure options", content=chooser)
+            self._popup.open()
+
+    def save_figure(self, selection, filename):
+        fullpath = selection[0]
+
+        split = os.path.splitext(filename)
+        if split[1].lower() != ".png":
+            filename = filename + ".png"
+
+        if os.path.isdir(fullpath):
+            fullpath = os.path.join(fullpath, filename)
+        else:
+            fullpath = os.path.join(os.path.dirname(fullpath), filename)
+
+        Logger.debug("saving figure %s", fullpath)
+
+        self.figure.savefig(fullpath, dpi=300)
+        self.dismiss_popup()
+
+    def _show_error_popup(self, title_str, msg):
+        content = MessagePopupContent()
+
+        popup = Popup(
+            title=title_str, content=content, auto_dismiss=False,
+            size_hint=(0.4, 0.4)
         )
-
-        self._popup = Popup(title="save figure options", content=chooser)
-        self._popup.open()
-
-    def save_figure(self, path, filename):
-        Logger.debug("Saving figure ... ")
-        Logger.debug(filename)
-        self.figure.savefig(filename + '.png', dpi=300)
+        content.ids.msg_label.text = str(msg)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return
+    
+    def _check_list_selection(self):
+        """Checks if at least one of the variables is selected."""
+        for _, config_variables in self.selected_list_items.items():
+            if config_variables != []:
+                # at least one variable is selected, not empty
+                return False
+        return True
 
     def clear_figure(self):
         self.ids.detail_plot_canvas.clear_widgets()
 
     def drop_config_menu(self):
-        for config in self.project.configurations():
-            self.configurations.append(config)
-
-        # TO DO: Replace with evaluated configurations
-        num_configs = len(list(self.project.configurations()))
-        # num_configs = self.project.num_configurations()
 
         menu_items = []
-        for ctr in range(num_configs):
-            display_text = "Configuration " + str(ctr + 1)
+        for config_id, config_ui_id in self.simulation_configurations.items():
+            display_text = config_ui_id
             menu_items.append({
                 "viewclass": "OneLineListItem",
                 "text": display_text,
-                "on_release": lambda x=display_text: self.set_config(x)
+                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
             })
 
         self.menu = MDDropdownMenu(
@@ -2409,49 +2647,58 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.menu.open()
 
     def update_selected_variables(self):
-        print('Update selected variables called!')
-
-        # self.selected_list_items = {}
+       
         selected_items = []
         for variable in self.ids.variable_list_detail.children:
             if variable.selected:
                 selected_items.append(variable.text)
 
         self.selected_list_items[self.current_configuration] = selected_items
+        Logger.debug(">" * 50)
+        Logger.debug(self.selected_list_items)
+        Logger.debug("<" * 50)
 
-        print(self.current_configuration)
-        print(self.selected_list_items)
+    def set_config(self, value_id, value_ui_id):
 
-    def set_config(self, value):
-
-        print(">>>>>>>>>>>>>>>>>>>>>>>>>")
-        print(value)
-
-        self.current_configuration = value
-
-        print(self.selected_variables)
+        self.current_configuration = value_ui_id
+               
         # read the current selected configuration
-        self.ids.config_list_detail.text = value
+        self.ids.config_list_detail.text = value_ui_id
+        
+        # put the 'Result' objects in a dict with configuration ids
+        # this will allows the results to be mapped with 
+        # corresponding configurations
+        simulation_results = {}
+        for result in self.project_results.results():
+            # configuraiton directory of the result
+            config_dir = os.path.basename(os.path.normpath(result.config_dir))
+            simulation_results[config_dir] = result
 
-        # extract all results from all the configutations
-        project_results = self.project_results.results()
-        # obtain the index for the current selected configuration
-        # TODO: setup a proper mapping system between Results and Configuration
-        current_result_index = int(value[-1]) - 1
         # extract the `current_result` based on selection from drop down menu
-        current_result = next(itertools.islice(project_results, current_result_index, None))
-
+        current_result = simulation_results[value_id]
+    
         # extract the data
-        self.list_items, self.variable_data = current_result.storage_state()
+        storage_state_headers, storage_state_data = current_result.storage_state()
+        storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
+        
+        # remove 'time' from the header list and pandas data frame to prevent
+        # duplication
+        if storage_voltage_headers is not None: 
+            storage_voltage_headers.pop(0)
+        storage_voltage_data.drop(['time'], axis=1, inplace=True)
+
+        # 'storage_voltage_headers' have no indication that these labels
+        # represent voltage, append string '_voltage' to each label
+        storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]                                                                                                                            
+        
+        self.list_items = storage_state_headers + storage_voltage_headers
+        self.variable_data = pd.concat([storage_state_data, storage_voltage_data], axis=1)
 
         self.x_data = list(self.variable_data.loc[:, 'time'])
 
         self.ids.variable_list_detail.clear_widgets()
         # add the list of variables in the selected configuration
         # into the MDList
-
-        Logger.debug('>>> Current selection records: ')
-        Logger.debug(self.selected_list_items)
 
         for item in self.list_items:
             # do not add 'time' to the variable list
@@ -2518,7 +2765,13 @@ class SaveSSIMTOMLDialog(FloatLayout):
 class SaveFigureDialog(FloatLayout):
     save = ObjectProperty(None)
     cancel = ObjectProperty(None)
-    text_input = ObjectProperty(None)
+    
+    def manage_filename_field(self):
+        sel = self.ids.filechooser.selection[0]
+        if os.path.isdir(sel):
+            self.ids.filenamefield.text = ""
+        else:
+            self.ids.filenamefield.text = os.path.basename(sel)
 
 
 class SSimScreen(SSimBaseScreen):
