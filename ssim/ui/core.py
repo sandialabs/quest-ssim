@@ -1513,7 +1513,7 @@ class Results:
     def storage_voltages(self):
         """Returns name of the columns (buses) where storage is placed and
         voltages at those buses as a pandas dataframe"""
-        storage_voltages_file = Path(self.config_dir / "storage_voltages.csv")
+        storage_voltages_file = Path(self.config_dir / "storage_voltage.csv")
         if storage_voltages_file.is_file():
             storage_buses, storage_voltages = self._extract_data("storage_voltage.csv")
         else:
