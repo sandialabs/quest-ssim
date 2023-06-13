@@ -1248,7 +1248,7 @@
                     size_hint_y: None
                     height: 50
 
-                ScrollView:
+                MDScrollView:
                     canvas.before:
                         Color:
                             rgba: .5, .5, .5, 1
@@ -1571,13 +1571,12 @@
 
 <ListItemWithCheckbox>:
     id: the_list_item
-    markup: True
 
     LeftCheckbox:
         id: selected
-        active: True
-        on_release:
-            root.toggle_selection()
+        listItem: root
+        # on_release:
+        #     root.toggle_selection()
 
     IconRightWidget:
         icon: 'trash-can-outline'

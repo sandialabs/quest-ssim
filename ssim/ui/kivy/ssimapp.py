@@ -205,8 +205,10 @@ class SSimBaseScreen(Screen):
         self.project = project
         self.project_results = ProjectResults(self.project)
         self.configurations: List[Configuration] = []
-        self.selected_configurations: List[Configuration] = []
-        self.simulation_configurations= {}
+        self.configurations_to_eval: List[Configuration] = []
+        self.simulation_configurations= {} # sets up concrete mappings
+        self.selected_configurations = {}
+        # self.simulation_configurations= {} # sets up concrete mappings
         super().__init__(*args, **kwargs)
 
 
@@ -2187,8 +2189,11 @@ class RunSimulationScreen(SSimBaseScreen):
     def on_enter(self):
         # # clear the MDList every time the RunSimulationScreen is opened
         # # TO DO: Keep track of selected configs
-        self.ids.config_list.clear_widgets()
+        # self.ids.config_list.clear_widgets()
+        Logger.debug(self.selected_configurations)
         self.populate_configurations()
+        # update the configurations that are currently selected
+        # self.update_selected_configurations()
 
     def populate_configurations(self):
         # store all the project configurations into a list
@@ -2204,10 +2209,8 @@ class RunSimulationScreen(SSimBaseScreen):
 
         self.configurations = configs
 
-        Logger.debug(">" * 50)
-        Logger.debug(self.selected_configurations)
-        Logger.debug(self.simulation_configurations)
-        Logger.debug("<" * 50)
+        self.ids.config_list.clear_widgets()
+        self.ids.config_list.active = False
 
         ctr = 1
         # populate the UI with the list of configurations
@@ -2226,61 +2229,81 @@ class RunSimulationScreen(SSimBaseScreen):
             final_secondary_text = "\n".join(secondary_detail_text)
             final_tertiary_text = "\n".join(tertiary_detail_text)
 
-            self.ids.config_list.add_widget(
-                ListItemWithCheckbox(text=self.simulation_configurations[config.id],
-                                     sec_text=config.id,
-                                     tert_text=final_tertiary_text)
-            )
+            config_item = ListItemWithCheckbox(text=self.simulation_configurations[config.id], 
+                                               sec_text=config.id, 
+                                               tert_text=final_tertiary_text)
+            config_item.ids.selected.bind(active=self.on_item_check_changed)
+            self.ids.config_list.add_widget(config_item)
+  
+            # update the items that are currently selected
+            if config.id in self.selected_configurations.keys():
+                config_item.ids.selected.active = True
+            else:
+                config_item.ids.selected.active = False
 
-            # if config in self.selected_configurations:
-            #     self.ids.config_list.children.selected.active = True 
-            # else:
-            #     self.ids.config_list.children.selected.active = False 
-
-
-    def update_selected_configurations(self):
-
-        Logger.debug('!' * 50)
-        Logger.debug('update_selected_configurations')
-        Logger.debug('!' * 50)
-
-        Logger.debug(self.configurations)
-        debug_ids = []
-        for config  in self.configurations:
-            debug_ids.append(config.id)
-        Logger.debug(debug_ids)
-
+    def _update_configurations_to_eval(self):
         no_of_configurations = len(self.configurations)
         ctr = no_of_configurations - 1
-        # self.selected_configurations = []
-        self.selected_configurations = []
+        self.configurations_to_eval = []
         for wid in self.ids.config_list.children:
             if wid.selected:
-                print('*' * 20)
-                print(wid.text)
-                print('*' * 20)
-                # extract a subset of selected configurations
-                self.selected_configurations.append(self.configurations[ctr])
+                self.configurations_to_eval.append(self.configurations[ctr])
             ctr = ctr - 1
-        # run all the configurations
-        # Logger.debug("===================================")
-        # Logger.debug('Selected Configurations:')
-        # Logger.debug(self.selected_configurations)
-        debug_ids = []
-        for config  in self.selected_configurations:
-            debug_ids.append(config.id)
-        Logger.debug(debug_ids)
-        # Logger.debug(self.simulation_configurations)
-        # Logger.debug("===================================")
+
+    def _get_config_key(self, config_dict, config_UI_id):
+        for key, value in config_dict.items():
+            if value == config_UI_id:
+                return key
+        return('Configuration Not Found')
+    
+    def on_item_check_changed(self, ckb, value):
+        Logger.debug('Callback function called')
+        config_key = self._get_config_key(self.simulation_configurations, ckb.listItem.text)
+
+        # Based on whether an item is selected or not, add or remove
+        # the configuration from self.selected_configurations
+        if value:
+            self.selected_configurations[config_key] = ckb.listItem.text
+        else:
+            del self.selected_configurations[config_key]
+        
+    # def update_selected_configurations(self):
+
+    #     Logger.debug('!' * 50)
+    #     Logger.debug('update_selected_configurations() called')
+    #     Logger.debug('!' * 50)
+
+    #     no_of_configurations = len(self.configurations)
+    #     ctr = no_of_configurations - 1
+    #     # self.selected_configurations = []
+    #     self.selected_configurations = []
+    #     for wid in self.ids.config_list.children:
+    #         if wid.selected:
+    #             print('*' * 20)
+    #             print(wid.text)
+    #             print('*' * 20)
+    #             # extract a subset of selected configurations
+    #             self.selected_configurations.append(self.configurations[ctr])
+    #         ctr = ctr - 1
+    
+    #     debug_ids = []
+    #     for config  in self.selected_configurations:
+    #         debug_ids.append(config.id)
+    #     Logger.debug(debug_ids)
+        
 
     def _evaluate(self):
         # # step 1: check the configurations that are currently selected 
-        # self._update_selected_configurations()
-        
+        self._update_configurations_to_eval()
+
+        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        Logger.debug(self.configurations_to_eval)
+        Logger.debug("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
+
         # step 2: evaluate the selected configurations
-        for config in self.selected_configurations:
+        for config in self.configurations_to_eval:
             Logger.debug("Currently Running configuration:")
-            Logger.debug(config.id)
+            # Logger.debug(config.id)
             Logger.debug(self.simulation_configurations[config.id])
             Logger.debug("===================================")
             config.evaluate(basepath=self.project.base_dir)
@@ -2331,7 +2354,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             # obtain accumulated metric values and times-series 
             # data in a pandas dataframe for metrics
             _, accumulated_metric, data_metrics = result.metrics_log()
-            config_key = self.simulation_configurations[config_dir]
+            config_key = self.simulation_configurations[config_dir][0]
 
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
@@ -2427,7 +2450,9 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         
     def drop_config_menu_metrics(self):
         menu_items = []
+        Logger.debug("??????????????????????????????????????")
         Logger.debug(self.simulation_configurations)
+        Logger.debug("??????????????????????????????????????")
         for config_id, config_ui_id in self.simulation_configurations.items():
             display_text = config_ui_id
             menu_items.append({
@@ -2549,7 +2574,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             # combine all data into a single dataframe
             data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
-            config_key = self.simulation_configurations[config_dir]
+            config_key = self.simulation_configurations[config_dir][0]
             
             # columns to plot
             columns_to_plot = self.selected_list_items[config_key]
@@ -2742,8 +2767,8 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
         print(the_list_item)
         self.parent.remove_widget(the_list_item)
     
-    def toggle_selection(self):
-        self.parent.parent.parent.parent.parent.parent.update_selected_configurations()
+    # def toggle_selection(self):
+    #     self.parent.parent.parent.parent.parent.parent.update_selected_configurations()
     
     @property
     def selected(self):
