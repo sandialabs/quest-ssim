@@ -21,6 +21,7 @@ from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.popup import Popup
+from kivy.uix.progressbar import ProgressBar
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.screenmanager import Screen, ScreenManager
@@ -2276,15 +2277,47 @@ class MetricConfigurationScreen(SSimBaseScreen):
         list.active = True
 
 
+class RunProgressPopupContent(BoxLayout):
+    """A popup that displays the progress of the running simulation(s)."""
+
+    @property
+    def max(self):
+        """The maximum value for the progress bar."""
+        return self.ids.progress.max
+
+    @max.setter
+    def max(self, value):
+        self.ids.progress.max = value
+
+    @property
+    def text(self):
+        """The text of the label above the progress bar."""
+        return self.ids.info.text
+
+    @text.setter
+    def text(self, value):
+        self.ids.info.text = value
+
+    def cancel(self):
+        """Change the progress bar label to 'canceling...'"""
+        self.ids.info.text = "canceling..."
+
+    def increment(self):
+        """Tell the progress bar to advance its progress."""
+        self.ids.progress.value += 1
+        self.text = (
+            f"Running simulation {self.ids.progress.value + 1} out of {self.max}."
+        )
+
+
 class RunSimulationScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.configurations: List[Configuration] = []
-        self.temp_config_ids = []
-        self.selected_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
         self._run_thread = None
+        self._canceled = False
 
     def on_enter(self):
         # # clear the MDList every time the RunSimulationScreen is opened
@@ -2326,20 +2359,25 @@ class RunSimulationScreen(SSimBaseScreen):
                                      tertiary_text=final_tertiary_text)
             )
 
-    def _evaluate(self):
-        # step 1: check the configurations that are currently selected
+    @property
+    def selected_configurations(self):
+        """Return a list of the selected configurations."""
+        selected_configurations = []
         mdlist = self.ids.config_list  # get reference to the configuration list
-        self.selected_configurations = []
         no_of_configurations = len(self.configurations)
         ctr = no_of_configurations - 1
         for wid in mdlist.children:
             if wid.ids.check.active:
-                print('*' * 20)
-                print(wid.text)
-                print('*' * 20)
+                Logger.debug(f"Selected configuration: {wid.text}")
                 # extract a subset of selected configurations
-                self.selected_configurations.append(self.configurations[ctr])
+                selected_configurations.append(self.configurations[ctr])
             ctr = ctr - 1
+        return selected_configurations
+
+    def _evaluate(self):
+        # step 1: check the configurations that are currently selected
+        self._total_num_configs_to_run = len(self.selected_configurations)
+        self._total_num_configs_done = 0
         # run all the configurations
         Logger.debug("===================================")
         Logger.debug('Selected Configurations:')
@@ -2347,16 +2385,36 @@ class RunSimulationScreen(SSimBaseScreen):
         Logger.debug("===================================")
 
         for config in self.selected_configurations:
+            if self._canceled:
+                Logger.debug("evaluation canceled")
+                break
             Logger.debug("Currently Running configuration:")
             Logger.debug(config.id)
             Logger.debug(self.simulation_configurations[config.id])
             Logger.debug("===================================")
             config.evaluate(basepath=self.project.base_dir)
             config.wait()
+            self._total_num_configs_done += 1
+            self._progress_popup.content.increment()
+        Logger.debug("clearing progress popup")
+        self._canceled = False
+        self._progress_popup.dismiss()
 
     def run_configurations(self):
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
+        self._progress = RunProgressPopupContent()
+        self._progress.max = len(self.selected_configurations)
+        self._progress.text = f"Running simulation 1 out of {self._progress.max}"
+        self._progress.ids.dismissBtn.bind(on_press=self._cancel_run)
+        self._progress_popup = Popup(title="simulation running...",
+                                     content=self._progress)
+        self._progress_popup.open()
+
+    def _cancel_run(self, _dt):
+        Logger.debug("Canceling simulation run.")
+        self._canceled = True
+        self._progress.cancel()
 
     def open_visualize_results(self):
         self.manager.current = "results-visualize"
