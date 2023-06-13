@@ -2192,6 +2192,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # self.ids.config_list.clear_widgets()
         Logger.debug(self.selected_configurations)
         self.populate_configurations()
+        self.manage_selection_buttons_enabled_state()
         # update the configurations that are currently selected
         # self.update_selected_configurations()
 
@@ -2266,32 +2267,39 @@ class RunSimulationScreen(SSimBaseScreen):
             self.selected_configurations[config_key] = ckb.listItem.text
         else:
             del self.selected_configurations[config_key]
+
+    def manage_selection_buttons_enabled_state(self):
+        """Enables or disables the buttons for select all and deselect all based
+        on whether or not there are any entries in the configuration list.
+
+        If there are items in the list, the buttons are enabled.  If there are no
+        items in the list, the buttons are disabled.
+        """
+        numCldrn = len(self.ids.config_list.children) == 0
+        self.ids.btnSelectAll.disabled = numCldrn
+        self.ids.btnDeselectAll.disabled = numCldrn
+
+    def deselect_all_configurations(self):
+        """Deselects all the items in the configuration list."""
+        for wid in self.ids.config_list.children:
+            if isinstance(wid, ListItemWithCheckbox):
+                wid.ids.selected.active = False
+        # update the configurations to be evaluated list
+        self._update_configurations_to_eval()
+
+    def select_all_configurations(self):
+        """Selects all the items in configuration list.
+
+        This clears the currently selected busses and then appends each
+        back into the list of selected busses as the checks are set.
+        """
+        self.configurations_to_eval.clear()
+        for wid in self.ids.config_list.children:
+            if isinstance(wid, ListItemWithCheckbox):
+                wid.ids.selected.active = True
+        # update the configurations to be evaluated list
+        self._update_configurations_to_eval()
         
-    # def update_selected_configurations(self):
-
-    #     Logger.debug('!' * 50)
-    #     Logger.debug('update_selected_configurations() called')
-    #     Logger.debug('!' * 50)
-
-    #     no_of_configurations = len(self.configurations)
-    #     ctr = no_of_configurations - 1
-    #     # self.selected_configurations = []
-    #     self.selected_configurations = []
-    #     for wid in self.ids.config_list.children:
-    #         if wid.selected:
-    #             print('*' * 20)
-    #             print(wid.text)
-    #             print('*' * 20)
-    #             # extract a subset of selected configurations
-    #             self.selected_configurations.append(self.configurations[ctr])
-    #         ctr = ctr - 1
-    
-    #     debug_ids = []
-    #     for config  in self.selected_configurations:
-    #         debug_ids.append(config.id)
-    #     Logger.debug(debug_ids)
-        
-
     def _evaluate(self):
         # # step 1: check the configurations that are currently selected 
         self._update_configurations_to_eval()
@@ -2354,7 +2362,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             # obtain accumulated metric values and times-series 
             # data in a pandas dataframe for metrics
             _, accumulated_metric, data_metrics = result.metrics_log()
-            config_key = self.simulation_configurations[config_dir][0]
+            config_key = self.simulation_configurations[config_dir]
 
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
@@ -2574,7 +2582,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             # combine all data into a single dataframe
             data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
-            config_key = self.simulation_configurations[config_dir][0]
+            config_key = self.simulation_configurations[config_dir]
             
             # columns to plot
             columns_to_plot = self.selected_list_items[config_key]

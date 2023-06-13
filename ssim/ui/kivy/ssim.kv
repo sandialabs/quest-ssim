@@ -1243,10 +1243,28 @@
                 orientation: "vertical"
                 padding: 5
 
-                Label:
-                    text: "Configurations that will be evaluated:"
-                    size_hint_y: None
-                    height: 50
+                BoxLayout:
+                    orientation: "horizontal"
+                    size_hint: None, None
+                    size: self.parent.width, 10
+                    padding: 5
+                    spacing: 5
+                    
+                    Button:
+                        id: btnSelectAll
+                        text: "Select All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.select_all_configurations()
+                        disabled: True
+
+                    Button:
+                        id: btnDeselectAll
+                        text: "Deselect All"
+                        size_hint: 0.5, None
+                        size: self.parent.width, 10
+                        on_release: root.deselect_all_configurations()
+                        disabled: True
 
                 MDScrollView:
                     canvas.before:
@@ -1263,10 +1281,10 @@
                 padding: 5
                 spacing: 5
 
-                Label:
-                    text: "Total number of configurations 256 (128 completed)"
-                    size_hint_y: None
-                    height: 50
+                # Label:
+                #     text: "Total number of configurations 256 (128 completed)"
+                #     size_hint_y: None
+                #     height: 50
 
                 Button:
                     text: "View Saved Results"
