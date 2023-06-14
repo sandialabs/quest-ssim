@@ -26,6 +26,7 @@ from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.textinput import TextInput
+from kivy.core.window import Window
 from kivymd.app import MDApp
 from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
@@ -174,6 +175,8 @@ class SSimApp(MDApp):
         super().__init__(*args, **kwargs)
 
     def build(self):
+        Window.size = (1000, 800)
+
         screen_manager = ScreenManager()
         screen_manager.add_widget(SSimScreen(self.project, name="ssim"))
         screen_manager.add_widget(
