@@ -179,7 +179,7 @@ class Storage(StorageDevice):
         float
             Seconds until the device must change state.
         """
-        if self.state is StorageState.IDLE:
+        if self.state is StorageState.IDLE or self.kw == 0.0:
             return math.inf
         if self.state is StorageState.DISCHARGING:
             kwh_minimum = self.kwh_rated * float(self._get("%reserve")) / 100
