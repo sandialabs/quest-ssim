@@ -121,20 +121,23 @@ def parse_float_or_str(strval):
 
     Parameters
     ----------
-    strval
-        The string to try and parse into a floating point number.
+    strval : Optional[str]
+        The string to try and parse into a floating point number, or None.
 
     Returns
     -------
-    float or str:
+    float or str or None:
         This returns None if the supplied input string is None.  Otherwise, it
         tries to cast the input string to a float.   If that succeeds, then the
         float is returned.  If it doesn't, then the supplied string is returned
         unaltered.
     """
-    if not strval: return None
+    if strval is None:
+        return None
     flt = parse_float(strval)
-    return strval if flt is None else flt
+    if flt is None:
+        return strval
+    return flt
 
 
 def try_co_sort(xl: list, yl: list) -> (list, list):
