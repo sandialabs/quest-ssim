@@ -26,6 +26,7 @@ Drafts/
 build/
 venv/
 _build/
+.vs/
 
 *.egg-info/
 .installed.cfg
