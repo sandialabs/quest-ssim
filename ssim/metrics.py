@@ -383,7 +383,7 @@ class Metric:
             lower limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for minimization.
         """
-        return self.__do_max_norm__(-value, -self._lower_limit, -self._objective)
+        return self.__do_max_norm__(-value, -self._upper_limit, -self._objective)
 
     def _normalize_for_maximization(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value for a
@@ -401,7 +401,7 @@ class Metric:
             upper limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for maximization.
         """
-        return self.__do_max_norm__(value, self._upper_limit, self._objective)
+        return self.__do_max_norm__(value, self._lower_limit, self._objective)
 
     def _normalize_for_seek_value(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value for a
@@ -619,7 +619,7 @@ class Metric:
 
         if value < limit:
             return self._violated(resp_norm)
-        if value < self._objective:
+        if value < objective:
             return self._feasible(resp_norm)
         return self._super_optimal(resp_norm)
 
