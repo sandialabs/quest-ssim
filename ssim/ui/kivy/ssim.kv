@@ -1774,3 +1774,20 @@
             Button:
                 text: "Save"
                 on_release: root.save(filechooser.selection or [filechooser.path], filenamefield.text)
+
+
+<RunProgressPopupContent>:
+    orientation: "vertical"
+
+    Label:
+        id: info
+        text: ""
+        height: 30
+
+    ProgressBar:
+        id: progress
+
+    Button:
+        id: dismissBtn
+        text: 'Cancel'
+        size_hint: 1, 0.2
