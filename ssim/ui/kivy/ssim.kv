@@ -1303,7 +1303,9 @@
                     id: simulation_runtime    
 
                 Button:
+                    id: run_configuration_btn
                     text: "Run Selected Configurations"
+                    disabled: True
                     on_press: root.run_configurations()
 
         Button:
@@ -1597,6 +1599,7 @@
         #     root.toggle_selection()
 
     IconRightWidget:
+        id: delete_config
         icon: 'trash-can-outline'
         theme_text_color: "Custom"
         text_color: 1, 0, 0, 1

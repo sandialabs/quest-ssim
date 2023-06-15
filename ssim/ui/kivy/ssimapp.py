@@ -2192,7 +2192,9 @@ class RunSimulationScreen(SSimBaseScreen):
         # self.ids.config_list.clear_widgets()
         Logger.debug(self.selected_configurations)
         self.populate_configurations()
+        self._update_configurations_to_eval()
         self.manage_selection_buttons_enabled_state()
+        self.manage_run_button_enabled_state()
         # update the configurations that are currently selected
         # self.update_selected_configurations()
 
@@ -2234,6 +2236,7 @@ class RunSimulationScreen(SSimBaseScreen):
                                                sec_text=config.id, 
                                                tert_text=final_tertiary_text)
             config_item.ids.selected.bind(active=self.on_item_check_changed)
+            # config_item.ids.delete_config.bind(active=self.on_delete_config)
             self.ids.config_list.add_widget(config_item)
   
             # update the items that are currently selected
@@ -2267,6 +2270,18 @@ class RunSimulationScreen(SSimBaseScreen):
             self.selected_configurations[config_key] = ckb.listItem.text
         else:
             del self.selected_configurations[config_key]
+            
+        self._update_configurations_to_eval()
+        self.manage_run_button_enabled_state()
+
+    def on_delete_config(self):
+        pass
+
+    def manage_run_button_enabled_state(self):
+        Logger.debug(self.configurations_to_eval)
+        numCldrn = len(self.configurations_to_eval) == 0
+        Logger.debug(numCldrn)
+        self.ids.run_configuration_btn.disabled = numCldrn
 
     def manage_selection_buttons_enabled_state(self):
         """Enables or disables the buttons for select all and deselect all based
