@@ -2182,31 +2182,29 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.temp_config_ids = []
         self.storage_options: List[StorageOptions] = []
         self._run_thread = None
 
     def on_enter(self):
-        # # clear the MDList every time the RunSimulationScreen is opened
-        # # TO DO: Keep track of selected configs
-        # self.ids.config_list.clear_widgets()
-        Logger.debug(self.selected_configurations)
+        # populate configurations list
         self.populate_configurations()
+        # update the configurations that are currently selected for 
+        # evaluation
         self._update_configurations_to_eval()
+        # enable/disable selection buttons
         self.manage_selection_buttons_enabled_state()
+        # enable/disable run button
         self.manage_run_button_enabled_state()
-        # update the configurations that are currently selected
-        # self.update_selected_configurations()
 
     def populate_configurations(self):
-        # store all the project configurations into a list
+        """Populates the configurations list. Also creates mappings between
+           internal configurations IDs and once that are displayed in the UI.
+        """
         ctr = 1
-        # rest the configurations list everytime before populating
-        # to avoid duplications
         configs = []
         for config in self.project.configurations():
             configs.append(config)
-            # establish the mappings between config id and confif UI_ids
+            # establish the mappings between config id and config UI_ids
             self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
             ctr += 1
 
@@ -2233,7 +2231,7 @@ class RunSimulationScreen(SSimBaseScreen):
             final_tertiary_text = "\n".join(tertiary_detail_text)
 
             config_item = ListItemWithCheckbox(text=self.simulation_configurations[config.id], 
-                                               sec_text=config.id, 
+                                               sec_text=final_secondary_text, 
                                                tert_text=final_tertiary_text)
             config_item.ids.selected.bind(active=self.on_item_check_changed)
             # config_item.ids.delete_config.bind(active=self.on_delete_config)
@@ -2246,6 +2244,10 @@ class RunSimulationScreen(SSimBaseScreen):
                 config_item.ids.selected.active = False
 
     def _update_configurations_to_eval(self):
+        """Updates the list (`self.configurations_to_eval`) that keeps 
+        track of current selection in the UI for configurations to 
+        be evaluated.
+        """
         no_of_configurations = len(self.configurations)
         ctr = no_of_configurations - 1
         self.configurations_to_eval = []
@@ -2255,40 +2257,73 @@ class RunSimulationScreen(SSimBaseScreen):
             ctr = ctr - 1
 
     def _get_config_key(self, config_dict, config_UI_id):
+        """Returns the internal configuration ID.
+
+        Parameters
+        ----------
+        config_dict : dict
+            A dictionary that establishes mappings between internal 
+            configration IDs and configuration IDs displayed in the
+            UI.
+        config_UI_id: str
+            Configuration ID displayed in the UI whose internal ID
+            is being queried.
+
+        Returns
+        -------
+        str:
+            Internal configuration ID corresponding to `config_UI_id`.
+        """
         for key, value in config_dict.items():
             if value == config_UI_id:
                 return key
         return('Configuration Not Found')
     
     def on_item_check_changed(self, ckb, value):
-        Logger.debug('Callback function called')
-        config_key = self._get_config_key(self.simulation_configurations, ckb.listItem.text)
+        """A callback function for the config list items to use when their
+        check state changes.
 
-        # Based on whether an item is selected or not, add or remove
-        # the configuration from self.selected_configurations
+        This method looks at the current check state (value) and either 
+        adds configuration UI id into the dict of currently selected 
+        configurations (`self.selected_configurations`) if value is true 
+        and removes it if value is false.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box 
+            (true = checked, false = unchecked).
+        """
+        config_key = self._get_config_key(self.simulation_configurations,
+                                           ckb.listItem.text)
+
         if value:
             self.selected_configurations[config_key] = ckb.listItem.text
         else:
             del self.selected_configurations[config_key]
-            
+
+        # update the configurations that are currently selected for 
+        # evaluation
         self._update_configurations_to_eval()
+        # enable/disable run button
         self.manage_run_button_enabled_state()
 
     def on_delete_config(self):
         pass
 
     def manage_run_button_enabled_state(self):
-        Logger.debug(self.configurations_to_eval)
         numCldrn = len(self.configurations_to_eval) == 0
-        Logger.debug(numCldrn)
         self.ids.run_configuration_btn.disabled = numCldrn
 
     def manage_selection_buttons_enabled_state(self):
-        """Enables or disables the buttons for select all and deselect all based
-        on whether or not there are any entries in the configuration list.
+        """Enables or disables the buttons for select all and deselect all 
+        based on whether or not there are any entries in the configuration 
+        list.
 
-        If there are items in the list, the buttons are enabled.  If there are no
-        items in the list, the buttons are disabled.
+        If there are items in the list, the buttons are enabled.  
+        If there are no items in the list, the buttons are disabled.
         """
         numCldrn = len(self.ids.config_list.children) == 0
         self.ids.btnSelectAll.disabled = numCldrn
@@ -2304,31 +2339,26 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def select_all_configurations(self):
         """Selects all the items in configuration list.
-
-        This clears the currently selected busses and then appends each
-        back into the list of selected busses as the checks are set.
         """
         self.configurations_to_eval.clear()
         for wid in self.ids.config_list.children:
             if isinstance(wid, ListItemWithCheckbox):
                 wid.ids.selected.active = True
-        # update the configurations to be evaluated list
+        # update the configurations that are currently selected for 
+        # evaluation
         self._update_configurations_to_eval()
         
     def _evaluate(self):
-        # # step 1: check the configurations that are currently selected 
+        """Initiates evaluation of configurations that are currelty selected.
+        """
+        # step 1: get an update on the current selection
         self._update_configurations_to_eval()
-
-        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        Logger.debug(self.configurations_to_eval)
-        Logger.debug("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
         # step 2: evaluate the selected configurations
         for config in self.configurations_to_eval:
             Logger.debug("Currently Running configuration:")
-            # Logger.debug(config.id)
             Logger.debug(self.simulation_configurations[config.id])
-            Logger.debug("===================================")
+            Logger.debug("==========================================")
             config.evaluate(basepath=self.project.base_dir)
             config.wait()
 
