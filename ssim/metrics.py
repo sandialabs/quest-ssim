@@ -16,6 +16,17 @@ class ImprovementType(int, enum.Enum):
     SeekValue = 2
 
     @staticmethod
+    def to_pretty_str(imp_type: ImprovementType):
+        if imp_type == ImprovementType.Minimize:
+            return "Minimize"
+
+        if imp_type == ImprovementType.Maximize:
+            return "Maximize"
+
+        return "Seek Value"
+
+
+    @staticmethod
     def parse(str: str):
         """A utility method to parse a string into a member of the
            ImprovementType enumeration.
@@ -342,7 +353,8 @@ class Metric:
             "name": key,
             "lower_limit": self._lower_limit,
             "upper_limit": self._upper_limit,
-            "objective": self._objective
+            "objective": self._objective,
+            "sense": ImprovementType.to_pretty_str(self._imp_type)
         }
 
     def normalize(self, value: float) -> float:
@@ -420,9 +432,9 @@ class Metric:
             This does calculations for a metric meant for seek value.
         """
         if value < self._objective:
-            return self._normalize_for_minimization(value)
+            return self._normalize_for_maximization(value)
 
-        return self._normalize_for_maximization(value)
+        return self._normalize_for_minimization(value)
 
     def _violated(self, norm_val: float) -> float:
         """Calculates the normalized value of a pre-normalized metric value
