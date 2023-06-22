@@ -189,12 +189,13 @@
 
 <ResultsVariableListItemWithCheckbox>:
     id: results_variable_list
-    markup: True
+    # markup: True
 
     LeftCheckBox:
         id: selected
-        active: False
-        on_release: root.toggle_selection()
+        listItem: root
+        # active: False
+        # on_release: root.toggle_selection()
 
 <ResultsMetricsListItemWithCheckbox>:
     id: results_metrics_list

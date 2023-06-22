@@ -1676,8 +1676,8 @@ class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
         # self.config = config
         self.text = variable_name
 
-    def toggle_selection(self):
-        self.parent.parent.parent.parent.parent.parent.update_selected_variables()
+    # def toggle_selection(self):
+    #     self.parent.parent.parent.parent.parent.parent.update_selected_variables()
 
     @property
     def selected(self):
@@ -1691,7 +1691,7 @@ class ResultsMetricsListItemWithCheckbox(TwoLineAvatarIconListItem):
     
     @property
     def selected(self):
-        return self.ids.selected.active
+        return self.ids.metrics_selected.active
 
 
 class VariableListItem(TwoLineAvatarIconListItem):
@@ -2781,9 +2781,17 @@ class ResultsDetailScreen(SSimBaseScreen):
                 if item == 'time':
                     continue
                 else:
-                    self.ids.variable_list_detail.add_widget(
-                        ResultsVariableListItemWithCheckbox(variable_name=item)
-                    )
+                    list_item = ResultsVariableListItemWithCheckbox(variable_name=str(item))
+                    list_item.ids.selected.bind(active=self.on_item_check_changed)
+                    self.ids.variable_list_detail.add_widget(list_item)
+                    # self.ids.variable_list_detail.add_widget(
+                    #     ResultsVariableListItemWithCheckbox(variable_name=item)
+                    # )
+
+                    if item in self.selected_list_items[self.current_configuration]:
+                        list_item.ids.selected.active = True
+                    else:
+                        list_item.ids.selected.active = False
 
             # close the drop-down menu
             self.menu.dismiss()
@@ -2792,6 +2800,12 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             Logger.debug('This configuration has not been evaluated')
 
+    def on_item_check_changed(self, ckb, value):
+        if value:
+            if str(ckb.listItem.text) not in self.selected_list_items[str(self.current_configuration)]:
+                self.selected_list_items[str(self.current_configuration)].append(str(ckb.listItem.text))
+        else:
+            self.selected_list_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
