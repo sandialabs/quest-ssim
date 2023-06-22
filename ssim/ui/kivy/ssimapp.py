@@ -1688,10 +1688,6 @@ class ResultsMetricsListItemWithCheckbox(TwoLineAvatarIconListItem):
     def __init__(self, variable_name, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.text = variable_name
-
-    # # TO DO: Check if there is a more concise of implementing this
-    # def toggle_selection(self):
-    #     self.parent.parent.parent.parent.parent.parent.parent.parent.parent.update_selected_metrics()
     
     @property
     def selected(self):
@@ -2389,10 +2385,6 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             self.selected_metric_items['Configuration ' + str(ctr)] = []
             ctr += 1
         
-        Logger.debug(">" * 50)
-        Logger.debug(self.selected_metric_items)
-        Logger.debug("<" * 50)
-
     def dismiss_popup(self):
         self._popup.dismiss()
         
@@ -2502,9 +2494,6 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         
     def drop_config_menu_metrics(self):
         menu_items = []
-        Logger.debug("??????????????????????????????????????")
-        Logger.debug(self.simulation_configurations)
-        Logger.debug("??????????????????????????????????????")
         for config_id, config_ui_id in self.simulation_configurations.items():
             display_text = config_ui_id
             menu_items.append({
@@ -2568,25 +2557,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
                 self.selected_metric_items[str(self.current_configuration)].append(str(ckb.listItem.text))
         else:
             self.selected_metric_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
-
-        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-        Logger.debug(self.selected_metric_items)
-        Logger.debug("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
-
-    def update_selected_metrics(self):
-        Logger.debug("Update selected metrics called")
-
-        selected_metrics = []
-        for metric in self.ids.metrics_list.children:
-            if metric.selected:
-                selected_metrics.append(metric.text)
         
-        self.selected_metric_items[self.current_configuration] = selected_metrics
-        
-        Logger.debug(">" * 50)
-        Logger.debug(self.selected_metric_items)
-        Logger.debug("<" * 50)
-
     def open_results_detail(self):
         self.manager.current = "results-detail"
 
