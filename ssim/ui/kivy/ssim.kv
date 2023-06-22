@@ -198,12 +198,13 @@
 
 <ResultsMetricsListItemWithCheckbox>:
     id: results_metrics_list
-    markup: True
+    # markup: True
 
     LeftCheckBox:
-        id: selected
-        active: False
-        on_release: root.toggle_selection()
+        id: metrics_selected
+        listItem: root
+        # active: False
+        # on_release: root.toggle_selection()
 
 <PVListitem>:
 

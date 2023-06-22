@@ -1689,9 +1689,9 @@ class ResultsMetricsListItemWithCheckbox(TwoLineAvatarIconListItem):
         super().__init__(*args, **kwargs)
         self.text = variable_name
 
-    # TO DO: Check if there is a more concise of implementing this
-    def toggle_selection(self):
-        self.parent.parent.parent.parent.parent.parent.parent.parent.parent.update_selected_metrics()
+    # # TO DO: Check if there is a more concise of implementing this
+    # def toggle_selection(self):
+    #     self.parent.parent.parent.parent.parent.parent.parent.parent.parent.update_selected_metrics()
     
     @property
     def selected(self):
@@ -2234,7 +2234,7 @@ class RunSimulationScreen(SSimBaseScreen):
                                                sec_text=final_secondary_text, 
                                                tert_text=final_tertiary_text)
             config_item.ids.selected.bind(active=self.on_item_check_changed)
-            # config_item.ids.delete_config.bind(active=self.on_delete_config)
+            config_item.ids.delete_config.bind(on_release=self.on_delete_config)
             self.ids.config_list.add_widget(config_item)
   
             # update the items that are currently selected
@@ -2310,8 +2310,10 @@ class RunSimulationScreen(SSimBaseScreen):
         # enable/disable run button
         self.manage_run_button_enabled_state()
 
-    def on_delete_config(self):
-        pass
+    def on_delete_config(self, value):
+        Logger.debug("???????")
+        Logger.debug(value)
+        Logger.debug("Delete pressed")
 
     def manage_run_button_enabled_state(self):
         numCldrn = len(self.configurations_to_eval) == 0
@@ -2375,14 +2377,11 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_results = ProjectResults(self.project)
-        self.selected_metrics = {}
         self.selected_metric_items = {}
         self.current_configuration = None
         self.metrics_figure = None
 
     def on_enter(self):
-        # populate `selected_list_items` assuming no selection 
-        # from dropdown menu
         # TO DO: Replace with evaluated configurations
         ctr = 1
         for config in self.project.configurations():
@@ -2544,19 +2543,35 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # add the list of metrics in the selected configuration into the MDList
         # clear the variable list
         self.ids.metrics_list.clear_widgets()
-
-
+    
         for item in metrics_headers:
             # do not add 'time' to the variable list
             if item == 'time':
                 continue
             else:
-                self.ids.metrics_list.add_widget(
-                    ResultsMetricsListItemWithCheckbox(variable_name=item)
-                )
+                metrics_item = ResultsMetricsListItemWithCheckbox(variable_name=str(item))
+                metrics_item.ids.metrics_selected.bind(active=self.on_item_check_changed)
+                self.ids.metrics_list.add_widget(metrics_item)
+
+                ## TO DO: Add logic to check if the variable in already selected.
+                if item in self.selected_metric_items[self.current_configuration]:
+                    metrics_item.ids.metrics_selected.active = True
+                else:
+                    metrics_item.ids.metrics_selected.active = False     
 
         # close the drop-down menu
         self.menu.dismiss()
+
+    def on_item_check_changed(self, ckb, value):
+        if value:
+            if str(ckb.listItem.text) not in self.selected_metric_items[str(self.current_configuration)]:
+                self.selected_metric_items[str(self.current_configuration)].append(str(ckb.listItem.text))
+        else:
+            self.selected_metric_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
+
+        Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+        Logger.debug(self.selected_metric_items)
+        Logger.debug("<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<")
 
     def update_selected_metrics(self):
         Logger.debug("Update selected metrics called")
