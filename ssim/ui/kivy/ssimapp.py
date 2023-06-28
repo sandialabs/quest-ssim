@@ -2373,7 +2373,9 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.project_results = ProjectResults(self.project)
+        # keeps track of metrics that have been selected for plotting
         self.selected_metric_items = {}
+        # stores the current configuration selected from the dropdown menu
         self.current_configuration = None
         self.metrics_figure = None
 
@@ -2389,6 +2391,14 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self._popup.dismiss()
         
     def _create_metrics_figure(self):
+        """Creates instance of matplotlib figure based on selections 
+           made in the UI.
+        
+        Returns
+        ----------
+        matplotlib.Figure:
+            Instance of matplotlib figure.
+        """
         metrics_fig = plt.figure()
         plt.clf()
         ctr = 1
@@ -2414,8 +2424,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
             ctr += 1
         
-        # x-axis label will always be time
-        plt.xlabel('time')
+        # x-axis label will always be time and seconds by default
+        plt.xlabel('time [s]')
         # update y-axis label based on user input
         if self.ids.detail_figure_ylabel.text is not None:
             plt.ylabel(self.ids.detail_figure_ylabel.text)
@@ -2429,9 +2439,13 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         return metrics_fig
 
     def update_metrics_figure(self):
+        """ Places the metrics figure in the UI canvas.
+        """
+        # check if atleast one variable is selected for plotting
         if self._check_metrics_list_selection():
             self._show_error_popup('No Metrics(s) Selected!', 
-                                   'Please select metrics(s) from the dropdown menu to update the plot.')
+                                   'Please select metrics(s) from the \
+                                    dropdown menu to update the plot.')
         else:
             self.metrics_figure = self._create_metrics_figure()
             # Add kivy widget to the canvas
@@ -2441,23 +2455,37 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             )
 
     def clear_metrics_figure(self):
+        """ Clears the metrics figure from the UI canvas.
+        """
         self.ids.summary_canvas.clear_widgets()
 
     def save_figure_options_metrics(self):
+        """Provides interface to save the metric figure onto the local drive.
+        """
         if self.metrics_figure is None:
-            self._show_error_popup('No Figure to Plot', 
+            self._show_error_popup('No Figure to Save', 
                                    'Please create a plot before saving.')
         else:
             chooser = SaveFigureDialog(
                 save=self.save_figure, cancel=self.dismiss_popup
             )
-
             self._popup = Popup(title="Save figure options", content=chooser)
             self._popup.open()
 
     def save_figure(self, selection, filename):
+        """ Saves the current metric figure into the local drive.
+
+        Parameters
+        ----------
+        selection : list
+            A list containing information of the path where the figure
+            will be stored. The fullpath is the first element of this list.
+        filename : str
+            Filename for the figure to be saved.
+        """
         fullpath = selection[0]
 
+        # by default, the figures are currently saved in PNG format
         split = os.path.splitext(filename)
         if split[1].lower() != ".png":
             filename = filename + ".png"
@@ -2469,10 +2497,23 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
         Logger.debug("saving figure %s", fullpath)
 
+        # by default, the figures are currently saved with DPI 300
         self.metrics_figure.savefig(fullpath, dpi=300)
         self.dismiss_popup()
 
     def _show_error_popup(self, title_str, msg):
+        """A generic popup dialog box to show errors within the 
+           visualiation screen.
+        
+        Parameters
+        ----------
+        selection : list
+            A list containing information of the path where the figure
+            will be stored. The fullpath is the first element of this list.
+        filename : str
+            Filename for the figure to be saved.
+        """
+
         content = MessagePopupContent()
 
         popup = Popup(
@@ -2485,7 +2526,9 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         return
 
     def _check_metrics_list_selection(self):
-        """Checks if at least one of the variables is selected."""
+        """Checks if at least one of the variables is selected from 
+           the dropdown menus.
+        """
         for _, config_variables in self.selected_metric_items.items():
             if config_variables != []:
                 # at least one variable is selected, not empty
@@ -2493,6 +2536,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         return True
         
     def drop_config_menu_metrics(self):
+        """Displays the dropdown menu in the visualization screen.
+        """
         menu_items = []
         for config_id, config_ui_id in self.simulation_configurations.items():
             display_text = config_ui_id
@@ -2508,13 +2553,23 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.menu.open()
 
     def set_config(self, value_id, value_ui_id):
- 
+        """Populates the variables list based on the item (configuration)
+           selected from the dropdown menu.
+
+        Parameters
+        ----------
+        value_id : str
+            Internal ID representing the selected configuration.
+        filename : str
+            ID displayed in the UI of the selected configuration.
+        
+        """
         self.current_configuration = value_ui_id
         
         # read the current selected configuration
         self.ids.config_list_detail_metrics.text = value_ui_id
 
-         # put the 'Result' objects in a dict with configuration ids
+        # put the 'Result' objects in a dict with configuration ids
         # this will allows the results to be mapped with 
         # corresponding configurations
         simulation_results = {}
@@ -2542,7 +2597,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
                 metrics_item.ids.metrics_selected.bind(active=self.on_item_check_changed)
                 self.ids.metrics_list.add_widget(metrics_item)
 
-                ## TO DO: Add logic to check if the variable in already selected.
+                # Check if the variable in already selected.
                 if item in self.selected_metric_items[self.current_configuration]:
                     metrics_item.ids.metrics_selected.active = True
                 else:
@@ -2552,6 +2607,20 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.menu.dismiss()
 
     def on_item_check_changed(self, ckb, value):
+        """A callback function for the list items to use when their check 
+        state changes.
+
+        This method looks at the current check state (value) and either adds 
+        the currently selected variable into `self.selected_metric_items` 
+        if value is true and removes it if value is false.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box (true = checked, false = unchecked).
+        """
         if value:
             if str(ckb.listItem.text) not in self.selected_metric_items[str(self.current_configuration)]:
                 self.selected_metric_items[str(self.current_configuration)].append(str(ckb.listItem.text))
