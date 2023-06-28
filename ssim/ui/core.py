@@ -1108,7 +1108,8 @@ class StorageOptions:
                             power,
                             self.control.mode if inv_control is None else None,
                             soc=self.initial_soc,
-                            controller_params=self.control.active_params
+                            controller_params=self.control.active_params,
+                            params={"kva": power}
                         ),
                         self._inverter_control
                     )
