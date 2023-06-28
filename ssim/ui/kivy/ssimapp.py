@@ -15,7 +15,6 @@ import pandas as pd
 from importlib_resources import files, as_file
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
-from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
@@ -43,6 +42,7 @@ from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.textfield import MDTextField
 from matplotlib.collections import LineCollection
 from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
+import ssim.ui
 from ssim.ui import (
     Configuration,
     Project,
@@ -51,6 +51,14 @@ from ssim.ui import (
     ProjectResults,
     is_valid_opendss_name
 )
+
+import kivy.garden
+import inspect
+kivy.garden.garden_system_dir = os.path.join(
+    os.path.dirname(inspect.getfile(ssim.ui)), "libs/garden"
+)
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
+
 
 _FONT_FILES = {
     "exo_regular": "Exo2-Regular.ttf",
