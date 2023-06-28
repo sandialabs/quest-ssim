@@ -1676,9 +1676,6 @@ class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
         # self.config = config
         self.text = variable_name
 
-    # def toggle_selection(self):
-    #     self.parent.parent.parent.parent.parent.parent.update_selected_variables()
-
     @property
     def selected(self):
         return self.ids.selected.active
@@ -2507,13 +2504,11 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         
         Parameters
         ----------
-        selection : list
-            A list containing information of the path where the figure
-            will be stored. The fullpath is the first element of this list.
-        filename : str
-            Filename for the figure to be saved.
+        title_str : str
+            Title of the popup box.
+        msg : str
+            Message to be displayed in the popup box.
         """
-
         content = MessagePopupContent()
 
         popup = Popup(
@@ -2554,15 +2549,14 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
     def set_config(self, value_id, value_ui_id):
         """Populates the variables list based on the item (configuration)
-           selected from the dropdown menu.
+        selected from the dropdown menu.
 
         Parameters
         ----------
         value_id : str
-            Internal ID representing the selected configuration.
+            Internal ID of the selected configuration.
         filename : str
             ID displayed in the UI of the selected configuration.
-        
         """
         self.current_configuration = value_ui_id
         
@@ -2635,9 +2629,6 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.configurations: List[Configuration] = []
-        self.selected_variables = {}
-        self.variables = {}
         self.current_configuration = None
         self.list_items = []
         self.selected_list_items = {}
@@ -2645,24 +2636,25 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.figure = None
 
     def on_enter(self):
-        # populate `selected_list_items` assuming no selection 
-        # from dropdown menu
         # TO DO: Replace with evaluated configurations
-
         ctr = 1
         for config in self.project.configurations():
             self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
             self.selected_list_items['Configuration ' + str(ctr)] = []
             ctr += 1
-        
-        Logger.debug(">" * 50)
-        Logger.debug(self.selected_list_items)
-        Logger.debug("<" * 50)
 
     def dismiss_popup(self):
         self._popup.dismiss()
 
     def _create_figure(self):
+        """Creates instance of matplotlib figure based on selections 
+        made in the UI.
+        
+        Returns
+        ----------
+        matplotlib.Figure:
+            Instance of matplotlib figure.
+        """
         fig = plt.figure()
         plt.clf()
         project_results = self.project_results.results()
@@ -2697,6 +2689,8 @@ class ResultsDetailScreen(SSimBaseScreen):
             ctr += 1
 
         plt.xlabel('time')
+
+        # update the y-axis labels
         if self.ids.detail_figure_ylabel.text is not None:
             plt.ylabel(self.ids.detail_figure_ylabel.text)
         plt.legend()
@@ -2708,23 +2702,26 @@ class ResultsDetailScreen(SSimBaseScreen):
         return fig
 
     def update_figure(self):
+        """ Places the details figure in the UI canvas.
+        """
+        # check if atleast one variable is selected for plotting
         if self._check_list_selection():
             self._show_error_popup('No Variable(s) Selected!', 
-                                   'Please select variable(s) from the dropdown menu to update the plot.')
+                                   'Please select variable(s) from the \
+                                    dropdown menu to update the plot.')
         else:
             self.figure = self._create_figure()
-            Logger.debug("Figure update command issued from GUI ...")
-            Logger.debug(self.ids.detail_figure_title.text)
             self.ids.detail_plot_canvas.clear_widgets()
             self.ids.detail_plot_canvas.add_widget(
                 FigureCanvasKivyAgg(self.figure)
             )
 
     def save_figure_options(self):
-        '''Saves the current active figure.'''
-        
+        """Provides interface to save the metric figure onto the local drive.
+        """
         if self.figure is None:
-            self.__show_no_figure_popup('No Figure to Plot. Please create a plot before saving.')
+            self.__show_no_figure_popup('No Figure to Plot. \
+                                        Please create a plot before saving.')
         else:
             chooser = SaveFigureDialog(
                 save=self.save_figure, cancel=self.dismiss_popup
@@ -2734,8 +2731,20 @@ class ResultsDetailScreen(SSimBaseScreen):
             self._popup.open()
 
     def save_figure(self, selection, filename):
+        """ Saves the current detail figure into the local drive.
+
+        Parameters
+        ----------
+        selection : list
+            A list containing information of the path where the figure
+            will be stored. The fullpath is the first element of this list.
+        filename : str
+            Filename for the figure to be saved.
+        """
+
         fullpath = selection[0]
 
+        # by default, the figures are currently saved in PNG format
         split = os.path.splitext(filename)
         if split[1].lower() != ".png":
             filename = filename + ".png"
@@ -2747,10 +2756,21 @@ class ResultsDetailScreen(SSimBaseScreen):
 
         Logger.debug("saving figure %s", fullpath)
 
+        # by default, the figures are currently saved with DPI 300
         self.figure.savefig(fullpath, dpi=300)
         self.dismiss_popup()
 
     def _show_error_popup(self, title_str, msg):
+        """A generic popup dialog box to show errors within the 
+        visualiation screen.
+        
+        Parameters
+        ----------
+        title_str : str
+            Title of the popup box.
+        msg : str
+            Message to be displayed in the popup box.
+        """
         content = MessagePopupContent()
 
         popup = Popup(
@@ -2763,7 +2783,9 @@ class ResultsDetailScreen(SSimBaseScreen):
         return
     
     def _check_list_selection(self):
-        """Checks if at least one of the variables is selected."""
+        """Checks if at least one of the variables is selected from 
+        the dropdown menus.
+        """
         for _, config_variables in self.selected_list_items.items():
             if config_variables != []:
                 # at least one variable is selected, not empty
@@ -2771,10 +2793,13 @@ class ResultsDetailScreen(SSimBaseScreen):
         return True
 
     def clear_figure(self):
+        """ Clears the detail figure from the UI canvas.
+        """
         self.ids.detail_plot_canvas.clear_widgets()
 
     def drop_config_menu(self):
-
+        """Displays the dropdown menu in the visualization screen.
+        """
         menu_items = []
         for config_id, config_ui_id in self.simulation_configurations.items():
             display_text = config_ui_id
@@ -2789,20 +2814,17 @@ class ResultsDetailScreen(SSimBaseScreen):
         )
         self.menu.open()
 
-    def update_selected_variables(self):
-       
-        selected_items = []
-        for variable in self.ids.variable_list_detail.children:
-            if variable.selected:
-                selected_items.append(variable.text)
-
-        self.selected_list_items[self.current_configuration] = selected_items
-        Logger.debug(">" * 50)
-        Logger.debug(self.selected_list_items)
-        Logger.debug("<" * 50)
-
     def set_config(self, value_id, value_ui_id):
+        """Populates the variables list based on the item (configuration)
+        selected from the dropdown menu.
 
+        Parameters
+        ----------
+        value_id : str
+            Internal ID of the selected configuration.
+        filename : str
+            ID displayed in the UI of the selected configuration.
+        """
         self.current_configuration = value_ui_id
                
         # read the current selected configuration
@@ -2818,7 +2840,6 @@ class ResultsDetailScreen(SSimBaseScreen):
             simulation_results[config_dir] = result
 
         # extract the `current_result` based on selection from drop down menu
-        
         if value_id in simulation_results:
             current_result = simulation_results[value_id]
           
@@ -2853,10 +2874,7 @@ class ResultsDetailScreen(SSimBaseScreen):
                     list_item = ResultsVariableListItemWithCheckbox(variable_name=str(item))
                     list_item.ids.selected.bind(active=self.on_item_check_changed)
                     self.ids.variable_list_detail.add_widget(list_item)
-                    # self.ids.variable_list_detail.add_widget(
-                    #     ResultsVariableListItemWithCheckbox(variable_name=item)
-                    # )
-
+                
                     if item in self.selected_list_items[self.current_configuration]:
                         list_item.ids.selected.active = True
                     else:
@@ -2870,6 +2888,20 @@ class ResultsDetailScreen(SSimBaseScreen):
             Logger.debug('This configuration has not been evaluated')
 
     def on_item_check_changed(self, ckb, value):
+        """A callback function for the list items to use when their check 
+        state changes.
+
+        This method looks at the current check state (value) and either adds 
+        the currently selected variable into `self.selected_list_items` 
+        if value is true and removes it if value is false.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box (true = checked, false = unchecked).
+        """
         if value:
             if str(ckb.listItem.text) not in self.selected_list_items[str(self.current_configuration)]:
                 self.selected_list_items[str(self.current_configuration)].append(str(ckb.listItem.text))
