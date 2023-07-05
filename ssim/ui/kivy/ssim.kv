@@ -1147,6 +1147,7 @@
                     size_hint_y: None
                     height: 320
                     disabled: True
+                    padding: 10
 
                     Label:
                         id: metriclabel
@@ -1727,7 +1728,7 @@
     orientation: "vertical"
 
     Label:
-        text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Limit"" and ""Objective"" and select a ""Sense"".'
+        text: 'Not all metric values have been properly specified.  Be sure to enter numbers for ""Upper Limit"", ""Lower Limit"", and ""Objective"" and select a ""Sense"".'
         text_size: self.width, None
         height: self.texture_size[1]
 
@@ -1796,3 +1797,20 @@
             Button:
                 text: "Save"
                 on_release: root.save(filechooser.selection or [filechooser.path], filenamefield.text)
+
+
+<RunProgressPopupContent>:
+    orientation: "vertical"
+
+    Label:
+        id: info
+        text: ""
+        height: 30
+
+    ProgressBar:
+        id: progress
+
+    Button:
+        id: dismissBtn
+        text: 'Cancel'
+        size_hint: 1, 0.2

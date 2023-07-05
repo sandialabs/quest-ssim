@@ -356,10 +356,14 @@ def run():
         type=float,
         help="how long to log"
     )
+    parser.add_argument(
+        "--show-plots",
+        action="store_true"
+    )
     args = parser.parse_args()
     storage_devices = _device_names(args.grid_config)
     federate = helicsCreateValueFederateFromConfig(args.federate_config)
-    run_federate(federate, storage_devices, args.hours, True)
+    run_federate(federate, storage_devices, args.hours, args.show_plots)
 
 
 def _power_plot(power_logger: PowerLogger):

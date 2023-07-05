@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import enum
 import math
+import hashlib
 
 
 @enum.unique
@@ -194,12 +195,28 @@ class Metric:
             self._c == other._c and \
             self._g == other._g
 
-    def __hash__(self):
-        return hash((
-            self._lower_limit, self._upper_limit, self._objective, self._imp_type,
-            self._a, self._b, self._c, self._g
-        ))
+    def __hash__(self):        
+        """Produces a hash value for this instance of a Metric.
 
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
+        m = hashlib.sha256()
+        m.update(repr(self._lower_limit).encode())
+        m.update(repr(self._upper_limit).encode())
+        m.update(repr(self._objective).encode())
+        m.update(repr(self._imp_type).encode())
+        m.update(repr(self._a).encode())
+        m.update(repr(self._b).encode())
+        m.update(repr(self._c).encode())
+        m.update(repr(self._g).encode())
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
+    
     @property
     def lower_limit(self) -> float:
         """Allows access to the supplied lower limit value for this metric.
@@ -366,7 +383,7 @@ class Metric:
             lower limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for minimization.
         """
-        return self.__do_max_norm__(-value, -self._lower_limit, -self._objective)
+        return self.__do_max_norm__(-value, -self._upper_limit, -self._objective)
 
     def _normalize_for_maximization(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value for a
@@ -384,7 +401,7 @@ class Metric:
             upper limit and objective, and the other curve parameters of this metric.
             this does calculations for a metric meant for maximization.
         """
-        return self.__do_max_norm__(value, self._upper_limit, self._objective)
+        return self.__do_max_norm__(value, self._lower_limit, self._objective)
 
     def _normalize_for_seek_value(self, value: float) -> float:
         """Convert a raw metric value into a normalized fitness value for a
@@ -547,8 +564,8 @@ class Metric:
 
     @staticmethod
     def _do_pre_normalization(
-            raw_value: float, limit: float, objective: float
-    ) -> float:
+        raw_value: float, limit: float, objective: float
+        ) -> float:
         """Calculates the pre-normalized equivalent of the supplied raw value
            for the given limit and objective.
 
@@ -574,8 +591,8 @@ class Metric:
         return (raw_value - limit) / (objective - limit)
 
     def __do_max_norm__(
-            self, value: float, limit: float, objective: float
-    ) -> float:
+        self, value: float, limit: float, objective: float
+        ) -> float:
         """Calculates the normalized equivalent of the supplied raw value for
            the supplied limit and objective assuming maximization.
 
@@ -602,7 +619,7 @@ class Metric:
 
         if value < limit:
             return self._violated(resp_norm)
-        if value < self._objective:
+        if value < objective:
             return self._feasible(resp_norm)
         return self._super_optimal(resp_norm)
 
@@ -637,9 +654,9 @@ class Metric:
 
     @staticmethod
     def validate_metric_values(
-            lower_limit: float, upper_limit: float, objective: float, imp_type: ImprovementType,
-            do_assert: bool = False
-    ) -> str:
+        lower_limit: float, upper_limit: float, objective: float, imp_type: ImprovementType,
+        do_assert: bool = False
+        ) -> str:
         """Tests the validity/usability of the metric values provided.
 
         This will either return an error string or throw an exception with an
@@ -740,6 +757,15 @@ class MetricAccumulator:
         return self._metric == other._metric
 
     def __hash__(self):
+        """Produces a hash value for this instance of a MetricAccumulator.
+
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
         return hash(self._metric)
 
     def accumulate(self, value: float, d_time: float) -> float:
@@ -899,6 +925,15 @@ class MetricTimeAccumulator(MetricAccumulator):
         return self._metric == other._metric
 
     def __hash__(self):
+        """Produces a hash value for this instance of a MetricTimeAccumulator.
+
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
         return hash(self._metric)
 
     @staticmethod
@@ -985,13 +1020,24 @@ class MetricManager:
         return True
 
     def __hash__(self):
-        hval = 0
+        """Produces a hash value for this instance of a MetricManager.
 
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
+        m = hashlib.sha256()
+        
         # Iterate in sorted order to make a functional rather than literal hash.
         for k, v in sorted(self._all_metrics.items()):
-            hval = hash((hval, k, v))
+            m.update(k.encode())
+            m.update(repr(hash(v)).encode())
 
-        return hval
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
 
     def add_accumulator(self, name: str, accum: MetricTimeAccumulator):
         """ Adds a new time accumulator to this metric manager.
