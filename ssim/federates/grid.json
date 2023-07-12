@@ -1,0 +1,23 @@
+{
+  "name": "grid",
+  "core_name": "grid_core",
+  "log_level": "trace",
+  "core_type": "zmq",
+  "time_delta": 1.0,
+  "subscriptions": [],
+  "publications": [
+    {
+      "key": "total_power",
+      "type":  "complex",
+      "units": "kW"
+    }
+  ],
+  "endpoints": [
+    {
+      "name": "reliability"
+    },
+    {
+      "name": "metrics"
+    }
+  ]
+}

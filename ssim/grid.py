@@ -15,6 +15,11 @@ from typing import Optional, List, Tuple
 Curve = Tuple[Tuple[float, float], ...]
 
 
+def _curve_to_dict(curve):
+    xs, ys = zip(*curve)
+    return {"x": xs, "y": ys}
+
+
 def _curve_from_dict(curve):
     if curve.keys() < {"x", "y"}:
         raise ValueError("Invalid curve specification. Must include keys "
@@ -67,6 +72,9 @@ class StorageSpecification:
     #: Type of the controller for this device.
     controller: str
 
+    #: Additional parameters to be passed to the controller constructor.
+    controller_params: dict = field(default_factory=dict)
+
     #: Number of phases to which the device is connected.
     phases: int = 3
 
@@ -78,9 +86,6 @@ class StorageSpecification:
 
     #: Inverter efficiency relative to power output (per-unit of `kva_rated`).
     inverter_efficiency: Optional[Curve] = None
-
-    #: Additional parameters to be passed to the controller constructor.
-    controller_params: dict = field(default_factory=dict)
 
     @classmethod
     def from_dict(cls, params: dict):
@@ -97,18 +102,42 @@ class StorageSpecification:
         # copy the dict so we can modify it with impunity
         params = params.copy()
         # pop the keys off so we are left with only the extra OpenDSS params.
+        controller_params = params.pop("controller_params", dict())
+        print(f"controller_params = {controller_params}")
+        print(f"params = {params}")
         return cls(
-            params.pop("name"),
-            params.pop("bus"),
-            params.pop("kwhrated"),
-            params.pop("kwrated"),
-            params.pop("controller"),
-            params.pop("phases", 3),
-            params.pop("%stored", 50) / 100,
+            name=params.pop("name"),
+            bus=params.pop("bus"),
+            kwh_rated=params.pop("kwhrated"),
+            kw_rated=params.pop("kwrated"),
+            controller=params.pop("controller"),
+            phases=params.pop("phases", 3),
+            soc=params.pop("%stored", 50) / 100,
             inverter_efficiency=_get_curve("inverter_efficiency", params),
-            controller_params=params.pop("controller_params", dict()),
+            controller_params=controller_params,
             params=params
         )
+
+    def to_dict(self):
+        """Return a dictionary representation this device.
+
+        The dictionary represents the device as it would appear in the
+        grid configuration JSON file.
+        """
+        return {
+            "name": self.name,
+            "bus": self.bus,
+            "kwhrated": self.kwh_rated,
+            "kwrated": self.kw_rated,
+            "phases": self.phases,
+            "%stored": self.soc * 100,
+            "controller": self.controller,
+            "controller_params": self.controller_params,
+            **self.params,
+            **({"inverter_efficiency":
+                _curve_to_dict(self.inverter_efficiency)}
+               if self.inverter_efficiency else {})
+        }
 
 
 @dataclass
@@ -156,6 +185,18 @@ class InvControlSpecification:
             params=params
         )
 
+    def to_dict(self):
+        params = {
+            "name": self.name,
+            "der_list": self.der_list,
+            "inv_control_mode": self.inv_control_mode,
+            "function_curve_1": _curve_to_dict(self.function_curve_1),
+            **self.params
+        }
+        if self.function_curve_2 is not None:
+            params["function_curve_2"] = _curve_to_dict(self.function_curve_2)
+        return params
+
 
 @dataclass
 class PVSpecification:
@@ -186,7 +227,7 @@ class PVSpecification:
 
     #: Maximum DC array output at changing temperature relative to `pmpp`.
     pt_curve: Optional[Curve] = None
-
+    
     @classmethod
     def from_dict(cls, params: dict):
         """Build a PVSpecification instance from a dict with OpenDSS keys.
@@ -214,6 +255,21 @@ class PVSpecification:
             params=params
         )
 
+    def to_dict(self):
+        """Return a dictionary representation of this PV system."""
+        pv = {
+            "name": self.name,
+            "bus": self.bus,
+            "pmpp": self.pmpp,
+            "kva_rated": self.kva_rated,
+            "phases": self.phases,
+            **self.params
+        }
+        if self.inverter_efficiency is not None:
+            pv["inverter_efficiency"] = str(self.inverter_efficiency)
+        if self.pt_curve is not None:
+            pv["inverter_efficiency"] = _curve_to_dict(self.pt_curve)
+        return pv
 
 @dataclass
 class EMSSpecification:

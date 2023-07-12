@@ -29,7 +29,11 @@ def cycle_spec():
 
 
 def test_DroopConrtoller_step(droop_spec):
-    controller = storage.DroopController(**droop_spec.controller_params)
+    controller = storage.DroopController(
+        droop_spec.controller_params['p_droop'],
+        droop_spec.controller_params['q_droop'],
+        droop_spec
+        )
     assert controller.step(1, 1.0, 0.5) == complex(0, 0)
     assert controller.step(1, 0.0, 0.5) == complex(5000, -500)
 

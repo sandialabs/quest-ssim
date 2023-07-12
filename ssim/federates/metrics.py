@@ -26,7 +26,8 @@ from ssim.metrics import ImprovementType
 
 
 class MetricsFederate:
-    """Manager for metrics and accumulators that record values from other HELICS federates.
+    """Manager for metrics and accumulators that record values from other
+       HELICS federates.
 
     Parameters
     ----------
@@ -38,7 +39,7 @@ class MetricsFederate:
         self._metricMgr = MetricManager()
         self.endpoint = federate.get_endpoint_by_name("metrics")
         g_spec = GridSpecification.from_json(grid_config)
-
+        
         self.csv_file = open("metric_log.csv", 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_fields = ["time"]
@@ -47,7 +48,11 @@ class MetricsFederate:
             self.add_accumulator(
                 bv_dict["name"],
                 MetricTimeAccumulator(
-                    Metric(bv_dict["limit"], bv_dict["objective"], ImprovementType.SeekValue),
+                    Metric(
+                        bv_dict["lower_limit"], bv_dict["upper_limit"],
+                        bv_dict["objective"],
+                        ImprovementType.parse(bv_dict["sense"])
+                        ),
                     0.0
                 )
             )
@@ -70,8 +75,9 @@ class MetricsFederate:
         Parameters
         ----------
         name : str
-            Unique identifier for the metric accumulator. If a metric accumulator
-            already exists with the same name an exception is raised.
+            Unique identifier for the metric accumulator. If a metric
+            accumulator already exists with the same name an exception is
+            raised.
         accumulator : MetricTimeAccumulator
             The metric accumulator to add.
 
@@ -88,7 +94,7 @@ class MetricsFederate:
         while self.endpoint.has_message():
             message = self.endpoint.get_message()
             bv_msg: BusVoltageStatus = StatusMessage.from_json(message.data)  # noqa
-            curr_metric: MetricTimeAccumulator = self._metricMgr[bv_msg.name]
+            curr_metric: MetricTimeAccumulator = self._metricMgr.get_accumulator(bv_msg.name)
             met_val = curr_metric.accumulate(bv_msg.voltage, bv_msg.time)
             index = self.csv_fields.index(bv_msg.name)
             values[index] = met_val
@@ -106,8 +112,8 @@ class MetricsFederate:
         schedule = timing.schedule(self._federate)
         for time in schedule:
             if time == helics_time_maxtime:
-                # Don't update since this is the signal that all other federates
-                # have finished
+                # Don't update since this is the signal that all other
+                # federates have finished
                 return
             self._update_metrics(time)
 

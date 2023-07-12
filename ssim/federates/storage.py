@@ -246,6 +246,19 @@ class ExternalController(StorageController):
         return self.time + 300
 
 
+class NoController(StorageController):
+    """Controller that does nothing."""
+
+    def step(self, time, voltage, soc):
+        pass
+
+    def apply_control(self, control_messages):
+        pass
+
+    def next_update(self):
+        return helics_time_maxtime
+
+
 def _get_controller(device):
     """Return a StorageController for `device`.
 
@@ -266,6 +279,8 @@ def _get_controller(device):
         return DroopController(device=device, **device.controller_params)
     if device.controller == 'external':
         return ExternalController(device)
+    if device.controller is None:
+        return NoController()
     else:
         raise ValueError(f"Unknown controller: '{device.controller}'")
 

@@ -1,0 +1,109 @@
+# This is where global constants and common UI design elements are defined to be used across all loaded .kv files.
+# To add a widget from here to a new .py file, create a class with its name and what it is subclassing.
+#
+# example:
+# class TileButton(Button):
+#     pass
+
+#: import C kivy.utils.get_color_from_hex
+#: import os os
+#: import clock kivy.clock
+
+# # Application name and tagline strings.
+# #:set APP_NAME 'QuESt'
+# #:set TAGLINE 'Optimizing Energy Storage'
+
+# Widths, in pixels, for proper measure in labels.
+#:set TWO_ABC_WIDTH 800
+#:set THREE_ABC_WIDTH 1200
+
+#:set WIZ_PADDING_X 170
+
+# Animation durations.
+#:set BASE_TRANSITION_DUR 0.600
+
+# Color sets.
+#:set hex_pantone1625c '#FFA38B'
+#:set hex_pantone294c '#002F6C'
+#:set hex_pantone427c '#D0D3D4'
+#
+#:set hex_cloud_dancer '#F0EEE9'
+#:set hex_scuba_blue '#00ABC0'
+#:set hex_ultra_violet '#5F4B8B'
+#
+#:set hex_snl_medium_blue '005376'
+#:set hex_snl_green '84BD00'
+#:set hex_snl_gray '3D3D3D'
+
+# Application palette.
+# QuESt foundation colors
+#:set hex_primary hex_snl_medium_blue
+#:set hex_secondary hex_snl_green
+
+# QuESt support colors
+#:set hex_pms312 '00ADD0'
+#:set hex_pms137 'FFA300'
+#:set hex_pms178 'FF585D'
+#:set hex_pms674 'AE2573'
+
+#:set hex_black hex_snl_gray
+#:set hex_white '#FFFFFF'
+
+# Font sizes.
+#:set default_font sp(20)
+#:set stnd_font sp(22)
+#:set large_font sp(30)
+#:set huge_font sp(40)
+
+<TextInput>:
+    on_focused: self.focused and clock.Clock.schedule_once(lambda dt: self.select_all())
+
+<BoxLayout>:
+#    padding: 5
+    spacing: 5
+
+# This is the generic flat, square Tile Button used throughout the application.
+# Subclass: Button
+<Button>:
+    background_normal: '' # os.path.join('resources', 'images', 'button_normal.png')
+    background_down: '' # os.path.join('resources', 'images', 'button_down.png')
+    background_color: C(hex_primary)
+    color: C(hex_white)
+    font_name: 'Exo 2'
+    halign: 'center'
+    markup: True
+
+# This is a generic popup with a modified appearance. Subclass from this to make more specific popups.
+# Subclass: Popup
+<Popup>:
+    separator_color: C(hex_secondary)
+    separator_height: dp(2)
+
+    title_align: 'left'
+    title_font: 'Exo 2'
+    title_size: stnd_font
+
+    size_hint: (0.90, 0.97)
+    auto_dismiss: False
+
+# This is a warning popup window to inform users of execution warnings. Contains text and a single dismiss button.
+# Subclass: MyPopup
+<WarningPopup@Popup>:
+    popup_text: popup_text
+    dismiss_button: dismiss_button
+    title: 'Oops!'
+
+    BoxLayout:
+        orientation: 'vertical'
+        padding: 10
+
+        PopupLabel:
+            id: popup_text
+
+        Button:
+            id: dismiss_button
+            halign: 'center'
+            size_hint: (1.00, 0.20)
+            text: 'Got it'
+            font_size: stnd_font
+            on_release: root.dismiss()

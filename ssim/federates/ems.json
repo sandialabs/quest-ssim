@@ -1,0 +1,12 @@
+{
+  "name": "ems",
+  "core_name": "ems_core",
+  "log_level": "debug",
+  "core_type": "zmq",
+  "time_delta": 300.0,
+  "uninterruptible": true,
+  "endpoints": [
+    { "name":  "control" },
+    { "name":  "reliability"}
+  ]
+}

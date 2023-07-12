@@ -1,0 +1,41 @@
+[Project]
+name = 'unnamed'
+grid_model_path = 'C:\Users\jpeddy\storage-sim\examples\tamrakar_test\test_circuit.dss'
+[reliability]
+[reliability.line]
+enabled = false
+[reliability.switch]
+enabled = false
+[reliability.generator]
+enabled = false
+aging = {enabled = false}
+operating_wear_out = {enabled = false}
+
+[storage-options."NewBESS"]
+phases = 3
+required = true
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['loadbus2']
+power = [1000.0]
+duration = [2.0, 4.0]
+
+
+[storage-options."NewBESS".control-params]
+mode = 'droop'
+
+
+[storage-options."NewBESS".control-params.droop]
+"p_droop" = 500.0
+"q_droop" = -300.0
+
+
+[metrics."Bus Voltage"]
+values=[{name="regbus", lower_limit = 0.9, upper_limit = 1.1, objective = 1.0, sense = "Minimize"},
+{name="loadbus3", lower_limit = 0.9, upper_limit = 1.1, objective = 1.0, sense = "Minimize"},
+{name="loadbus2", lower_limit = 0.9, upper_limit = 1.1, objective = 1.0, sense = "Minimize"},
+{name="loadbus1", lower_limit = 0.9, upper_limit = 1.1, objective = 1.0, sense = "Minimize"},
+{name="subbus", lower_limit = 0.9, upper_limit = 1.1, objective = 1.0, sense = "Minimize"},
+{name="sourcebus", lower_limit = 0.9, upper_limit = 1.1, objective = 1.0, sense = "Minimize"},
+]

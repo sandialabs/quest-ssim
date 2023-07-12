@@ -1,0 +1,90 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{4a78fdaf-83a0-4e0a-86f3-d13e012cef93}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>ssim\ui\kivy\ssimapp.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>Global|PythonCore|3.9</InterpreterId>
+    <TestFramework>pytest</TestFramework>
+    <UnitTestPattern>test*.py</UnitTestPattern>
+    <UnitTestRootDirectory>.</UnitTestRootDirectory>
+    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="docs\metrics.rst" />
+    <Content Include="Local Settings\PythonSettings.json" />
+    <Content Include="ssim\tests\PythonSettings.json" />
+    <Content Include="storage_sim.egg-info\dependency_links.txt" />
+    <Content Include="storage_sim.egg-info\entry_points.txt" />
+    <Content Include="storage_sim.egg-info\requires.txt" />
+    <Content Include="storage_sim.egg-info\SOURCES.txt" />
+    <Content Include="storage_sim.egg-info\top_level.txt" />
+    <Content Include="svr.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="docs\conf.py" />
+    <Compile Include="setup.py" />
+    <Compile Include="ssim\dssutil.py" />
+    <Compile Include="ssim\ems.py" />
+    <Compile Include="ssim\federates\ems.py" />
+    <Compile Include="ssim\federates\loads.py" />
+    <Compile Include="ssim\federates\logger.py" />
+    <Compile Include="ssim\federates\metrics.py" />
+    <Compile Include="ssim\federates\opendss.py" />
+    <Compile Include="ssim\federates\reliability.py" />
+    <Compile Include="ssim\federates\storage.py" />
+    <Compile Include="ssim\federates\timing.py" />
+    <Compile Include="ssim\federates\__init__.py" />
+    <Compile Include="ssim\grid.py" />
+    <Compile Include="ssim\heuristicems.py" />
+    <Compile Include="ssim\loads.py" />
+    <Compile Include="ssim\metrics.py" />
+    <Compile Include="ssim\opendss.py" />
+    <Compile Include="ssim\reliability.py" />
+    <Compile Include="ssim\storage.py" />
+    <Compile Include="ssim\tests\conftest.py" />
+    <Compile Include="ssim\tests\test_1.py">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="ssim\tests\test_dssutil.py" />
+    <Compile Include="ssim\tests\test_ems.py" />
+    <Compile Include="ssim\tests\test_grid.py" />
+    <Compile Include="ssim\tests\test_hashing.py" />
+    <Compile Include="ssim\tests\test_metrics.py" />
+    <Compile Include="ssim\tests\test_opendss.py" />
+    <Compile Include="ssim\tests\test_reilability.py" />
+    <Compile Include="ssim\tests\test_storage_control.py" />
+    <Compile Include="ssim\tests\__init__.py" />
+    <Compile Include="ssim\ui\core.py" />
+    <Compile Include="ssim\ui\kivy\ssimapp.py" />
+    <Compile Include="ssim\ui\__init__.py" />
+    <Compile Include="ssim\__init__.py" />
+    <Compile Include="svr.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="docs" />
+    <Folder Include="Local Settings\" />
+    <Folder Include="ssim" />
+    <Folder Include="ssim\federates" />
+    <Folder Include="ssim\tests" />
+    <Folder Include="ssim\ui" />
+    <Folder Include="ssim\ui\kivy" />
+    <Folder Include="storage_sim.egg-info" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="Global|PythonCore|3.9" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>

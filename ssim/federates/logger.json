@@ -1,0 +1,7 @@
+{
+  "name": "logger",
+  "core_type": "zmq",
+  "core_name": "logger_core",
+  "observer": true,
+  "log_level": "trace"
+}
