@@ -39,7 +39,7 @@ class MetricsFederate:
         self._metricMgr = MetricManager()
         self.endpoint = federate.get_endpoint_by_name("metrics")
         g_spec = GridSpecification.from_json(grid_config)
-
+        
         self.csv_file = open("metric_log.csv", 'w', newline='')
         self.csv_writer = csv.writer(self.csv_file)
         self.csv_fields = ["time"]
@@ -49,8 +49,9 @@ class MetricsFederate:
                 bv_dict["name"],
                 MetricTimeAccumulator(
                     Metric(
-                        bv_dict["lower_limit"], bv_dict["upper_limit"], bv_dict["objective"],
-                        ImprovementType.SeekValue
+                        bv_dict["lower_limit"], bv_dict["upper_limit"],
+                        bv_dict["objective"],
+                        ImprovementType.parse(bv_dict["sense"])
                         ),
                     0.0
                 )
