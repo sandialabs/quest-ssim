@@ -211,7 +211,6 @@ class SSimBaseScreen(Screen):
         self.configurations_to_eval: List[Configuration] = []
         self.simulation_configurations= {} # sets up concrete mappings
         self.selected_configurations = {}
-        # self.simulation_configurations= {} # sets up concrete mappings
         super().__init__(*args, **kwargs)
 
 
@@ -1740,7 +1739,6 @@ class PVListItem(TwoLineAvatarIconListItem):
 class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
     def __init__(self, variable_name, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.config = config
         self.text = variable_name
 
     @property
@@ -2427,7 +2425,7 @@ class RunSimulationScreen(SSimBaseScreen):
             (true = checked, false = unchecked).
         """
         config_key = self._get_config_key(self.simulation_configurations,
-                                           ckb.listItem.text)
+                                          ckb.listItem.text)
 
         if value:
             self.selected_configurations[config_key] = ckb.listItem.text
@@ -3076,28 +3074,10 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
         print("Delete icon was button was pressed")
         print(the_list_item)
         self.parent.remove_widget(the_list_item)
-    
-    # def toggle_selection(self):
-    #     self.parent.parent.parent.parent.parent.parent.update_selected_configurations()
-    
+        
     @property
     def selected(self):
         return self.ids.selected.active
-
-
-# class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
-#     '''Custom left container'''
-
-#     def __init__(self, pk=None, **kwargs):
-#         super().__init__(**kwargs)
-#         self.pk = pk
-
-#     def toggle_configuration_check(self, check):
-#         # print(check)
-#         # if check.active:
-#         #     print('Configuration checked')
-#         # print("selection made")
-#         pass
 
 
 class SelectGridDialog(FloatLayout):
