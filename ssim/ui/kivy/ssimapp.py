@@ -2496,7 +2496,6 @@ class RunSimulationScreen(SSimBaseScreen):
             Logger.debug("==========================================")
             config.evaluate(basepath=self.project.base_dir)
             config.wait()
-            self._total_num_configs_done += 1
             self._progress_popup.content.increment()
         Logger.debug("clearing progress popup")
         self._canceled = False
