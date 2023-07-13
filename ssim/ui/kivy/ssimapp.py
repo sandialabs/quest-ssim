@@ -209,7 +209,7 @@ class SSimBaseScreen(Screen):
         self.project_results = ProjectResults(self.project)
         self.configurations: List[Configuration] = []
         self.configurations_to_eval: List[Configuration] = []
-        self.simulation_configurations= {} # sets up concrete mappings
+        self.config_id_to_name= {} # sets up concrete mappings
         self.selected_configurations = {}
         super().__init__(*args, **kwargs)
 
@@ -2329,13 +2329,20 @@ class RunSimulationScreen(SSimBaseScreen):
         for i, config in enumerate(self.project.configurations()):
             configs.append(config)
             # establish the mappings between config id and config UI_ids
-            self.simulation_configurations[config.id] = f'Configuration {i+1}'
+            self.config_id_to_name[config.id] = f'Configuration {i+1}'
             # populate the UI with the configuration
             self._add_config_to_ui(config)
 
         self.configurations = configs
 
     def _add_config_to_ui(self, config):
+        """Populates the UI with details on the Configuration `config`.
+
+        Parameter
+        ---------
+        config: Configuration
+            The configuration to be added to the UI.
+        """
         secondary_detail_text = []
         tertiary_detail_text = []
         final_secondary_text = []
@@ -2350,7 +2357,7 @@ class RunSimulationScreen(SSimBaseScreen):
         final_secondary_text = "\n".join(secondary_detail_text)
         final_tertiary_text = "\n".join(tertiary_detail_text)
 
-        config_item = ListItemWithCheckbox(text=self.simulation_configurations[config.id], 
+        config_item = ListItemWithCheckbox(text=self.config_id_to_name[config.id], 
                                            sec_text=final_secondary_text, 
                                            tert_text=final_tertiary_text)
         config_item.ids.selected.bind(active=self.on_item_check_changed)
@@ -2421,7 +2428,7 @@ class RunSimulationScreen(SSimBaseScreen):
             The current check state of the check box 
             (true = checked, false = unchecked).
         """
-        config_key = self._get_config_key(self.simulation_configurations,
+        config_key = self._get_config_key(self.config_id_to_name,
                                           ckb.listItem.text)
 
         if value:
@@ -2487,7 +2494,7 @@ class RunSimulationScreen(SSimBaseScreen):
                 Logger.debug("evaluation canceled")
                 break
             Logger.debug("Currently Running configuration:")
-            Logger.debug(self.simulation_configurations[config.id])
+            Logger.debug(self.config_id_to_name[config.id])
             Logger.debug("==========================================")
             config.evaluate(basepath=self.project.base_dir)
             config.wait()
@@ -2531,7 +2538,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # TO DO: Replace with evaluated configurations
         ctr = 1
         for config in self.project.configurations():
-            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_metric_items['Configuration ' + str(ctr)] = []
             ctr += 1
         
@@ -2556,7 +2563,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             # obtain accumulated metric values and times-series 
             # data in a pandas dataframe for metrics
             _, accumulated_metric, data_metrics = result.metrics_log()
-            config_key = self.simulation_configurations[config_dir]
+            config_key = self.config_id_to_name[config_dir]
 
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
@@ -2685,7 +2692,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         """Displays the dropdown menu in the visualization screen.
         """
         menu_items = []
-        for config_id, config_ui_id in self.simulation_configurations.items():
+        for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
             menu_items.append({
                 "viewclass": "OneLineListItem",
@@ -2790,7 +2797,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         # TO DO: Replace with evaluated configurations
         ctr = 1
         for config in self.project.configurations():
-            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
+            self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_list_items['Configuration ' + str(ctr)] = []
             ctr += 1
 
@@ -2825,7 +2832,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             # combine all data into a single dataframe
             data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
-            config_key = self.simulation_configurations[config_dir]
+            config_key = self.config_id_to_name[config_dir]
             
             # columns to plot
             columns_to_plot = self.selected_list_items[config_key]
@@ -2952,7 +2959,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         """Displays the dropdown menu in the visualization screen.
         """
         menu_items = []
-        for config_id, config_ui_id in self.simulation_configurations.items():
+        for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
             menu_items.append({
                 "viewclass": "OneLineListItem",
