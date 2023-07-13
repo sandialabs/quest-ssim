@@ -2323,48 +2323,45 @@ class RunSimulationScreen(SSimBaseScreen):
         """Populates the configurations list. Also creates mappings between
            internal configurations IDs and once that are displayed in the UI.
         """
-        ctr = 1
         configs = []
-        for config in self.project.configurations():
+        self.ids.config_list.clear_widgets()
+        self.ids.config_list.active = False
+        for i, config in enumerate(self.project.configurations()):
             configs.append(config)
             # establish the mappings between config id and config UI_ids
-            self.simulation_configurations[config.id] = 'Configuration ' + str(ctr)
-            ctr += 1
+            self.simulation_configurations[config.id] = f'Configuration {i+1}'
+            # populate the UI with the configuration
+            self._add_config_to_ui(config)
 
         self.configurations = configs
 
-        self.ids.config_list.clear_widgets()
-        self.ids.config_list.active = False
+    def _add_config_to_ui(self, config):
+        secondary_detail_text = []
+        tertiary_detail_text = []
+        final_secondary_text = []
+        final_tertiary_text = []
 
-        ctr = 1
-        # populate the UI with the list of configurations
-        for config in self.project.configurations():
-            secondary_detail_text = []
-            tertiary_detail_text = []
-            final_secondary_text = []
-            final_tertiary_text = []
-
-            for storage in config.storage:
-                if storage is not None:
-                    secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
-                    tertiary_detail_text.append(f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
-                else:
-                    secondary_detail_text.append('no storage')
-            final_secondary_text = "\n".join(secondary_detail_text)
-            final_tertiary_text = "\n".join(tertiary_detail_text)
-
-            config_item = ListItemWithCheckbox(text=self.simulation_configurations[config.id], 
-                                               sec_text=final_secondary_text, 
-                                               tert_text=final_tertiary_text)
-            config_item.ids.selected.bind(active=self.on_item_check_changed)
-            config_item.ids.delete_config.bind(on_release=self.on_delete_config)
-            self.ids.config_list.add_widget(config_item)
-  
-            # update the items that are currently selected
-            if config.id in self.selected_configurations.keys():
-                config_item.ids.selected.active = True
+        for storage in config.storage:
+            if storage is not None:
+                secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
+                tertiary_detail_text.append(f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
             else:
-                config_item.ids.selected.active = False
+                secondary_detail_text.append('no storage')
+        final_secondary_text = "\n".join(secondary_detail_text)
+        final_tertiary_text = "\n".join(tertiary_detail_text)
+
+        config_item = ListItemWithCheckbox(text=self.simulation_configurations[config.id], 
+                                           sec_text=final_secondary_text, 
+                                           tert_text=final_tertiary_text)
+        config_item.ids.selected.bind(active=self.on_item_check_changed)
+        config_item.ids.delete_config.bind(on_release=self.on_delete_config)
+        self.ids.config_list.add_widget(config_item)
+
+        # update the items that are currently selected
+        if config.id in self.selected_configurations.keys():
+            config_item.ids.selected.active = True
+        else:
+            config_item.ids.selected.active = False
 
     def _update_configurations_to_eval(self):
         """Updates the list (`self.configurations_to_eval`) that keeps 
