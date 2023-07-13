@@ -189,23 +189,17 @@
 
 <ResultsVariableListItemWithCheckbox>:
     id: results_variable_list
-    # markup: True
 
     LeftCheckBox:
         id: selected
         listItem: root
-        # active: False
-        # on_release: root.toggle_selection()
 
 <ResultsMetricsListItemWithCheckbox>:
     id: results_metrics_list
-    # markup: True
 
     LeftCheckBox:
         id: metrics_selected
         listItem: root
-        # active: False
-        # on_release: root.toggle_selection()
 
 <PVListitem>:
 
@@ -1284,11 +1278,6 @@
                 padding: 5
                 spacing: 5
 
-                # Label:
-                #     text: "Total number of configurations 256 (128 completed)"
-                #     size_hint_y: None
-                #     height: 50
-
                 Button:
                     text: "View Saved Results"
 
@@ -1316,111 +1305,6 @@
             size_hint_y: None
             height: 100
             on_press: root.manager.current = 'ssim'
-
-<ResultsSummary@FloatLayout>:
-
-    BoxLayout:
-        orientation: "horizontal"
-        padding: 5
-
-        BoxLayout:
-            id: summary_canvas
-            size_hint_x: 1.5
-            orientation: "vertical"
-            padding: 5
-            spacing: 5
-
-        BoxLayout:
-            orientation: "vertical"
-
-            BoxLayout:
-                orientation: "vertical"
-                padding: 5
-
-                BoxLayout:
-                    orientation: "horizontal"
-
-                    BoxLayout:
-                        orientation: "vertical"
-                        Label:
-                            size_hint_y: 0.1
-                            text: "Select y-Display:"
-                            color: 0,0,0,1
-                        Label:
-                            size_hint_y: 0.1
-                            text: "Aggregate Metric:"
-                            color: 0,0,0,1
-
-                        ScrollView:
-                            size_hint_y: 0.8
-                            canvas.before:
-                                Color:
-                                    rgba: .5, .5, .5, 1
-                                Line:
-                                    width: 2
-                                    rectangle: self.x, self.y, self.width, self.height
-                            MDList:
-                                id: metric_list_summary
-
-                    BoxLayout:
-                        orientation: "vertical"
-                        Label:
-                            size_hint_y: 0.1
-                            text: "Select x-Display:"
-                            color: 0,0,0,1
-                        Label:
-                            size_hint_y: 0.1
-                            text: "Configuration Number:"
-                            color: 0,0,0,1
-
-                        ScrollView:
-                            size_hint_y: 0.8
-                            canvas.before:
-                                Color:
-                                    rgba: .5, .5, .5, 1
-                                Line:
-                                    width: 2
-                                    rectangle: self.x, self.y, self.width, self.height
-                            MDList:
-                                id: config_list_summary
-
-            BoxLayout:
-                orientation: "vertical"
-                padding: 5
-                spacing: 5
-                Button:
-                    text: "View Details"
-                    on_press: root.open_results_detail()
-                Button:
-                    text: "Compare"
-                    on_press: root.open_results_compare()
-                Button:
-                    text: "Save Figure"
-
-<ResultsDetail@FloatLayout>:
-
-    MDGridLayout:
-        cols: 2
-        rows: 1
-        adaptive_height: True
-        spacing: 25
-        padding: 12
-        pos_hint: {"center_x": 0.5, "center_y": 0.5}
-
-        BoxLayout:
-            id: detail_plot_canvas
-            size_hint_x: 1.5
-            orientation: "vertical"
-            padding: 5
-            spacing: 5
-            Label:
-                text: "Plot Displayed Here!"
-                color: 0, 0, 0, 1
-
-        BoxLayout:
-            orientation: "vertical"
-            Button:
-                text: "Pass"
 
 <ResultsDetailScreen>:
     name: "results-detail"
@@ -1453,7 +1337,6 @@
                     id: config_list_detail
                     text: "Select Configuration ... "
                     size_hint_x: 1.0
-                    # size: self.parent.width, 25
                     on_release: root.drop_config_menu()
 
                 Label:
@@ -1598,8 +1481,6 @@
     LeftCheckbox:
         id: selected
         listItem: root
-        # on_release:
-        #     root.toggle_selection()
 
     IconRightWidget:
         id: delete_config
