@@ -1972,6 +1972,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         This manages the button selection states for the Minimize button.
         """
         self.manage_button_selection_states(self.ids.min_btn)
+        self.ids.lowerLimitText.opacity, self.ids.lowerLimitText.disabled = 0, True
+        self.ids.upperLimitText.opacity, self.ids.upperLimitText.disabled = 1, False
 
     def set_maximize_sense(self):
         """Sets the input state to indicate the Maximize sense.
@@ -1979,6 +1981,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         This manages the button selection states for the Maximize button.
         """
         self.manage_button_selection_states(self.ids.max_btn)
+        self.ids.lowerLimitText.opacity, self.ids.lowerLimitText.disabled = 1, False
+        self.ids.upperLimitText.opacity, self.ids.upperLimitText.disabled = 0, True
 
     def set_seek_value_sense(self):
         """Sets the input state to indicate the Seek Value sense.
@@ -1986,6 +1990,8 @@ class MetricConfigurationScreen(SSimBaseScreen):
         This manages the button selection states for the seek value button.
         """
         self.manage_button_selection_states(self.ids.seek_btn)
+        self.ids.lowerLimitText.opacity, self.ids.lowerLimitText.disabled = 1, False
+        self.ids.upperLimitText.opacity, self.ids.upperLimitText.disabled = 1, False
 
     def manage_button_selection_states(self, selButton):
         """Sets the state and color of all sense buttons in accordance with
