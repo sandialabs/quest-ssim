@@ -1,6 +1,0 @@
-{
-  "TestFramework": "pytest",
-  "UnitTestRootDirectory": ".\\ssim\\tests",
-  "UnitTestPattern": "test_*.py",
-  "SearchPaths": [ ".\\ssim", ".\\ssim\\ui" ]
-}

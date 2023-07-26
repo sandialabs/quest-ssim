@@ -12,10 +12,7 @@
     <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <InterpreterId>Global|PythonCore|3.9</InterpreterId>
-    <TestFramework>pytest</TestFramework>
-    <UnitTestPattern>test*.py</UnitTestPattern>
-    <UnitTestRootDirectory>.</UnitTestRootDirectory>
-    <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
+    <TestFramework>Pytest</TestFramework>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
   <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
@@ -24,8 +21,6 @@
   </PropertyGroup>
   <ItemGroup>
     <Content Include="docs\metrics.rst" />
-    <Content Include="Local Settings\PythonSettings.json" />
-    <Content Include="ssim\tests\PythonSettings.json" />
     <Content Include="storage_sim.egg-info\dependency_links.txt" />
     <Content Include="storage_sim.egg-info\entry_points.txt" />
     <Content Include="storage_sim.egg-info\requires.txt" />
@@ -54,15 +49,9 @@
     <Compile Include="ssim\opendss.py" />
     <Compile Include="ssim\reliability.py" />
     <Compile Include="ssim\storage.py" />
-    <Compile Include="ssim\tests\conftest.py" />
-    <Compile Include="ssim\tests\test_1.py">
-      <SubType>Code</SubType>
-    </Compile>
     <Compile Include="ssim\tests\test_dssutil.py" />
     <Compile Include="ssim\tests\test_ems.py" />
     <Compile Include="ssim\tests\test_grid.py" />
-    <Compile Include="ssim\tests\test_hashing.py" />
-    <Compile Include="ssim\tests\test_metrics.py" />
     <Compile Include="ssim\tests\test_opendss.py" />
     <Compile Include="ssim\tests\test_reilability.py" />
     <Compile Include="ssim\tests\test_storage_control.py" />
@@ -75,7 +64,6 @@
   </ItemGroup>
   <ItemGroup>
     <Folder Include="docs" />
-    <Folder Include="Local Settings\" />
     <Folder Include="ssim" />
     <Folder Include="ssim\federates" />
     <Folder Include="ssim\tests" />
