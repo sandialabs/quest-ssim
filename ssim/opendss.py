@@ -753,6 +753,7 @@ class DSSModel:
         dssutil.run_command(
             "set mode=time controlmode=time number=1 stepsize=15m"
         )
+        self._model_file = dss_file
         self.loadshapeclass = loadshape_class
         self._last_solution_time = None
         self._storage = {}
@@ -1427,6 +1428,17 @@ class DSSModel:
 
     def add_loading_recorder(self):
         self._loading_recorder = PDERecorder()
+
+    def export_model(self, output_dir):
+        """Write the grid model as a connonical set of files.
+
+        Parameters
+        ----------
+        output_dir : str
+            Directory where the output files will be written.
+        """
+        source_dir = path.dirname(self._model_file)
+        dssutil.export(source_dir, output_dir)
 
 
 def _count_lines(file_path):

@@ -1,4 +1,5 @@
 from unittest import mock
+import hashlib
 import pytest
 import opendssdirect as dssdirect
 import pandas as pd
@@ -93,3 +94,38 @@ def test_lock_unlock_switch(simple_circuit):
     dssdirect.SwtControls.Name("swc1")
     state = dssdirect.SwtControls.State()
     assert not dssdirect.SwtControls.IsLocked()
+
+
+def test_fingerprint(model_dir, grid_model_path, irradiance_path,
+                     wind_path, tmp_path_factory):
+    # compute hash directly from list of files
+    export_dir = tmp_path_factory.mktemp("grid_export")
+    h = hashlib.sha256()
+    dssutil.run_command("clear")
+    dssutil.load_model(grid_model_path)
+    dssutil.export(model_dir, export_dir)
+    FILES = (
+        "BusCoords.dss",
+        "BusVoltageBases.DSS",
+        "Capacitor.DSS",
+        "CapControl.DSS",
+        "Generator.DSS",
+        "GrowthShape.DSS",
+        "Line.DSS",
+        "LineCode.DSS",
+        "Load.DSS",
+        "LoadShape.DSS",
+        "Master.DSS",
+        "RegControl.DSS",
+        "Spectrum.DSS",
+        "TCC_Curve.DSS",
+        "Transformer.DSS",
+        "Vsource.dss",
+        "zavwind.csv"
+    )
+    for fname in FILES:
+        p = export_dir / fname
+        h.update(p.read_bytes())
+    expected_hash = h.hexdigest()
+    assert expected_hash == dssutil.fingerprint(export_dir)
+    dssutil.run_command("clear")

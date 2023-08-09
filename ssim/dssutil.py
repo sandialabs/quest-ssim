@@ -3,6 +3,12 @@ import warnings
 from collections import namedtuple
 from collections.abc import Iterable
 from typing import Optional
+import hashlib
+import os
+from os import path
+from shutil import copyfile
+import uuid
+import re
 
 import pandas as pd
 import opendssdirect as dssdirect
@@ -332,3 +338,126 @@ def unlock_switch_control(element: str, terminal: Optional[int] = None):
         The terminal of `element` that the switch control is connected to.
     """
     _set_switch_control_lock(element, locked=False, terminal=terminal)
+
+
+def export(source_dir, output_dir):
+    source_dir = str(source_dir)
+    output_dir = str(output_dir)
+    if not path.isdir(output_dir):
+        raise ValueError(
+            f"Output directory '{output_dir}' does not exist "
+            "or is not a directory."
+        )
+    dssdirect.run_command(f"save circuit dir={output_dir}")
+    for dirpath, _, filenames in os.walk(output_dir):
+        for filename in filenames:
+            if not (
+                filename.endswith(".dss") or filename.endswith(".DSS")
+            ):
+                continue
+            datafiles = _get_datafiles(path.join(dirpath, filename))
+            newpaths = _copy_datafiles(
+                datafiles,
+                source_dir,
+                output_dir
+            )
+            _update_paths(path.join(output_dir, filename), newpaths)
+
+
+def fingerprint(model_path):
+    # Get a list of the cannonical file names and read them in
+    h = hashlib.sha256()
+    datafiles = set()
+    for dssfile in os.listdir(model_path):
+        _, ext = path.splitext(dssfile)
+        if ext.lower() != ".dss":
+            continue
+        dssfile = path.join(model_path, dssfile)
+        datafiles = datafiles.union(_get_datafiles(dssfile))
+        with open(dssfile, 'rb') as f:
+            h.update(f.read())
+    # find the datafiles referenced by each file and hash the contents
+    for datafile in datafiles:
+        with open(path.join(model_path, datafile), 'rb') as f:
+            h.update(f.read())
+    # return the final complete hash.
+    return h.hexdigest()
+
+
+def _update_paths(filename, newpaths):
+    # iterate over all (key, value) in `newpaths`
+    # replace key with value in the contents of `filename`
+    with open(filename, 'r') as f:
+        text = f.read()
+    for original_path, new_path in newpaths.items():
+        text.replace(original_path, new_path)
+    with open(filename, 'w') as f:
+        f.write(text)
+
+
+def _copy_datafiles(datafiles, source_dir, output_dir):
+    new_paths = {}
+    for datafile in datafiles:
+        # check if the datafile path is relative or absolute.
+        if path.isabs(datafile):
+            new_paths[datafile] = _copy_datafile_abs(datafile, output_dir)
+        else:
+            new_paths[datafile] = _copy_datafile_relative(
+                datafile, source_dir, output_dir)
+    return new_paths
+
+
+def _copy_datafile_abs(datafile, output_dir):
+    # Copy a datafile from an absolute path to a new location within output_dir
+    name, ext = os.path.splitext(datafile)
+    newname = uuid.uuid4().hex + ext
+    copyfile(datafile, os.path.join(output_dir, newname))
+    return newname
+
+
+def _copy_datafile_relative(datafile, source_dir, output_dir):
+    """Copy a datafile from `source_dir` to `output_dir`.
+
+    If datafile is a relative path that is above `source_dir`
+    (e.g. "../foo") then the file is coppied using
+    :py:func:`_copy_datafile_abs`.
+
+    Parameters
+    ----------
+    datafile : str
+        Path to the datafile relative to `source_dir`.
+    source_dir : str
+        Path to the directory containing `datafile`.
+    output_dir : str
+        Path where the datafile should be copied.
+
+    Returns
+    -------
+    str
+        The path to the new file. If `datafile` is below `source_dir`
+        then this will be `datafile`, otherwise it will be a new path
+        below `output_dir`.
+    """
+    sourcefile = os.path.join(source_dir, datafile)
+    destfile = os.path.join(output_dir, datafile)
+    if (not _is_safe_path(source_dir, sourcefile)) or os.path.exists(destfile):
+        return _copy_datafile_abs(os.path.abspath(sourcefile), output_dir)
+    copyfile(sourcefile, destfile)
+    return destfile
+
+
+def _is_safe_path(basedir, pth):
+    abspth = path.abspath(pth)
+    return basedir == os.path.commonpath([basedir, abspth])
+
+
+def _get_datafiles(dssfilepath):
+    opendss_datafile = re.compile(
+        # This still could match something like "asdf\"basd" as "asdf\"
+        r"[Ff]ile\s*=\s*(?P<filename>([^ \s,]*)|(\".*\"[\s,]))"
+    )
+    with open(dssfilepath, "r") as f:
+        data = f.read()
+    matches = opendss_datafile.finditer(data)
+    for match in matches:
+        yield match["filename"]
