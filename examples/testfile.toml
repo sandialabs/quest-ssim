@@ -17,7 +17,7 @@ required = true
 min_soc = 0.2
 max_soc = 0.8
 initial_soc = 0.5
-busses = ['633','671','650','646','634','675','sourcebus']
+busses = ['650','633','634','646','sourcebus','675','671']
 power = [200.0, 100.0, 300.0]
 duration = [1.0, 2.0, 3.0]
 
@@ -37,7 +37,7 @@ required = true
 min_soc = 0.2
 max_soc = 0.8
 initial_soc = 0.5
-busses = ['670','611']
+busses = ['633','670','611']
 power = [568.0, 874.0, 526.0]
 duration = [1.0, 2.0]
 
@@ -47,5 +47,45 @@ mode = 'droop'
 
 
 [storage-options."NewBESS".control-params.droop]
+"p_droop" = 500.0
+"q_droop" = -300.0
+
+
+[storage-options."NewBESS2"]
+phases = 3
+required = true
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['645','633']
+power = [2.0]
+duration = [2.0]
+
+
+[storage-options."NewBESS2".control-params]
+mode = 'droop'
+
+
+[storage-options."NewBESS2".control-params.droop]
+"p_droop" = 500.0
+"q_droop" = -300.0
+
+
+[storage-options."NewBESS3"]
+phases = 3
+required = true
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['692','633']
+power = [3.0]
+duration = [3.0]
+
+
+[storage-options."NewBESS3".control-params]
+mode = 'droop'
+
+
+[storage-options."NewBESS3".control-params.droop]
 "p_droop" = 500.0
 "q_droop" = -300.0

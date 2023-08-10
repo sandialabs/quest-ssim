@@ -3298,10 +3298,12 @@ class SSimScreen(SSimBaseScreen):
         
     def getImage(self, path):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
+    
+    def __make_battery_patch(
+        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5., incl_txt = True
+        ):
 
-    def __make_battery_patch(self, x, y, w, h, c, ax, yoffset = 5.):
-
-        llx = x-w/2.
+        llx = x + xoffset - w/2.
         lly = y + yoffset
         fs = min(h, w/2.)
         
@@ -3315,10 +3317,12 @@ class SSimScreen(SSimBaseScreen):
             [Path.LINETO]*3
         
         path = Path(vertices, codes)
-        patch = patches.PathPatch(path, facecolor='none', edgecolor=c)
+        patch = patches.PathPatch(path, facecolor='white', edgecolor=c)
 
         ax.add_patch(patch)
         
+        if not incl_txt: return
+
         f = plt.gcf()
         r = f.canvas.get_renderer()
 
@@ -3345,6 +3349,42 @@ class SSimScreen(SSimBaseScreen):
         
         nst.set_visible(False)
         ost.set_visible(False)
+                
+    def __draw_storage_options(self, seg_busses, ax):
+
+        # make a mapping of all busses to receive batteries to the storage
+        # options that include them.  Also map colors to storage options.
+
+        so_colors = {}
+        bat_busses = {}
+                
+        for so in self.project.storage_options:
+            so_colors[so] = self.colors[self.cindex]
+            self.cindex = (self.cindex + 1) % len(self.colors)
+            
+            for b in so.busses:
+                if b not in seg_busses: continue
+                if b not in bat_busses:
+                    bat_busses[b] = [so]
+                else:
+                    bat_busses[b] += [so]
+
+        # we know where to draw each battery and what color to make them.
+        for b, sos in bat_busses.items():
+            bx, by = [seg_busses[b][0], seg_busses[b][1]]
+
+            # draw the first n-1 without text
+            for i in range(len(sos) - 1): 
+                self.__make_battery_patch(
+                    bx, by, 18, 8, so_colors[sos[i]], ax, i * 3, 5 + i * 3,
+                    False
+                    )
+            
+            li = len(sos) - 1
+
+            self.__make_battery_patch(
+                bx, by, 18, 8, so_colors[sos[li]], ax, li * 3, 5 + li * 3
+                )
 
     def refresh_grid_plot(self):
         gm = self.project.grid_model
@@ -3362,7 +3402,7 @@ class SSimScreen(SSimBaseScreen):
         if len(lines) == 0 and len(busses) == 0:
             self.ids.grid_diagram.display_plot_error(
                 "There are no lines and no busses in the current grid model."
-            )
+                )
             return
 
         # Start by plotting the lines if there are any.  Note that if there are
@@ -3426,13 +3466,7 @@ class SSimScreen(SSimBaseScreen):
         
         ax.scatter(x, y)
 
-        for so in self.project.storage_options:
-            color = self.colors[self.cindex]
-            self.cindex = (self.cindex + 1) % len(self.colors)
-            for b in so.busses:
-                if b not in seg_busses: continue
-                bx, by = [seg_busses[b][0], seg_busses[b][1]]
-                self.__make_battery_patch(bx, by, 18, 8, color, ax)
+        self.__draw_storage_options(seg_busses, ax)
 
         if self.ids.show_bus_labels.active:
             for bus in seg_busses:
