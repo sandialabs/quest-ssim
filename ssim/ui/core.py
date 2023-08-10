@@ -191,6 +191,10 @@ class Project:
     @property
     def storage_names(self):
         return set(device.name for device in self.storage_devices)
+    
+    @property
+    def storage_options(self):
+        return self.storage_devices
 
     @property
     def grid_model(self) -> DSSModel:

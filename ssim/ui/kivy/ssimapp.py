@@ -9,7 +9,13 @@ from threading import Thread
 from typing import List
 
 import kivy
+import matplotlib as mpl
+from matplotlib.path import Path
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib.colors as mplcolors
+
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import opendssdirect as dssdirect
 import pandas as pd
 from importlib_resources import files, as_file
@@ -59,7 +65,6 @@ kivy.garden.garden_system_dir = os.path.join(
     os.path.dirname(inspect.getfile(ssim.ui)), "libs/garden"
 )
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
-
 
 _FONT_FILES = {
     "exo_regular": "Exo2-Regular.ttf",
@@ -3086,6 +3091,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         else:
             self.selected_list_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
 
+
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, text, sec_text, tert_text, *args, **kwargs):
@@ -3140,6 +3146,10 @@ class SaveFigureDialog(FloatLayout):
 
 class SSimScreen(SSimBaseScreen):
     grid_path = ObjectProperty(None)
+
+    colors = list(mplcolors.TABLEAU_COLORS.keys())
+
+    cindex = 0
 
     def on_kv_post(self, base_widget):
         self.refresh_grid_plot()
@@ -3235,6 +3245,9 @@ class SSimScreen(SSimBaseScreen):
 
         self._popup = Popup(title="select SSIM TOML file", content=chooser)
         self._popup.open()
+        
+    def on_pre_enter(self):
+        self.refresh_grid_plot()
 
     def select_grid_model(self):
         chooser = SelectGridDialog(
@@ -3279,52 +3292,59 @@ class SSimScreen(SSimBaseScreen):
     def line_busses(self, line):
         dssdirect.Lines.Name(line)
         return [dssdirect.Lines.Bus1(), dssdirect.Lines.Bus2()]
-
-    # def plot_line(self, line):
-    #    x, y = zip(*line_bus_coords(line))
-    #    if (0 in x) and (0 in y):
-    #        return
-    #    plt.plot(x, y, color='gray', solid_capstyle='round')
-
-    #def _distance_meters(self, latitude1, longitude1, latitude2, longitude2):
-    #    """Return distance between two points in meters"""
-    #    # Use the mean latitude to get a reasonable approximation
-    #    latitude = (latitude1 + latitude2) / 2
-    #    m_per_degree_lat = 111132.92 - 559.82 * cos(2 * latitude) \
-    #                       + 1.175 * cos(4 * latitude) \
-    #                       - 0.0023 * cos(6 * latitude)
-    #    m_per_degree_lon = 111412.84 * cos(latitude) \
-    #                      - 93.5 * cos(3 * latitude) \
-    #                      + 0.118 * cos(5 * latitude)
-    #    y = (latitude1 - latitude2) * m_per_degree_lat
-    #    x = (longitude1 - longitude2) * m_per_degree_lon
-    #    return hypot(x, y)
-
-    #def _get_substation_location(self):
-    #    """Return gps coordinates of the substation.
-
-    #    Returns
-    #    -------
-    #    latitude : float
-    #    longitude : float
-    #    """
-    #    if not dssdirect.Solution.Converged():
-    #        dssdirect.Solution.Solve()
-    #    busses = dssdirect.Circuit.AllBusNames()
-    #    distances = dssdirect.Circuit.AllBusDistances()
-    #    substation = sorted(zip(busses, distances), key=lambda x: x[1])[0][0]
-    #    dssdirect.Circuit.SetActiveBus(substation)
-    #    return dssdirect.Bus.Y(), dssdirect.Bus.X()
-
-    #def group(self, x):
-    #    if x < 0.33:
-    #        return 1
-    #    if x < 0.66:
-    #        return 2
-    #    return 3
-
+    
     def changed_show_bus_labels(self, active_state):
         self.refresh_grid_plot()
+        
+    def getImage(self, path):
+        return OffsetImage(plt.imread(path, format="png"), zoom=.1)
+
+    def __make_battery_patch(self, x, y, w, h, c, ax, yoffset = 5.):
+
+        llx = x-w/2.
+        lly = y + yoffset
+        fs = min(h, w/2.)
+        
+        vertices = [
+            [llx,lly], [llx+w, lly], [llx+w, lly+h], [llx, lly+h], [llx, lly],
+            [llx,lly+h/4.], [llx-w/12., lly+h/4.], [llx-w/12.,lly+3*h/4.],
+            [llx, lly+3*h/4.]
+            ]
+
+        codes = [Path.MOVETO] + [Path.LINETO]*4 + [Path.MOVETO] + \
+            [Path.LINETO]*3
+        
+        path = Path(vertices, codes)
+        patch = patches.PathPatch(path, facecolor='none', edgecolor=c)
+
+        ax.add_patch(patch)
+        
+        f = plt.gcf()
+        r = f.canvas.get_renderer()
+
+        nst = plt.text(0.5, 0.5, '+-', fontsize=fs)
+        nss = nst.get_window_extent(renderer=r)
+
+        # If we can't fit text in the icon, leave it out.
+        if nss.width > (w * 1.1): return
+
+        ost = plt.text(0.5, 0.5, '          ', fontsize=fs)
+        oss = ost.get_window_extent(renderer=r)
+        spaceWdth = oss.width / 10
+        
+        stf = (w * 1.1) - nss.width
+
+        nSpaces = math.floor(stf / spaceWdth)
+
+        txt = '+' + ' ' * nSpaces + '-'
+        
+        ax.annotate(
+            txt, (llx + w/2., lly + h/2.), color=c, weight='bold',
+            fontsize=fs, ha='center', va='center'
+            )
+        
+        nst.set_visible(False)
+        ost.set_visible(False)
 
     def refresh_grid_plot(self):
         gm = self.project.grid_model
@@ -3333,7 +3353,7 @@ class SSimScreen(SSimBaseScreen):
         if gm is None:
             self.ids.grid_diagram.display_plot_error(
                 "There is no current grid model."
-            )
+                )
             return
 
         lines = gm.line_names
@@ -3345,11 +3365,13 @@ class SSimScreen(SSimBaseScreen):
             )
             return
 
-        # Start by plotting the lines if there are any.  Note that if there are lines,
-        # there must be busses but the opposite may not be true.
+        # Start by plotting the lines if there are any.  Note that if there are
+        # lines, there must be busses but the opposite may not be true.
         plotlines = len(lines) > 0
 
         seg_busses = {}
+        
+        fig, ax = plt.subplots()
 
         if plotlines > 0:
             seg_lines = [line for line in lines
@@ -3366,28 +3388,17 @@ class SSimScreen(SSimBaseScreen):
 
             if len(line_segments) == 0:
                 self.ids.grid_diagram.display_plot_error(
-                    "There are lines but their bus locations are not known so no meaningful plot can be produced."
-                )
+                    "There are lines but their bus locations are not known " +
+                    "so no meaningful plot can be produced."
+                    )
                 return
-
-            # line_widths = [num_phases(line) for line in lines[:-1]]
-
-            # substation_lat, substation_lon = self._get_substation_location()
-            # distance = functools.partial(self._distance_meters, substation_lat, substation_lon)
-
-            # distances = [min(distance(b1[1], b1[0]), distance(b2[1], b2[0]))  # / 2.0
-            #             for b1, b2 in line_segments]
-
-            # groups = [self.group(dist / max(distances)) for dist in distances]
-
+            
             lc = LineCollection(
                 line_segments, norm=plt.Normalize(1, 3), cmap='tab10'
-            )  # , linewidths=line_widths)
+                )
 
             lc.set_capstyle('round')
-            # lc.set_array(np.array(groups))
 
-            fig, ax = plt.subplots()
             fig.tight_layout()
 
             ax.add_collection(lc)
@@ -3412,26 +3423,31 @@ class SSimScreen(SSimBaseScreen):
 
         x = [seg_busses[bus][0] for bus in seg_busses]
         y = [seg_busses[bus][1] for bus in seg_busses]
-
+        
         ax.scatter(x, y)
+
+        for so in self.project.storage_options:
+            color = self.colors[self.cindex]
+            self.cindex = (self.cindex + 1) % len(self.colors)
+            for b in so.busses:
+                if b not in seg_busses: continue
+                bx, by = [seg_busses[b][0], seg_busses[b][1]]
+                self.__make_battery_patch(bx, by, 18, 8, color, ax)
 
         if self.ids.show_bus_labels.active:
             for bus in seg_busses:
                 loc = seg_busses[bus]
                 ax.annotate(bus, (loc[0], loc[1]))
-
-        # plt.title("Grid Layout")
-
-        # xlocs, xlabels = plt.xticks()
-        # ylocs, ylabels = plt.yticks()
-        # plt.xticks(ticks=xlocs, labels=[])
-        # plt.yticks(ticks=ylocs, labels=[])
-        # plt.grid()
+                
         plt.xticks([])
         plt.yticks([])
 
-        ax.set_xlim(min(xs) - 0.05 * (max_x - min_x), max(xs) + 0.05 * (max_x - min_x))
-        ax.set_ylim(min(ys) - 0.05 * (max_y - min_y), max(ys) + 0.05 * (max_y - min_y))
+        ax.set_xlim(
+            min(xs) - 0.05 * (max_x - min_x), max(xs) + 0.05 * (max_x - min_x)
+            )
+        ax.set_ylim(
+            min(ys) - 0.05 * (max_y - min_y), max(ys) + 0.05 * (max_y - min_y)        
+            )
 
         dg = self.ids.grid_diagram
         dg.reset_plot()
