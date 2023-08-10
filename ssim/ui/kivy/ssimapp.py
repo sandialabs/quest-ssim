@@ -3296,6 +3296,9 @@ class SSimScreen(SSimBaseScreen):
     def changed_show_bus_labels(self, active_state):
         self.refresh_grid_plot()
         
+    def changed_show_storage_options(self, active_state):
+        self.refresh_grid_plot()
+        
     def getImage(self, path):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
     
@@ -3465,8 +3468,9 @@ class SSimScreen(SSimBaseScreen):
         y = [seg_busses[bus][1] for bus in seg_busses]
         
         ax.scatter(x, y)
-
-        self.__draw_storage_options(seg_busses, ax)
+        
+        if self.ids.show_storage_options.active:
+            self.__draw_storage_options(seg_busses, ax)
 
         if self.ids.show_bus_labels.active:
             for bus in seg_busses:
