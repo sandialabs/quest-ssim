@@ -3308,51 +3308,37 @@ class SSimScreen(SSimBaseScreen):
 
         llx = x + xoffset - w/2.
         lly = y + yoffset
-        fs = min(h, w/2.)
         
+        # Start with main rectangle.
+        codes = [Path.MOVETO] + [Path.LINETO]*4
         vertices = [
-            [llx,lly], [llx+w, lly], [llx+w, lly+h], [llx, lly+h], [llx, lly],
-            [llx,lly+h/4.], [llx-w/12., lly+h/4.], [llx-w/12.,lly+3*h/4.],
-            [llx, lly+3*h/4.]
+            [llx,lly], [llx+w, lly], [llx+w, lly+h], [llx, lly+h], [llx, lly]
+            ]
+       
+        # Add in a small rectangle that looks like the nub on the + side.
+        codes += [Path.MOVETO] + [Path.LINETO]*3
+        vertices += [
+            [llx      ,lly+   h/4.], [llx-w/12., lly+   h/4.],
+            [llx-w/12.,lly+3.*h/4.], [llx      , lly+3.*h/4.]
             ]
 
-        codes = [Path.MOVETO] + [Path.LINETO]*4 + [Path.MOVETO] + \
-            [Path.LINETO]*3
+        # Finish with a drawing of a + and - sign.  Don't use annotations b/c
+        # this is simpler and more functional.  It's hard to size an annotation
+        # properly.
+        if incl_txt:
+            codes += ([Path.MOVETO] + [Path.LINETO])*3
+            
+            vertices += [
+                [llx+   w/4.,lly+h/4.], [llx+   w/4., lly+3.*h/4.],
+                [llx+   w/8.,lly+h/2.], [llx+3.*w/8., lly+   h/2.],
+                [llx+5.*w/8.,lly+h/2.], [llx+7.*w/8., lly+   h/2.],
+                ]
         
         path = Path(vertices, codes)
         patch = patches.PathPatch(path, facecolor='white', edgecolor=c)
 
         ax.add_patch(patch)
         
-        if not incl_txt: return
-
-        f = plt.gcf()
-        r = f.canvas.get_renderer()
-
-        nst = plt.text(0.5, 0.5, '+-', fontsize=fs)
-        nss = nst.get_window_extent(renderer=r)
-
-        # If we can't fit text in the icon, leave it out.
-        if nss.width > (w * 1.1): return
-
-        ost = plt.text(0.5, 0.5, '          ', fontsize=fs)
-        oss = ost.get_window_extent(renderer=r)
-        spaceWdth = oss.width / 10
-        
-        stf = (w * 1.1) - nss.width
-
-        nSpaces = math.floor(stf / spaceWdth)
-
-        txt = '+' + ' ' * nSpaces + '-'
-        
-        ax.annotate(
-            txt, (llx + w/2., lly + h/2.), color=c, weight='bold',
-            fontsize=fs, ha='center', va='center'
-            )
-        
-        nst.set_visible(False)
-        ost.set_visible(False)
-                
     def __draw_storage_options(self, seg_busses, ax):
 
         # make a mapping of all busses to receive batteries to the storage
@@ -3458,7 +3444,10 @@ class SSimScreen(SSimBaseScreen):
                 bc = self.bus_coords(bus)
                 seg_busses[self.get_raw_bus_name(bus)] = bc
 
-            xs, ys = zip(*[(x, y) for seg in seg_busses for x, y in seg_busses[seg]])
+            xs, ys = zip(
+                *[(x, y) for seg in seg_busses for x, y in seg_busses[seg]]
+                )
+            
             min_x = min(xs)
             max_x = max(xs)
             min_y = min(ys)
