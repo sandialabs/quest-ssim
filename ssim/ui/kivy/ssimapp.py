@@ -16,6 +16,7 @@ from importlib_resources import files, as_file
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.logger import Logger, LOG_LEVELS
+from kivy.metrics import dp
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
@@ -2714,14 +2715,38 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         menu_items = []
         for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
+            secondary_detail_text = []
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+
+            for i, config in enumerate(self.project.configurations()):
+                if config_ui_id == f'Configuration {i+1}':
+                    for storage in config.storage:
+                        if storage is not None:
+                            secondary_detail_text.append(
+                                f"name: {storage.name}, bus: {storage.bus}")
+                            tertiary_detail_text.append(
+                                f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+                        else:
+                            secondary_detail_text.append('no storage')
+
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
+
             menu_items.append({
-                "viewclass": "OneLineListItem",
+                "viewclass": "ThreeLineListItem",
                 "text": display_text,
+                "height": dp(90),
+                "secondary_text": final_secondary_text,
+                "tertiary_text": final_tertiary_text,
                 "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
             })
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.config_list_detail_metrics, items=menu_items, width_mult=5
+            caller=self.ids.config_list_detail_metrics, 
+            items=menu_items, 
+            width_mult=10
         )
         self.menu.open()
 
@@ -2975,20 +3000,61 @@ class ResultsDetailScreen(SSimBaseScreen):
         """
         self.ids.detail_plot_canvas.clear_widgets()
 
+    # def drop_config_menu(self):
+    #     """Displays the dropdown menu in the visualization screen.
+    #     """
+    #     menu_items = []
+    #     for config_id, config_ui_id in self.config_id_to_name.items():
+    #         display_text = config_ui_id
+    #         menu_items.append({
+    #             "viewclass": "OneLineListItem",
+    #             "text": display_text,
+    #             "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
+    #         })
+
+    #     self.menu = MDDropdownMenu(
+    #         caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+    #     )
+    #     self.menu.open()
+
     def drop_config_menu(self):
         """Displays the dropdown menu in the visualization screen.
         """
         menu_items = []
         for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
+            secondary_detail_text = []
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+
+            for i, config in enumerate(self.project.configurations()):
+                if config_ui_id == f'Configuration {i+1}':
+                    for storage in config.storage:
+                        if storage is not None:
+                            secondary_detail_text.append(
+                                f"name: {storage.name}, bus: {storage.bus}")
+                            tertiary_detail_text.append(
+                                f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+                        else:
+                            secondary_detail_text.append('no storage')
+
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
+
             menu_items.append({
-                "viewclass": "OneLineListItem",
+                "viewclass": "ThreeLineListItem",
                 "text": display_text,
-                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
+                "height": dp(90),
+                "secondary_text": final_secondary_text,
+                "tertiary_text": final_tertiary_text,
+                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
             })
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+            caller=self.ids.config_list_detail, 
+            items=menu_items, 
+            width_mult=10
         )
         self.menu.open()
 
