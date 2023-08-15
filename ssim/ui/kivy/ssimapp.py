@@ -2505,6 +2505,8 @@ class RunSimulationScreen(SSimBaseScreen):
     def _evaluate(self):
         """Initiates evaluation of configurations that are currelty selected.
         """
+        checkpoint = self.project.save_checkpoint()
+
         # step 1: get an update on the current selection
         self._update_configurations_to_eval()
 
@@ -2516,7 +2518,7 @@ class RunSimulationScreen(SSimBaseScreen):
             Logger.debug("Currently Running configuration:")
             Logger.debug(self.config_id_to_name[config.id])
             Logger.debug("==========================================")
-            config.evaluate(basepath=self.project.base_dir)
+            config.evaluate(basepath=checkpoint.checkpoint_dir)
             config.wait()
             self._progress_popup.content.increment()
         Logger.debug("clearing progress popup")
@@ -2547,7 +2549,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.project_results = ProjectResults(self.project)
+        self.project_results = self.project.results()
         # keeps track of metrics that have been selected for plotting
         self.selected_metric_items = {}
         # stores the current configuration selected from the dropdown menu

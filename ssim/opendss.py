@@ -6,6 +6,7 @@ import enum
 from functools import lru_cache, cached_property
 import logging
 import math
+import os
 from os import PathLike, path
 from pathlib import Path
 import re
@@ -1437,6 +1438,7 @@ class DSSModel:
         output_dir : str
             Directory where the output files will be written.
         """
+        os.makedirs(output_dir, exist_ok=True)
         source_dir = path.dirname(self._model_file)
         dssutil.export(source_dir, output_dir)
 
