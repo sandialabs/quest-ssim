@@ -12,6 +12,7 @@ import kivy
 import matplotlib as mpl
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
+from matplotlib.lines import Line2D
 import matplotlib.patches as patches
 import matplotlib.colors as mplcolors
 
@@ -3272,7 +3273,6 @@ class SSimScreen(SSimBaseScreen):
         self.manager.current = "run-sim"
         if self.project.grid_model is None:
             _show_no_grid_popup("ssim", self.manager)
-            return
 
     def num_phases(self, line):
         dssdirect.Lines.Name(line)
@@ -3303,7 +3303,8 @@ class SSimScreen(SSimBaseScreen):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
     
     def __make_battery_patch(
-        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5., incl_txt = True
+        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5.,
+        facecolor = None, incl_plus_minus = True
         ):
 
         llx = x + xoffset - w/2.
@@ -3315,17 +3316,17 @@ class SSimScreen(SSimBaseScreen):
             [llx,lly], [llx+w, lly], [llx+w, lly+h], [llx, lly+h], [llx, lly]
             ]
        
-        # Add in a small rectangle that looks like the nub on the + side.
+        # Add a small rectangle looking like the nub on + side of a battery.
         codes += [Path.MOVETO] + [Path.LINETO]*3
         vertices += [
             [llx      ,lly+   h/4.], [llx-w/12., lly+   h/4.],
             [llx-w/12.,lly+3.*h/4.], [llx      , lly+3.*h/4.]
             ]
 
-        # Finish with a drawing of a + and - sign.  Don't use annotations b/c
-        # this is simpler and more functional.  It's hard to size an annotation
-        # properly.
-        if incl_txt:
+        # Finish with a drawing of a + and - sign if requested.  Don't use
+        # annotations b/c this is simpler and more functional.  It's hard to
+        # size an annotation properly.
+        if incl_plus_minus:
             codes += ([Path.MOVETO] + [Path.LINETO])*3
             
             vertices += [
@@ -3333,11 +3334,14 @@ class SSimScreen(SSimBaseScreen):
                 [llx+   w/8.,lly+h/2.], [llx+3.*w/8., lly+   h/2.],
                 [llx+5.*w/8.,lly+h/2.], [llx+7.*w/8., lly+   h/2.],
                 ]
-        
-        path = Path(vertices, codes)
-        patch = patches.PathPatch(path, facecolor='white', edgecolor=c)
 
-        ax.add_patch(patch)
+        if facecolor is None:
+            facecolor = ax.get_facecolor()
+        
+        ax.add_patch(
+            patches.PathPatch(Path(vertices, codes), facecolor=facecolor,
+            edgecolor=c)
+            )
         
     def __draw_storage_options(self, seg_busses, ax):
 
@@ -3346,11 +3350,11 @@ class SSimScreen(SSimBaseScreen):
 
         so_colors = {}
         bat_busses = {}
+        self.cindex = 0
                 
         for so in self.project.storage_options:
             so_colors[so] = self.colors[self.cindex]
             self.cindex = (self.cindex + 1) % len(self.colors)
-            
             for b in so.busses:
                 if b not in seg_busses: continue
                 if b not in bat_busses:
@@ -3361,19 +3365,27 @@ class SSimScreen(SSimBaseScreen):
         # we know where to draw each battery and what color to make them.
         for b, sos in bat_busses.items():
             bx, by = [seg_busses[b][0], seg_busses[b][1]]
-
-            # draw the first n-1 without text
-            for i in range(len(sos) - 1): 
-                self.__make_battery_patch(
-                    bx, by, 18, 8, so_colors[sos[i]], ax, i * 3, 5 + i * 3,
-                    False
-                    )
             
-            li = len(sos) - 1
-
-            self.__make_battery_patch(
-                bx, by, 18, 8, so_colors[sos[li]], ax, li * 3, 5 + li * 3
+            # draw the first n-1 without text
+            for i in range(len(sos)): self.__make_battery_patch(
+                bx, by, 18, 8, so_colors[sos[i]], ax, i * 3, 5 + i * 3                
                 )
+
+    def __make_plot_legend(self, ax):
+
+        # The legend will show the storage options defined and have an
+        # indicator of their color.
+        self.cindex = 0
+        custom_lines = []
+        names = []
+                        
+        for so in self.project.storage_options:
+            c = self.colors[self.cindex]
+            self.cindex = (self.cindex + 1) % len(self.colors)
+            names += [so.name]
+            custom_lines += [Line2D([0], [0], color=c, lw=4)]
+            
+        ax.legend(custom_lines, names)
 
     def refresh_grid_plot(self):
         gm = self.project.grid_model
@@ -3460,6 +3472,7 @@ class SSimScreen(SSimBaseScreen):
         
         if self.ids.show_storage_options.active:
             self.__draw_storage_options(seg_busses, ax)
+            self.__make_plot_legend(ax)
 
         if self.ids.show_bus_labels.active:
             for bus in seg_busses:
