@@ -3348,6 +3348,17 @@ class SSimScreen(SSimBaseScreen):
         # make a mapping of all busses to receive batteries to the storage
         # options that include them.  Also map colors to storage options.
 
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+
+        xdiff = xlim[1] - xlim[0]
+        ydiff = ylim[1] - ylim[0]
+
+        w = int(xdiff / 25.)
+        h = int(ydiff / 40.)
+        o = int(xdiff / 150.)
+        yo = int(ydiff / 65.)
+
         so_colors = {}
         bat_busses = {}
         self.cindex = 0
@@ -3368,7 +3379,7 @@ class SSimScreen(SSimBaseScreen):
             
             # draw the first n-1 without text
             for i in range(len(sos)): self.__make_battery_patch(
-                bx, by, 18, 8, so_colors[sos[i]], ax, i * 3, 5 + i * 3                
+                bx, by, w, h, so_colors[sos[i]], ax, i * o, yo + i * o                
                 )
 
     def __make_plot_legend(self, ax):
