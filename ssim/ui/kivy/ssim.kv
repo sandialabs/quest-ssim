@@ -1345,7 +1345,7 @@
                     color: 0,0,0,1
 
                 ScrollView:
-                    size_hint_y: 0.8
+                    size_hint_y: 1.5
                     canvas.before:
                         Color:
                             rgba: .5, .5, .5, 1
@@ -1353,26 +1353,42 @@
                             width: 2
                             rectangle: self.x, self.y, self.width, self.height
                     MDList:
-                        id: variable_list_detail
+                        id: variable_list_detail_axes_1
+                        size_hint_y: 1.5
+
+                ScrollView:
+                    size_hint_y: 1.5
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+                    MDList:
+                        id: variable_list_detail_axes_2
 
                 MDTextField:
                     id: detail_figure_title
-                    hint_text: 'Enter custom title ...'
+                    hint_text: 'Enter title ...'
 
                 MDTextField:
                     id: detail_figure_ylabel
-                    hint_text: 'Enter custom Y-axis label ...'
+                    hint_text: 'Enter Y-axis-1 label ...'
 
+                MDTextField:
+                    id: detail_figure_ylabel2
+                    hint_text: 'Enter Y-axis-2 label ...'
                 Button:
-                    size_hint_y: 0.1
+                    size_hint_y: 0.3
                     text: "Update Figure"
                     on_release: root.update_figure()
+                
                 Button:
-                    size_hint_y: 0.1
+                    size_hint_y: 0.3
                     text: "Clear Figure"
                     on_release: root.clear_figure()
                 Button:
-                    size_hint_y: 0.1
+                    size_hint_y: 0.3
                     text: "Save Figure"
                     on_release: root.save_figure_options()
 

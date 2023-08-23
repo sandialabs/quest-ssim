@@ -2809,7 +2809,9 @@ class ResultsDetailScreen(SSimBaseScreen):
         super().__init__(*args, **kwargs)
         self.current_configuration = None
         self.list_items = []
-        self.selected_list_items = {}
+        self.selected_list_items_axes_1 = {}
+        self.selected_list_items_axes_2 = {}
+        # self.selected_list_items = {}
         self.variable_data = pd.DataFrame()
         self.figure = None
 
@@ -2818,7 +2820,8 @@ class ResultsDetailScreen(SSimBaseScreen):
         ctr = 1
         for config in self.project.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
-            self.selected_list_items['Configuration ' + str(ctr)] = []
+            self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
+            self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
             ctr += 1
 
     def dismiss_popup(self):
@@ -2833,10 +2836,10 @@ class ResultsDetailScreen(SSimBaseScreen):
         matplotlib.Figure:
             Instance of matplotlib figure.
         """
-        fig = plt.figure()
-        plt.clf()
+        plt.style.use('ggplot')
+        fig, ax = plt.subplots(2, 1)
         project_results = self.project_results.results()
-        ctr = 1
+
         for result in project_results:
             # obtain pandas dataframe for storage states
             _, data_storage_state = result.storage_state()
@@ -2855,27 +2858,43 @@ class ResultsDetailScreen(SSimBaseScreen):
             config_key = self.config_id_to_name[config_dir]
             
             # columns to plot
-            columns_to_plot = self.selected_list_items[config_key]
-
+            columns_to_plot = self.selected_list_items_axes_1[config_key]
+            
             # select subset of data based on columns_to_plot
             selected_data = data[columns_to_plot]
             x_data = data.loc[:, 'time']
             
             # add the selected columns to plot
             for column in selected_data.keys():
-                plt.plot(x_data, selected_data[column], label=config_key + '-' + column)
-            ctr += 1
+                ax[0].plot(x_data, selected_data[column], label=config_key + '-' + column)
+      
+            # columns to plot
+            columns_to_plot = self.selected_list_items_axes_2[config_key]
+            # select subset of data based on columns_to_plot
+            selected_data = data[columns_to_plot]
 
-        plt.xlabel('time')
+            # add the selected columns to plot
+            for column in selected_data.keys():
+                ax[1].plot(x_data, selected_data[column], label=config_key + '-' + column)
 
         # update the y-axis labels
         if self.ids.detail_figure_ylabel.text is not None:
-            plt.ylabel(self.ids.detail_figure_ylabel.text)
-        plt.legend()
+            ax[0].set_ylabel(self.ids.detail_figure_ylabel.text)
+
+        if self.ids.detail_figure_ylabel2.text is not None:
+            ax[1].set_ylabel(self.ids.detail_figure_ylabel2.text)
+
+        # TODO: better locate the legends
+        ax[0].legend(loc='best')
+        ax[1].legend(loc='best')
+
         if self.ids.detail_figure_title is not None:
-            plt.title(self.ids.detail_figure_title.text)
+            fig.suptitle(self.ids.detail_figure_title.text, fontsize=14)
         else:
-            plt.title('Detail Plots')
+            fig.suptitle('Detail Plots')
+
+        ax[0].set_xlabel('time (s)')
+        ax[1].set_xlabel('time (s)')
 
         return fig
 
@@ -2964,11 +2983,21 @@ class ResultsDetailScreen(SSimBaseScreen):
         """Checks if at least one of the variables is selected from 
         the dropdown menus.
         """
-        for _, config_variables in self.selected_list_items.items():
+        list_item_axes1_empty = True
+        list_item_axes2_empty = True
+        for _, config_variables in self.selected_list_items_axes_1.items():
             if config_variables != []:
                 # at least one variable is selected, not empty
-                return False
-        return True
+                list_item_axes1_empty = False
+                # return False
+        for _, config_variables in self.selected_list_items_axes_2.items():
+            if config_variables != []:
+                list_item_axes2_empty = False
+
+        if not list_item_axes1_empty or not list_item_axes2_empty:
+            return False
+        else:
+            return True
 
     def clear_figure(self):
         """ Clears the detail figure from the UI canvas.
@@ -3000,7 +3029,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         ----------
         value_id : str
             Internal ID of the selected configuration.
-        filename : str
+        value_ui_id : str
             ID displayed in the UI of the selected configuration.
         """
         self.current_configuration = value_ui_id
@@ -3040,23 +3069,33 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             self.x_data = list(self.variable_data.loc[:, 'time'])
 
-            self.ids.variable_list_detail.clear_widgets()
+            self.ids.variable_list_detail_axes_1.clear_widgets()
+            self.ids.variable_list_detail_axes_2.clear_widgets()
+            
             # add the list of variables in the selected configuration
             # into the MDList
-
             for item in self.list_items:
                 # do not add 'time' to the variable list
                 if item == 'time':
                     continue
                 else:
-                    list_item = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-                    list_item.ids.selected.bind(active=self.on_item_check_changed)
-                    self.ids.variable_list_detail.add_widget(list_item)
-                
-                    if item in self.selected_list_items[self.current_configuration]:
-                        list_item.ids.selected.active = True
+                    list_item_axes_1 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
+                    list_item_axes_1.ids.selected.bind(active=self.on_item_check_changed_axes_1)
+                    self.ids.variable_list_detail_axes_1.add_widget(list_item_axes_1)
+
+                    list_item_axes_2 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
+                    list_item_axes_2.ids.selected.bind(active=self.on_item_check_changed_axes_2)
+                    self.ids.variable_list_detail_axes_2.add_widget(list_item_axes_2)
+                                    
+                    if item in self.selected_list_items_axes_1[self.current_configuration]:
+                        list_item_axes_1.ids.selected.active = True
                     else:
-                        list_item.ids.selected.active = False
+                        list_item_axes_1.ids.selected.active = False
+                    
+                    if item in self.selected_list_items_axes_2[self.current_configuration]:
+                        list_item_axes_2.ids.selected.active = True
+                    else:
+                        list_item_axes_2.ids.selected.active = False
 
             # close the drop-down menu
             self.menu.dismiss()
@@ -3065,12 +3104,12 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             Logger.debug('This configuration has not been evaluated')
 
-    def on_item_check_changed(self, ckb, value):
+    def on_item_check_changed_axes_1(self, ckb, value):
         """A callback function for the list items to use when their check 
         state changes.
 
         This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_list_items` 
+        the currently selected variable into `self.selected_list_items_axes_1` 
         if value is true and removes it if value is false.
 
         Parameters
@@ -3081,10 +3120,32 @@ class ResultsDetailScreen(SSimBaseScreen):
             The current check state of the check box (true = checked, false = unchecked).
         """
         if value:
-            if str(ckb.listItem.text) not in self.selected_list_items[str(self.current_configuration)]:
-                self.selected_list_items[str(self.current_configuration)].append(str(ckb.listItem.text))
+            if str(ckb.listItem.text) not in self.selected_list_items_axes_1[str(self.current_configuration)]:
+                self.selected_list_items_axes_1[str(self.current_configuration)].append(str(ckb.listItem.text))
         else:
-            self.selected_list_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
+            self.selected_list_items_axes_1[str(self.current_configuration)].remove(str(ckb.listItem.text))
+
+    # TODO: see if the same function can be resued
+    def on_item_check_changed_axes_2(self, ckb, value):
+        """A callback function for the list items to use when their check 
+        state changes.
+
+        This method looks at the current check state (value) and either adds 
+        the currently selected variable into `self.selected_list_items_axes_2` 
+        if value is true and removes it if value is false.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box (true = checked, false = unchecked).
+        """
+        if value:
+            if str(ckb.listItem.text) not in self.selected_list_items_axes_2[str(self.current_configuration)]:
+                self.selected_list_items_axes_2[str(self.current_configuration)].append(str(ckb.listItem.text))
+        else:
+            self.selected_list_items_axes_2[str(self.current_configuration)].remove(str(ckb.listItem.text))
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
