@@ -7,15 +7,17 @@ import itertools
 import json
 import logging
 import os
+import shutil
 import subprocess
 from os import path, makedirs
 from pathlib import Path, PurePosixPath
+import tempfile
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import pkg_resources
 import tomli
-from ssim import grid
+from ssim import dssutil, grid
 from ssim.metrics import MetricManager, MetricTimeAccumulator
 from ssim.opendss import DSSModel
 
@@ -236,9 +238,12 @@ class Project:
         m = hashlib.sha256()
 
         m.update(self.name.encode())
-        if self._grid_model_path is not None:
+
+        if self._grid_model is not None:
+            m.update(self._model_fingerprint.encode())
+        elif self._grid_model_path is not None:
             m.update(self._grid_model_path.encode())
-                
+
         self.storage_devices.sort(key=lambda x: x.name)
         for so in self.storage_devices:
             m.update(repr(hash(so)).encode())
@@ -250,7 +255,7 @@ class Project:
         for k, v in sorted(self._metricMgrs.items()):
             m.update(k.encode())
             m.update(repr(hash(v)).encode())
-            
+
         h = m.digest()
         return int.from_bytes(h, byteorder='big', signed=False)
 
@@ -331,8 +336,25 @@ class Project:
     def phases(self, bus):
         return self._grid_model.available_phases(bus)
 
+    @property
+    def _model_fingerprint(self):
+        if self._grid_model is None:
+            return ""
+        if self._grid_model_fingerprint is None:
+            self._grid_model_fingerprint = self._compute_model_fingerprint()
+        return self._grid_model_fingerprint
+
+    def _compute_model_fingerprint(self):
+        tmppath = tempfile.mkdtemp()
+        self._grid_model.export_model(tmppath)
+        fingerprint = dssutil.fingerprint(tmppath)
+        shutil.rmtree(tmppath)
+        return fingerprint
+
     def set_grid_model(self, model_path):
         self._grid_model_path = model_path
+        self._grid_model = None
+        self._grid_model_fingerprint = None
         if model_path and path.exists(model_path):
             self._grid_model = DSSModel(model_path)
 
