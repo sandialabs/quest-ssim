@@ -2574,6 +2574,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         matplotlib.Figure:
             Instance of matplotlib figure.
         """
+        plt.style.use('ggplot')
         metrics_fig = plt.figure()
         plt.clf()
         ctr = 1
