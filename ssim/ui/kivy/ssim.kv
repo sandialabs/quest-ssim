@@ -1450,7 +1450,26 @@
                                         rectangle: self.x, self.y, self.width, self.height
                                 MDList:
                                     id: metrics_list
-  
+                            
+                            BoxLayout:
+                                id: voltage_controls
+                                orientation: "horizontal"
+                                size_hint_y: None
+                                height: 30
+
+                                MDLabel:
+                                    id: show_voltage_overlay
+                                    size_hint_x: None
+                                    width: 135
+                                    text: "Show Bus Voltage"
+
+                                CheckBox:
+                                    id: show_bus_voltages
+                                    size_hint_x: None
+                                    width: 30
+                                    active: False
+                                    on_active: root.changed_show_voltage(self.active)
+
                 BoxLayout:
                     orientation: "vertical"
                     padding: 5
@@ -1458,9 +1477,6 @@
                     MDTextField:
                         id: detail_figure_title
                         hint_text: 'Enter custom title ...'
-                    MDTextField:
-                        id: detail_figure_ylabel
-                        hint_text: 'Enter custom Y-axis label ...'
                     Button:
                         size_hint_y: 0.1
                         text: "Update Figure"

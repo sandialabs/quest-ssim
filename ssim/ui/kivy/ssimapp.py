@@ -2553,6 +2553,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # stores the current configuration selected from the dropdown menu
         self.current_configuration = None
         self.metrics_figure = None
+        self._show_voltage_status = False
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
@@ -2576,8 +2577,12 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         """
         plt.style.use('ggplot')
         metrics_fig = plt.figure()
-        plt.clf()
-        ctr = 1
+        if self._show_voltage_status:
+            gs = metrics_fig.add_gridspec(2, hspace=0.05)
+        else:
+            gs = metrics_fig.add_gridspec(1, hspace=0.05)
+        axs = gs.subplots(sharex=True)
+
         for result in self.project_results.results():
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
 
@@ -2586,31 +2591,41 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             _, accumulated_metric, data_metrics = result.metrics_log()
             config_key = self.config_id_to_name[config_dir]
 
+            # obtain voltages
+            _, all_bus_voltages = result.bus_voltages()
+            
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
+            Logger.debug(columns_to_plot)
 
             # select the susbset of data based on 'columns_to_plot'
             selected_data = data_metrics[columns_to_plot]
             x_data = data_metrics.loc[:, 'time']
+            x_data_voltage = all_bus_voltages.loc[:, 'time']
+            all_bus_voltages.drop(["time"], axis=1, inplace=True)
 
             # add the selected columns to the plot
             for column in selected_data.keys():
-                plt.plot(x_data, selected_data[column], 
-                         label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                if self._show_voltage_status:
+                    axs[0].plot(x_data, selected_data[column], 
+                                label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                    axs[1].plot(x_data_voltage, all_bus_voltages[column], 
+                                label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                    axs[0].set(ylabel='Voltage Metric')
+                    axs[1].set(ylabel='Voltage [p.u.]')
+                else:
+                    axs.plot(x_data, selected_data[column],
+                             label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                    axs.set(ylabel='Voltage Metric')
 
-            ctr += 1
+        plt.legend()
         
         # x-axis label will always be time and seconds by default
-        plt.xlabel('time [s]')
-        # update y-axis label based on user input
-        if self.ids.detail_figure_ylabel.text is not None:
-            plt.ylabel(self.ids.detail_figure_ylabel.text)
-        plt.legend()
+        metrics_fig.supxlabel('time [s]')
+        
         # update the title based on user input
         if self.ids.detail_figure_title.text is not None:
-            plt.title(self.ids.detail_figure_title.text)
-        else:
-            plt.title('Metrics Plots')
+            metrics_fig.suptitle(self.ids.detail_figure_title.text)
 
         return metrics_fig
 
@@ -2623,12 +2638,18 @@ class ResultsVisualizeScreen(SSimBaseScreen):
                                    'Please select metrics(s) from the \
                                     dropdown menu to update the plot.')
         else:
+            plt.clf()
             self.metrics_figure = self._create_metrics_figure()
             # Add kivy widget to the canvas
             self.ids.summary_canvas.clear_widgets()
             self.ids.summary_canvas.add_widget(
                 FigureCanvasKivyAgg(self.metrics_figure)
             )
+
+    def changed_show_voltage(self, active_state):
+        Logger.debug('Show bus voltage checked!')
+        Logger.debug(active_state)
+        self._show_voltage_status = active_state
 
     def clear_metrics_figure(self):
         """ Clears the metrics figure from the UI canvas.
