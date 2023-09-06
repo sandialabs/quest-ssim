@@ -2553,7 +2553,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # stores the current configuration selected from the dropdown menu
         self.current_configuration = None
         self.metrics_figure = None
-        self._show_voltage_status = False
+        self._show_voltage_status = True
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
@@ -2593,10 +2593,9 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
             # obtain voltages
             _, all_bus_voltages = result.bus_voltages()
-            
+
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
-            Logger.debug(columns_to_plot)
 
             # select the susbset of data based on 'columns_to_plot'
             selected_data = data_metrics[columns_to_plot]
