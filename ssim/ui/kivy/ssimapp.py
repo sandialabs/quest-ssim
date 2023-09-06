@@ -2858,8 +2858,20 @@ class ResultsDetailScreen(SSimBaseScreen):
         matplotlib.Figure:
             Instance of matplotlib figure.
         """
+        # keep track of whether items are selected from the second list
+        _second_list_selected = any(self.selected_list_items_axes_2.values())
+        
+        # use the ggplot theme
         plt.style.use('ggplot')
-        fig, ax = plt.subplots(2, 1)
+
+        # create subplots based on whether items are selected from 
+        # the second list
+        if _second_list_selected:
+            fig, ax = plt.subplots(2, 1)
+        else:
+            fig, ax = plt.subplots(1, 1)
+        
+        # get the project results
         project_results = self.project_results.results()
 
         for result in project_results:
@@ -2887,36 +2899,52 @@ class ResultsDetailScreen(SSimBaseScreen):
             x_data = data.loc[:, 'time']
             
             # add the selected columns to plot
-            for column in selected_data.keys():
-                ax[0].plot(x_data, selected_data[column], label=config_key + '-' + column)
-      
-            # columns to plot
-            columns_to_plot = self.selected_list_items_axes_2[config_key]
-            # select subset of data based on columns_to_plot
-            selected_data = data[columns_to_plot]
+            if _second_list_selected:
+                for column in selected_data.keys():
+                    ax[0].plot(x_data, selected_data[column], label=config_key + '-' + column)
+            else:
+                for column in selected_data.keys():
+                    ax.plot(x_data, selected_data[column], label=config_key + '-' + column)
 
-            # add the selected columns to plot
-            for column in selected_data.keys():
-                ax[1].plot(x_data, selected_data[column], label=config_key + '-' + column)
+            if _second_list_selected:
+                # columns to plot
+                columns_to_plot = self.selected_list_items_axes_2[config_key]
+                # select subset of data based on columns_to_plot
+                selected_data = data[columns_to_plot]
+
+                # add the selected columns to plot
+                for column in selected_data.keys():
+                    ax[1].plot(x_data, selected_data[column], label=config_key + '-' + column)
 
         # update the y-axis labels
         if self.ids.detail_figure_ylabel.text is not None:
-            ax[0].set_ylabel(self.ids.detail_figure_ylabel.text)
+            if _second_list_selected:
+                ax[0].set_ylabel(self.ids.detail_figure_ylabel.text)
+            else:
+                ax.set_ylabel(self.ids.detail_figure_ylabel.text)
 
-        if self.ids.detail_figure_ylabel2.text is not None:
-            ax[1].set_ylabel(self.ids.detail_figure_ylabel2.text)
-
-        # TODO: better locate the legends
-        ax[0].legend(loc='best')
-        ax[1].legend(loc='best')
+        if _second_list_selected:
+            if self.ids.detail_figure_ylabel2.text is not None:
+                ax[1].set_ylabel(self.ids.detail_figure_ylabel2.text)
 
         if self.ids.detail_figure_title is not None:
             fig.suptitle(self.ids.detail_figure_title.text, fontsize=14)
         else:
             fig.suptitle('Detail Plots')
+        
+        # add x-labels
+        if _second_list_selected:
+            ax[0].set_xlabel('time (s)')
+            ax[1].set_xlabel('time (s)')
+        else:
+            ax.set_xlabel('time (s)')
 
-        ax[0].set_xlabel('time (s)')
-        ax[1].set_xlabel('time (s)')
+        # add legends
+        if _second_list_selected:
+            ax[0].legend(loc='best')
+            ax[1].legend(loc='best')
+        else:
+            ax.legend(loc='best')
 
         return fig
 
