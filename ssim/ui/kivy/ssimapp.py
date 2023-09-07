@@ -220,7 +220,6 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
-        self.project_results = ProjectResults(self.project)
         self.configurations: List[Configuration] = []
         self.configurations_to_eval: List[Configuration] = []
         self.config_id_to_name= {} # sets up concrete mappings
@@ -2400,7 +2399,7 @@ class RunSimulationScreen(SSimBaseScreen):
         self.configurations_to_eval = []
         for wid in self.ids.config_list.children:
             if wid.selected:
-                self.configurations_to_eval.append(self.configurations[ctr])
+                self.configurations_to_eval.append(self.configurations[ctr].id)
             ctr = ctr - 1
         # run all the configurations
         Logger.debug("===================================")
@@ -2501,7 +2500,7 @@ class RunSimulationScreen(SSimBaseScreen):
         # update the configurations that are currently selected for 
         # evaluation
         self._update_configurations_to_eval()
-        
+
     def _evaluate(self):
         """Initiates evaluation of configurations that are currelty selected.
         """
@@ -2511,7 +2510,9 @@ class RunSimulationScreen(SSimBaseScreen):
         self._update_configurations_to_eval()
 
         # step 2: evaluate the selected configurations
-        for config in self.configurations_to_eval:
+        for config in checkpoint.configurations():
+            if config.id not in self.configurations_to_eval:
+                continue
             if self._canceled:
                 Logger.debug("evaluation canceled")
                 break
@@ -2549,12 +2550,15 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.project_results = self.project.results()
         # keeps track of metrics that have been selected for plotting
         self.selected_metric_items = {}
         # stores the current configuration selected from the dropdown menu
         self.current_configuration = None
         self.metrics_figure = None
+
+    @property
+    def project_results(self):
+        return self.project.current_checkpoint.results()
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
@@ -2818,7 +2822,7 @@ class ResultsDetailScreen(SSimBaseScreen):
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
         ctr = 1
-        for config in self.project.configurations():
+        for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_list_items['Configuration ' + str(ctr)] = []
             ctr += 1
@@ -2837,7 +2841,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         """
         fig = plt.figure()
         plt.clf()
-        project_results = self.project_results.results()
+        project_results = self.project.current_checkpoint.results()
         ctr = 1
         for result in project_results:
             # obtain pandas dataframe for storage states
