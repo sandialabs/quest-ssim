@@ -96,9 +96,9 @@ class ProjectCheckpoint:
 
     def __init__(self, project: Project, version_manager: VersionManager):
         self.project = copy(project)
-        self.version = version_manager
         self._project_hash = hash(self.project)
-        self.checkpoint_dir = self.version.checkpoint_dir(self._project_hash)
+        self.version_manager = version_manager
+        self.checkpoint_dir = version_manager.checkpoint_dir(self._project_hash)
 
     @property
     def grid_model_dir(self):
@@ -110,21 +110,27 @@ class ProjectCheckpoint:
         The checkpoint is saved in the directory specified by the
         :py:class:`VersionManager`.
         """
-        os.makedirs(self.checkpoint_dir)
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
         self.project.export_grid_model(self.grid_model_dir)
-        self.project.set_grid_model(self.grid_model_dir / "master.DSS")
-        self.project.version = self.version.version(self._project_hash)
+        self.project.set_grid_model(str(self.grid_model_dir / "master.DSS"))
+        self.project.version = self.version_manager.version(self._project_hash)
         with open(self.checkpoint_dir / "project.toml", "w") as f:
             f.write(self.project.write_toml())
 
     @classmethod
     def version(cls, p):
-        with open(os.path.join(p, "project.toml"), "r") as f:
+        with open(os.path.join(p, "project.toml"), "rb") as f:
             try:
                 proj = tomli.load(f)
             except tomli.TOMLDecodeError:
                 return None
             return proj.get("version")
+
+    def configurations(self):
+        return self.project.configurations()
+
+    def results(self):
+        return self.project.results()
 
 
 class VersionManager:
@@ -151,7 +157,9 @@ class VersionManager:
     def is_checkpointed(self, project_hash):
         """Return True if a checkpoint project version with hash `project_hash`
         exists."""
-        if os.path.exists(self.checkpoint_dir(project_hash)):
+        if os.path.exists(
+            os.path.join(self.checkpoint_dir(project_hash), "project.toml")
+        ):
             return True
         return False
 
@@ -159,12 +167,17 @@ class VersionManager:
         p = os.path.join(self.basedir, name)
         if not os.path.isdir(p):
             return None
-        return ProjectCheckpoint.version(p)
+        try:
+            return ProjectCheckpoint.version(p)
+        except FileNotFoundError:
+            return None
 
     @property
     def all_versions(self):
         """A dictionary mapping checkpointed hashes to version numbers."""
         versions = {}
+        if not os.path.exists(self.basedir):
+            return versions
         for p in os.listdir(self.basedir):
             v = self._get_version(p)
             if v is not None:
@@ -182,7 +195,7 @@ class VersionManager:
         project : Project
         """
         if not self.is_checkpointed(project_hash):
-            return max(self.all_versions.values()) + 1
+            return max((0, *self.all_versions.values())) + 1
         return self.all_versions[project_hash]
 
 
@@ -200,6 +213,7 @@ class Project:
         self.reliability_params = _DEFAULT_RELIABILITY
         self.version = version
         self._version_manager = VersionManager(name)
+        self._current_checkpoint = None
 
     def __eq__(self, other):
 
@@ -262,6 +276,16 @@ class Project:
     def export_grid_model(self, dest):
         self._grid_model.export_model(dest)
 
+    @property
+    def current_checkpoint(self):
+        if self._current_checkpoint is None:
+            self._current_checkpoint = ProjectCheckpoint(
+                self, self._version_manager)
+        if hash(self) != hash(self._current_checkpoint.project):
+            self._current_checkpoint = ProjectCheckpoint(
+                self, self._version_manager)
+        return self._current_checkpoint
+
     def save_checkpoint(self):
         """Save a checkpoint of the current project state.
 
@@ -270,6 +294,7 @@ class Project:
         """
         h = hash(self)
         checkpoint = ProjectCheckpoint(self, self._version_manager)
+        self._current_checkpoint = checkpoint
         if self._version_manager.is_checkpointed(h):
             return checkpoint
         checkpoint.save()
@@ -369,6 +394,7 @@ class Project:
         """
         ret = "[Project]\n"
         ret += f"name = \'{self.name}\'\n"
+        ret += f"version = {self.version}\n"
         ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
 
         ret += self._reliability_to_toml()
@@ -394,6 +420,7 @@ class Project:
         projdict = tomlData["Project"]
         self.name = projdict["name"]
         self.set_grid_model(projdict["grid_model_path"])
+        self._current_checkpoint = None
 
         sodict = tomlData["storage-options"]
         for sokey in sodict:

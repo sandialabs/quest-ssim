@@ -2813,7 +2813,6 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.current_configuration = None
         self.list_items = []
         self.selected_list_items = {}
         self.variable_data = pd.DataFrame()
@@ -2841,7 +2840,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         """
         fig = plt.figure()
         plt.clf()
-        project_results = self.project.current_checkpoint.results()
+        project_results = self.project.current_checkpoint.results().results()
         ctr = 1
         for result in project_results:
             # obtain pandas dataframe for storage states
@@ -3018,7 +3017,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         # this will allows the results to be mapped with 
         # corresponding configurations
         simulation_results = {}
-        for result in self.project_results.results():
+        for result in self.project.current_checkpoint.results().results():
             # configuraiton directory of the result
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
             simulation_results[config_dir] = result
