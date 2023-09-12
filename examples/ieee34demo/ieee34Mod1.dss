@@ -239,7 +239,8 @@ Load.d844_846rc.vminpu=.85
 Load.d846_848sb.vminpu=.85
 Load.d846_848rb.vminpu=.85
 
-
 ! let the DSS estimate voltage bases automatically
 Set VoltageBases = "69,24.9,4.16, .48"
 CalcVoltageBases
+
+BusCoords IEEE34Node_BusXY_JE.csv
