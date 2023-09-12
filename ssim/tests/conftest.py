@@ -610,6 +610,11 @@ def grid_model_path(model_dir, irradiance_path, wind_path, triangle_path):
 
 
 @pytest.fixture(scope="session")
+def grid_definition():
+    return _SIMPLE_DSS
+
+
+@pytest.fixture(scope="session")
 def triangle_data():
     return _TRIANGLE
 

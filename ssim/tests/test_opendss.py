@@ -1,10 +1,12 @@
 """Tests for ssim.opendss"""
+import csv
 import math
 import os.path
 from pathlib import Path
 import pytest
 import opendssdirect as dssdirect
 from ssim import opendss, dssutil, grid
+import glob
 
 
 @pytest.fixture(scope='function')
@@ -375,3 +377,41 @@ def test_Storage_next_state_change(test_circuit_with_storage):
     change = storage.state_change()
     test_circuit_with_storage.solve(time + change)
     assert storage.soc == pytest.approx(1.0)
+
+
+def test_export_model(test_circuit, model_dir, tmp_path_factory, wind_data):
+    export_dir = tmp_path_factory.mktemp("export_dir")
+    test_circuit.export_model(export_dir)
+    dssutil.run_command("clear")
+    assert "" == dssutil.run_command(
+        f"redirect {str(export_dir / 'master.dss')}")
+    with open(export_dir / "zavwind.csv", 'r') as f:
+        reader = csv.reader(f)
+        data = tuple(map(float, (row[0] for row in reader)))
+    assert data == wind_data
+    dssutil.run_command("solve")
+
+
+def test_export_model_datafile_abspath(tmp_path_factory,
+                                       grid_definition,
+                                       wind_data,
+                                       model_dir):
+    gd = grid_definition.replace(
+        "zavwind.csv",
+        str(model_dir.absolute() / "zavwind.csv")
+    )
+    with open(model_dir / "main.dss", 'w') as f:
+        f.write(gd)
+    export_dir = tmp_path_factory.mktemp("export_dir")
+    starting_model = opendss.DSSModel(model_dir / "main.dss")
+    starting_model.export_model(export_dir)
+    dssutil.run_command("clear")
+    assert "" == dssutil.run_command(
+        f"redirect {str(export_dir / 'master.dss')}")
+    dssutil.run_command("solve")
+    csvfiles = list(glob.glob(str(export_dir / "*.csv")))
+    assert len(csvfiles) == 1
+    with open(csvfiles[0], 'r') as f:
+        reader = csv.reader(f)
+        data = tuple(map(float, (row[0] for row in reader)))
+    assert data == wind_data

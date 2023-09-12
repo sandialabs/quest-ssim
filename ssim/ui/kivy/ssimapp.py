@@ -23,6 +23,7 @@ from importlib_resources import files, as_file
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.logger import Logger, LOG_LEVELS
+from kivy.metrics import dp
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
@@ -2720,14 +2721,38 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         menu_items = []
         for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
+            secondary_detail_text = []
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+
+            for i, config in enumerate(self.project.configurations()):
+                if config_ui_id == f'Configuration {i+1}':
+                    for storage in config.storage:
+                        if storage is not None:
+                            secondary_detail_text.append(
+                                f"name: {storage.name}, bus: {storage.bus}")
+                            tertiary_detail_text.append(
+                                f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+                        else:
+                            secondary_detail_text.append('no storage')
+
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
+
             menu_items.append({
-                "viewclass": "OneLineListItem",
+                "viewclass": "ThreeLineListItem",
                 "text": display_text,
+                "height": dp(90),
+                "secondary_text": final_secondary_text,
+                "tertiary_text": final_tertiary_text,
                 "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
             })
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.config_list_detail_metrics, items=menu_items, width_mult=5
+            caller=self.ids.config_list_detail_metrics, 
+            items=menu_items, 
+            width_mult=10
         )
         self.menu.open()
 
@@ -2851,12 +2876,22 @@ class ResultsDetailScreen(SSimBaseScreen):
             _, data_storage_voltage = result.storage_voltages()
             data_storage_voltage.drop(['time'], axis=1, inplace=True)
 
+            _, all_bus_voltage = result.bus_voltages()
+            all_bus_voltage.drop(["time"], axis=1, inplace=True)
+            # rename the columns
+            all_bus_voltage.columns = [
+                col + '_bus_voltage' for col in all_bus_voltage.columns
+            ]
+
             # rename the 'data_storage_voltage' by appending '_voltage' to each header
             new_col_names = [item + '_voltage' for item in data_storage_voltage.columns]
             data_storage_voltage.columns = new_col_names
 
             # combine all data into a single dataframe
-            data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
+            data = pd.concat(
+                [data_storage_state, data_storage_voltage, all_bus_voltage],
+                axis=1
+            )
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
             config_key = self.config_id_to_name[config_dir]
             
@@ -2981,20 +3016,61 @@ class ResultsDetailScreen(SSimBaseScreen):
         """
         self.ids.detail_plot_canvas.clear_widgets()
 
+    # def drop_config_menu(self):
+    #     """Displays the dropdown menu in the visualization screen.
+    #     """
+    #     menu_items = []
+    #     for config_id, config_ui_id in self.config_id_to_name.items():
+    #         display_text = config_ui_id
+    #         menu_items.append({
+    #             "viewclass": "OneLineListItem",
+    #             "text": display_text,
+    #             "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
+    #         })
+
+    #     self.menu = MDDropdownMenu(
+    #         caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+    #     )
+    #     self.menu.open()
+
     def drop_config_menu(self):
         """Displays the dropdown menu in the visualization screen.
         """
         menu_items = []
         for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
+            secondary_detail_text = []
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+
+            for i, config in enumerate(self.project.configurations()):
+                if config_ui_id == f'Configuration {i+1}':
+                    for storage in config.storage:
+                        if storage is not None:
+                            secondary_detail_text.append(
+                                f"name: {storage.name}, bus: {storage.bus}")
+                            tertiary_detail_text.append(
+                                f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+                        else:
+                            secondary_detail_text.append('no storage')
+
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
+
             menu_items.append({
-                "viewclass": "OneLineListItem",
+                "viewclass": "ThreeLineListItem",
                 "text": display_text,
-                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
+                "height": dp(90),
+                "secondary_text": final_secondary_text,
+                "tertiary_text": final_tertiary_text,
+                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
             })
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+            caller=self.ids.config_list_detail, 
+            items=menu_items, 
+            width_mult=10
         )
         self.menu.open()
 
@@ -3030,6 +3106,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             # extract the data
             storage_state_headers, storage_state_data = current_result.storage_state()
             storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
+            bus_voltage_headers, bus_voltage_data = current_result.bus_voltages()
             
             # remove 'time' from the header list and pandas data frame to prevent
             # duplication
@@ -3037,12 +3114,24 @@ class ResultsDetailScreen(SSimBaseScreen):
                 storage_voltage_headers.pop(0)
             storage_voltage_data.drop(['time'], axis=1, inplace=True)
 
+            if bus_voltage_headers is not None:
+                bus_voltage_headers.pop(0)
+            bus_voltage_data.drop(['time'], axis=1, inplace=True)
+
             # 'storage_voltage_headers' have no indication that these labels
             # represent voltage, append string '_voltage' to each label
-            storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]                                                                                                                            
-            
-            self.list_items = storage_state_headers + storage_voltage_headers
-            self.variable_data = pd.concat([storage_state_data, storage_voltage_data], axis=1)
+            storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]
+            bus_voltage_headers = [item + '_bus_voltage' for item in bus_voltage_headers]
+
+            self.list_items = (
+                storage_state_headers
+                + storage_voltage_headers
+                + bus_voltage_headers
+            )
+            self.variable_data = pd.concat(
+                [storage_state_data, storage_voltage_data, bus_voltage_data],
+                axis=1
+            )
 
             self.x_data = list(self.variable_data.loc[:, 'time'])
 
