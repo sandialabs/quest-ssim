@@ -8,6 +8,7 @@
 #:set ssim_light_blue (0.68, 0.85, 0.90, 1.0)
 
 <MatlabPlotBox>
+    orientation: "vertical"
     pos_hint: {"top":1}
 
 <SSimScreen>:
@@ -89,7 +90,7 @@
                 MDLabel
                     id: grid_model_label
                     size_hint_y: None
-                    height: 25
+                    height: 50
                     text: "Grid Model:"
 
                 MatlabPlotBox:

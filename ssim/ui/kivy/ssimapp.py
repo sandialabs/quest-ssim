@@ -9,7 +9,9 @@ from threading import Thread
 from typing import List
 
 import kivy
+import numpy as np
 import matplotlib as mpl
+mpl.use('module://kivy.garden.matplotlib.backend_kivy')
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -17,6 +19,7 @@ import matplotlib.patches as patches
 import matplotlib.colors as mplcolors
 
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+import dss.plot
 import opendssdirect as dssdirect
 import pandas as pd
 from importlib_resources import files, as_file
@@ -66,7 +69,7 @@ import inspect
 kivy.garden.garden_system_dir = os.path.join(
     os.path.dirname(inspect.getfile(ssim.ui)), "libs/garden"
 )
-from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg, NavigationToolbar2Kivy
 
 _FONT_FILES = {
     "exo_regular": "Exo2-Regular.ttf",
@@ -241,7 +244,12 @@ class MatlabPlotBox(BoxLayout):
         """Clears the current diagram widget and draws a new one using the
         current figure (plt.gcf())"""
         self.clear_widgets()
-        self.add_widget(FigureCanvasKivyAgg(plt.gcf()))
+        fig = plt.gcf()
+        canvas = FigureCanvasKivyAgg(fig)
+        #nav = NavigationToolbar2Kivy(canvas)
+        #nav.actionbar.color = "white"
+        self.add_widget(canvas)
+        #self.add_widget(nav.actionbar)
 
     def display_plot_error(self, msg):
         """Puts a label with a supplied message in place of the diagram when
@@ -966,7 +974,7 @@ class VoltVarTabContent(BoxLayout):
             _make_xy_matlab_plot(
                 self.ids.plot_box, xs, ys, 'Voltage (p.u.)',
                 'Reactive Power (p.u.)', 'Volt-Var Control Parameters'
-            )
+                )
 
 
 class VoltWattTabContent(BoxLayout):
@@ -3240,7 +3248,11 @@ class SSimScreen(SSimBaseScreen):
     colors = list(mplcolors.TABLEAU_COLORS.keys())
 
     cindex = 0
-
+    curr_x_min = 0.0
+    curr_x_max = 0.0
+    curr_y_min = 0.0
+    curr_y_max = 0.0
+    
     def on_kv_post(self, base_widget):
         self.refresh_grid_plot()
 
@@ -3386,7 +3398,8 @@ class SSimScreen(SSimBaseScreen):
         self.refresh_grid_plot()
         
     def changed_show_storage_options(self, active_state):
-        self.refresh_grid_plot()
+        if len(self.project.storage_options) > 0:
+            self.refresh_grid_plot()
         
     def getImage(self, path):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
@@ -3395,9 +3408,11 @@ class SSimScreen(SSimBaseScreen):
         self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5.,
         facecolor = None, incl_plus_minus = True
         ):
+        
+        xpix, ypix = ax.transData.transform((x, y)).T
 
-        llx = x + xoffset - w/2.
-        lly = y + yoffset
+        llx = xpix + xoffset - w/2.
+        lly = ypix + yoffset
         
         # Start with main rectangle.
         codes = [Path.MOVETO] + [Path.LINETO]*4
@@ -3426,32 +3441,37 @@ class SSimScreen(SSimBaseScreen):
 
         if facecolor is None:
             facecolor = ax.get_facecolor()
-        
+
+        #transform the patch vertices back to data coordinates.
+        inv = ax.transData.inverted()
+        tverts = inv.transform(vertices)
+
         ax.add_patch(
-            patches.PathPatch(Path(vertices, codes), facecolor=facecolor,
+            patches.PathPatch(Path(tverts, codes), facecolor=facecolor,
             edgecolor=c)
             )
         
-    def __draw_storage_options(self, seg_busses, ax):
-
+    def __draw_storage_options(self, ax):
+                
+        gm = self.project.grid_model
+        
         # make a mapping of all busses to receive batteries to the storage
         # options that include them.  Also map colors to storage options.
 
-        xlim = ax.get_xlim()
+        # Without getting the limits here, things don't draw right.  IDK why.
         ylim = ax.get_ylim()
 
-        xdiff = xlim[1] - xlim[0]
-        ydiff = ylim[1] - ylim[0]
-
-        w = int(xdiff / 25.)
-        h = int(ydiff / 40.)
-        o = int(xdiff / 150.)
-        yo = int(ydiff / 65.)
+        w = 12
+        h = 6 
+        o = 2
+        yo = 4
 
         so_colors = {}
         bat_busses = {}
         self.cindex = 0
                 
+        seg_busses = self.__get_line_segment_busses(gm)
+        
         for so in self.project.storage_options:
             so_colors[so] = self.colors[self.cindex]
             self.cindex = (self.cindex + 1) % len(self.colors)
@@ -3466,12 +3486,14 @@ class SSimScreen(SSimBaseScreen):
         for b, sos in bat_busses.items():
             bx, by = [seg_busses[b][0], seg_busses[b][1]]
             
-            # draw the first n-1 without text
             for i in range(len(sos)): self.__make_battery_patch(
                 bx, by, w, h, so_colors[sos[i]], ax, i * o, yo + i * o                
                 )
 
     def __make_plot_legend(self, ax):
+
+        if len(self.project.storage_options) == 0:
+            return    
 
         # The legend will show the storage options defined and have an
         # indicator of their color.
@@ -3482,13 +3504,166 @@ class SSimScreen(SSimBaseScreen):
         for so in self.project.storage_options:
             c = self.colors[self.cindex]
             self.cindex = (self.cindex + 1) % len(self.colors)
-            names += [so.name]
+            names += [so.name + f" ({len(so.busses)})"]
             custom_lines += [Line2D([0], [0], color=c, lw=4)]
             
         ax.legend(custom_lines, names)
 
-    def refresh_grid_plot(self):
+    def __get_line_segments(self, gm):
+        lines = gm.line_names
+        if len(lines) == 0: return None
+        
+        return [line for line in gm.line_names
+            if (0., 0.) not in self.line_bus_coords(line)]
+    
+    def __get_line_segment_busses(self, gm, seg_lines=None):
+        if seg_lines is None:
+            seg_lines = self.__get_line_segments(gm)
+        
+        seg_busses = {}
+        
+        if len(seg_lines) == 0:
+            busses = gm.bus_names
+            if len(busses) == 0:
+                return None
+            
+            for bus in busses:
+                bc = self.bus_coords(bus)
+                seg_busses[self.get_raw_bus_name(bus)] = bc
+        else:            
+            for line in seg_lines:
+                bus1, bus2 = self.line_busses(line)
+                bc1 = self.bus_coords(bus1)
+                bc2 = self.bus_coords(bus2)
+                seg_busses[self.get_raw_bus_name(bus1)] = bc1
+                seg_busses[self.get_raw_bus_name(bus2)] = bc2
+
+        return seg_busses
+    
+    def compute_plot_limits(self):
+        return (
+            self.curr_x_min - 0.05 * (self.curr_x_max - self.curr_x_min),
+            self.curr_x_max + 0.05 * (self.curr_x_max - self.curr_x_min),
+            self.curr_y_min - 0.05 * (self.curr_y_max - self.curr_y_min),
+            self.curr_y_max + 0.05 * (self.curr_y_max - self.curr_y_min)
+            )
+
+    def set_plot_limits(self, lims = None):
+        ax = plt.gca()
+        if lims is None:
+            lims = self.compute_plot_limits()        
+        ax.set_xlim(lims[0], lims[1])
+        ax.set_ylim(lims[2], lims[3])
+
+    def draw_plot_using_dss_plot(self):        
         gm = self.project.grid_model
+        
+        if gm is None:
+            self.ids.grid_diagram.display_plot_error(
+                "There is no current grid model."
+                )
+            return
+
+        plt.clf()
+
+        dss.plot.enable(show=False)
+        dssdirect.Text.Command('redirect ' + gm._model_file)
+        #dssdirect.Solution.Solve()
+        label_txt = " Labels=Yes" if self.ids.show_bus_labels.active else ""
+        dssdirect.Text.Command('plot circuit dots=Yes' + label_txt)
+
+        plt.title('')
+        plt.xticks([])
+        plt.yticks([])
+        plt.xlabel('')
+        plt.ylabel('')        
+        
+        #fig, ax = plt.subplots()
+        ax = plt.gca()
+        fig = plt.gcf()
+        ax.axis("off")
+        
+        blocs = self.__get_bus_marker_locations()
+        if blocs is None:            
+            self.ids.grid_diagram.display_plot_error(
+                "Bus locations are not known so no meaningful plot can be " +
+                "produced."
+                )
+            return
+        
+        x, y = blocs
+        # Without doing the scatter here, things don't draw right.  IDK why.
+        ax.scatter(x, y, marker="None")
+        
+        if self.ids.show_storage_options.active:
+            self.__draw_storage_options(ax)
+            self.__make_plot_legend(ax)
+                   
+        fig.tight_layout()
+
+        self.curr_x_min, self.curr_x_max = (min(x), max(x))
+        self.curr_y_min, self.curr_y_max = (min(y), max(y))
+        self.set_plot_limits()
+
+        ax.callbacks.connect('ylim_changed', self.axis_limit_changed)
+        self.ids.grid_diagram.reset_plot()
+        
+    def axis_limit_changed(self, ax):
+        lims = self.compute_plot_limits()
+        cxlims = ax.get_xlim()
+        cylims = ax.get_ylim()
+        
+        if cxlims[0] != lims[0] or \
+           cxlims[1] != lims[1] or \
+           cylims[0] != lims[2] or \
+           cylims[1] != lims[3]: self.set_plot_limits()
+        
+    def __get_bus_marker_locations(self):
+        gm = self.project.grid_model
+        
+        if gm is None:
+            self.ids.grid_diagram.display_plot_error(
+                "There is no current grid model."
+                )
+            return
+        
+        lines = gm.line_names
+        busses = gm.bus_names
+        
+        if len(lines) == 0 and len(busses) == 0:
+            self.ids.grid_diagram.display_plot_error(
+                "There are no lines and no busses in the current grid model."
+                )
+            return
+        
+        plotlines = len(lines) > 0
+        
+        seg_lines = self.__get_line_segments(gm)
+        seg_busses = self.__get_line_segment_busses(gm, seg_lines)
+        
+        if plotlines:
+            
+            line_segments = [self.line_bus_coords(line) for line in seg_lines]
+            
+            if len(line_segments) == 0:
+                self.ids.grid_diagram.display_plot_error(
+                    "There are lines but their bus locations are not known " +
+                    "so no meaningful plot can be produced."
+                    )
+                return
+                        
+            return zip(*[(x, y) for seg in line_segments for x, y in seg])
+
+        else:
+            return ([seg_busses[bus][0] for bus in seg_busses], 
+                [seg_busses[bus][1] for bus in seg_busses])
+    
+    def refresh_grid_plot(self):
+        self.draw_plot_using_dss_plot()
+        return
+    
+        gm = self.project.grid_model
+        
         plt.clf()
 
         if gm is None:
@@ -3509,22 +3684,12 @@ class SSimScreen(SSimBaseScreen):
         # Start by plotting the lines if there are any.  Note that if there are
         # lines, there must be busses but the opposite may not be true.
         plotlines = len(lines) > 0
-
-        seg_busses = {}
-        
+                
         fig, ax = plt.subplots()
+        
+        seg_lines = self.__get_line_segments(gm)
 
-        if plotlines > 0:
-            seg_lines = [line for line in lines
-                         if (0., 0.) not in self.line_bus_coords(line)]
-
-            for line in seg_lines:
-                bus1, bus2 = self.line_busses(line)
-                bc1 = self.bus_coords(bus1)
-                bc2 = self.bus_coords(bus2)
-                seg_busses[self.get_raw_bus_name(bus1)] = bc1
-                seg_busses[self.get_raw_bus_name(bus2)] = bc2
-
+        if plotlines:
             line_segments = [self.line_bus_coords(line) for line in seg_lines]
 
             if len(line_segments) == 0:
@@ -3544,50 +3709,24 @@ class SSimScreen(SSimBaseScreen):
 
             ax.add_collection(lc)
             ax.axis("off")
-
-            xs, ys = zip(*[(x, y) for seg in line_segments for x, y in seg])
-            min_x = min(xs)
-            max_x = max(xs)
-            min_y = min(ys)
-            max_y = max(ys)
-
-        else:
-            for bus in busses:
-                bc = self.bus_coords(bus)
-                seg_busses[self.get_raw_bus_name(bus)] = bc
-
-            xs, ys = zip(
-                *[(x, y) for seg in seg_busses for x, y in seg_busses[seg]]
-                )
             
-            min_x = min(xs)
-            max_x = max(xs)
-            min_y = min(ys)
-            max_y = max(ys)
-
-        x = [seg_busses[bus][0] for bus in seg_busses]
-        y = [seg_busses[bus][1] for bus in seg_busses]
-        
+        x, y = self.__get_bus_marker_locations()
         ax.scatter(x, y)
         
         if self.ids.show_storage_options.active:
-            self.__draw_storage_options(seg_busses, ax)
+            self.__draw_storage_options(ax)
             self.__make_plot_legend(ax)
-
+            
+        seg_busses = self.__get_line_segment_busses(gm, seg_lines)
+        
         if self.ids.show_bus_labels.active:
             for bus in seg_busses:
                 loc = seg_busses[bus]
                 ax.annotate(bus, (loc[0], loc[1]))
                 
-        plt.xticks([])
-        plt.yticks([])
-
-        ax.set_xlim(
-            min(xs) - 0.05 * (max_x - min_x), max(xs) + 0.05 * (max_x - min_x)
-            )
-        ax.set_ylim(
-            min(ys) - 0.05 * (max_y - min_y), max(ys) + 0.05 * (max_y - min_y)        
-            )
+        self.curr_x_min, self.curr_x_max = (min(xs), max(xs))
+        self.curr_y_min, self.curr_y_max = (min(ys), max(ys))
+        self.set_plot_limits()
 
         dg = self.ids.grid_diagram
         dg.reset_plot()
@@ -3904,7 +4043,11 @@ def _show_no_grid_popup(dismiss_screen=None, manager=None):
     popup.open()
 
 
-def _make_xy_matlab_plot(mpb: MatlabPlotBox, xs: list, ys: list, xlabel: str, ylabel: str, title: str):
+def _make_xy_matlab_plot(
+    mpb: MatlabPlotBox, xs: list, ys: list, xlabel: str, ylabel: str,
+    title: str
+    ):
+    
     """A utility method to plot the xs and ys in the given box.  The supplied title
     and axis labels are installed.
 
