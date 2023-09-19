@@ -3404,6 +3404,63 @@ class SSimScreen(SSimBaseScreen):
     def getImage(self, path):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
     
+    def __make_pv_patch(
+        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5., facecolor = None
+        ):
+        
+        xpix, ypix = ax.transData.transform((x, y)).T
+
+        llx = xpix + xoffset - w/2.
+        lly = ypix + yoffset
+
+        panellow = 0.35 * h
+        tiltoffset = 1./8. * w
+        
+        # Start with main rectangle.
+        codes = [Path.MOVETO] + [Path.LINETO]*4
+        vertices = [
+            [llx,   lly+panellow], [llx+w-tiltoffset, lly+panellow],
+            [llx+w, lly+h       ], [llx+tiltoffset,   lly+h       ],
+            [llx,   lly+panellow]
+            ]
+       
+        poleleft = llx + 0.35*w
+        poleright = poleleft + .15*w
+        poleheight = panellow
+
+        # Add a small rectangle looking like the mounting pole on the bottom.
+        codes += [Path.MOVETO] + [Path.LINETO]*3
+        vertices += [
+            [poleleft , lly + poleheight], [poleleft , lly             ],
+            [poleright, lly             ], [poleright, lly + poleheight]
+            ]
+
+        spacing = (w - tiltoffset) / 4.
+        halfpanhght = (h - panellow) / 2.
+
+        # Finish with a drawing of vertical and horizontal lines on the box
+        codes += ([Path.MOVETO] + [Path.LINETO]) * 5
+        vertices += [
+            [llx +   spacing, lly + panellow], [llx+ tiltoffset +   spacing, lly+h],
+            [llx + 2*spacing, lly + panellow], [llx+ tiltoffset + 2*spacing, lly+h],
+            [llx + 3*spacing, lly + panellow], [llx+ tiltoffset + 3*spacing, lly+h],
+            [llx + 4*spacing, lly + panellow], [llx+ tiltoffset + 4*spacing, lly+h],
+            [llx + tiltoffset/2., lly + panellow + halfpanhght],
+            [llx + w - tiltoffset/2., lly + panellow + halfpanhght]
+            ]
+
+        if facecolor is None:
+            facecolor = ax.get_facecolor()
+
+        #transform the patch vertices back to data coordinates.
+        inv = ax.transData.inverted()
+        tverts = inv.transform(vertices)
+
+        ax.add_patch(
+            patches.PathPatch(Path(tverts, codes), facecolor=facecolor,
+            edgecolor=c)
+            )
+        
     def __make_battery_patch(
         self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5.,
         facecolor = None, incl_plus_minus = True
@@ -3486,9 +3543,39 @@ class SSimScreen(SSimBaseScreen):
         for b, sos in bat_busses.items():
             bx, by = [seg_busses[b][0], seg_busses[b][1]]
             
+            # for i in range(len(sos)): self.__make_pv_patch(
+            #     bx, by, w, 8, so_colors[sos[i]], ax, i * o, yo + i * o                
+            #     )
+                
             for i in range(len(sos)): self.__make_battery_patch(
                 bx, by, w, h, so_colors[sos[i]], ax, i * o, yo + i * o                
                 )
+                
+    def __draw_fixed_pv_assets(self, ax):
+                
+        gm = self.project.grid_model
+        
+        # make a mapping of all busses to receive batteries to the storage
+        # options that include them.  Also map colors to storage options.
+
+        # Without getting the limits here, things don't draw right.  IDK why.
+        ylim = ax.get_ylim()
+
+        w = 12
+        h = 6 
+        o = 2
+        yo = 4
+
+        self.cindex = 0
+                
+        seg_busses = self.__get_line_segment_busses(gm)
+        
+        for pv in self.project.pv_assets:
+            color = self.colors[self.cindex]
+            self.cindex = (self.cindex + 1) % len(self.colors)
+            if pv.bus not in seg_busses: continue            
+            bx, by = [seg_busses[pv.bus][0], seg_busses[pv.bus][1]]            
+            self.__make_pv_patch(bx, by, w, h, color, ax)
 
     def __make_plot_legend(self, ax):
 
@@ -3599,6 +3686,9 @@ class SSimScreen(SSimBaseScreen):
             self.__draw_storage_options(ax)
             self.__make_plot_legend(ax)
                    
+        #if self.ids.show_pv_assets.active:
+        self.__draw_fixed_pv_assets(ax)
+            
         fig.tight_layout()
 
         self.curr_x_min, self.curr_x_max = (min(x), max(x))

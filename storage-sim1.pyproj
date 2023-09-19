@@ -1,0 +1,288 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{0d804fcd-8473-4696-88bc-a04657014752}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>ssim\ui\kivy\ssimapp.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>CondaEnv|CondaEnv|ssim_environment</InterpreterId>
+    <TestFramework>Pytest</TestFramework>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include=".eggs\packaging-21.3-py3.9.egg\EGG-INFO\requires.txt" />
+    <Content Include=".eggs\packaging-21.3-py3.9.egg\EGG-INFO\top_level.txt" />
+    <Content Include=".eggs\pyparsing-3.0.9-py3.9.egg\EGG-INFO\requires.txt" />
+    <Content Include=".eggs\README.txt" />
+    <Content Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\EGG-INFO\entry_points.txt" />
+    <Content Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\EGG-INFO\requires.txt" />
+    <Content Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\EGG-INFO\top_level.txt" />
+    <Content Include=".spyproject\config\codestyle.ini" />
+    <Content Include=".spyproject\config\defaults\defaults-codestyle-0.2.0.ini" />
+    <Content Include=".spyproject\config\defaults\defaults-encoding-0.2.0.ini" />
+    <Content Include=".spyproject\config\defaults\defaults-vcs-0.2.0.ini" />
+    <Content Include=".spyproject\config\defaults\defaults-workspace-0.2.0.ini" />
+    <Content Include=".spyproject\config\encoding.ini" />
+    <Content Include=".spyproject\config\vcs.ini" />
+    <Content Include=".spyproject\config\workspace.ini" />
+    <Content Include="battery.svg" />
+    <Content Include="docs\maxnorm.png" />
+    <Content Include="docs\_build\html\api.html" />
+    <Content Include="docs\_build\html\configuration.html" />
+    <Content Include="docs\_build\html\ems.html" />
+    <Content Include="docs\_build\html\genindex.html" />
+    <Content Include="docs\_build\html\index.html" />
+    <Content Include="docs\_build\html\inverter_controls.html" />
+    <Content Include="docs\_build\html\metrics.html" />
+    <Content Include="docs\_build\html\py-modindex.html" />
+    <Content Include="docs\_build\html\search.html" />
+    <Content Include="docs\_build\html\searchindex.js" />
+    <Content Include="docs\_build\html\_images\maxnorm.png" />
+    <Content Include="docs\_build\html\_sources\api.rst.txt" />
+    <Content Include="docs\_build\html\_sources\configuration.rst.txt" />
+    <Content Include="docs\_build\html\_sources\ems.rst.txt" />
+    <Content Include="docs\_build\html\_sources\index.rst.txt" />
+    <Content Include="docs\_build\html\_sources\inverter_controls.rst.txt" />
+    <Content Include="docs\_build\html\_sources\metrics.rst.txt" />
+    <Content Include="docs\_build\html\_static\alabaster.css" />
+    <Content Include="docs\_build\html\_static\basic.css" />
+    <Content Include="docs\_build\html\_static\custom.css" />
+    <Content Include="docs\_build\html\_static\doctools.js" />
+    <Content Include="docs\_build\html\_static\documentation_options.js" />
+    <Content Include="docs\_build\html\_static\file.png" />
+    <Content Include="docs\_build\html\_static\graphviz.css" />
+    <Content Include="docs\_build\html\_static\jquery-3.6.0.js" />
+    <Content Include="docs\_build\html\_static\jquery.js" />
+    <Content Include="docs\_build\html\_static\language_data.js" />
+    <Content Include="docs\_build\html\_static\minus.png" />
+    <Content Include="docs\_build\html\_static\plus.png" />
+    <Content Include="docs\_build\html\_static\pygments.css" />
+    <Content Include="docs\_build\html\_static\searchtools.js" />
+    <Content Include="docs\_build\html\_static\sphinx_highlight.js" />
+    <Content Include="docs\_build\html\_static\underscore-1.13.1.js" />
+    <Content Include="docs\_build\html\_static\underscore.js" />
+    <Content Include="docs\_build\html\_static\_sphinx_javascript_frameworks_compat.js" />
+    <Content Include="docs\_build\latex\maxnorm.png" />
+    <Content Include="documentation outline.txt" />
+    <Content Include="resources\fonts\Exo_2\OFL.txt" />
+    <Content Include="resources\fonts\Open_Sans\LICENSE.txt" />
+    <Content Include="resources\images\arrow_button_down.png" />
+    <Content Include="resources\images\arrow_button_normal.png" />
+    <Content Include="resources\images\arrow_button_normal_transparent.png" />
+    <Content Include="resources\images\arrow_button_normal_transparent_down.png" />
+    <Content Include="resources\images\arrow_button_normal_white.png" />
+    <Content Include="resources\images\arrow_button_tail_disable_normal.png" />
+    <Content Include="resources\images\arrow_button_tail_down.png" />
+    <Content Include="resources\images\arrow_button_tail_normal.png" />
+    <Content Include="resources\images\arrow_head.png" />
+    <Content Include="resources\images\arrow_head_button_down.png" />
+    <Content Include="resources\images\arrow_head_button_normal.png" />
+    <Content Include="resources\images\arrow_head_transparent.png" />
+    <Content Include="resources\images\arrow_tail.png" />
+    <Content Include="resources\images\arrow_tail_transparent.png" />
+    <Content Include="resources\images\button_down.png" />
+    <Content Include="resources\images\button_normal.png" />
+    <Content Include="resources\images\gray.png" />
+    <Content Include="resources\images\home.png" />
+    <Content Include="resources\images\New_DOE_Logo_Color.jpg" />
+    <Content Include="resources\images\NNSA Logo 2017_color.png" />
+    <Content Include="resources\images\NNSA Logo_Color.png" />
+    <Content Include="resources\images\report_multisetbar.png" />
+    <Content Include="resources\images\SNL_Stacked_Black_Blue.jpg" />
+    <Content Include="resources\images\white.png" />
+    <Content Include="resources\logo\Quest_App_Icon.png" />
+    <Content Include="resources\logo\Quest_App_Icon.svg" />
+    <Content Include="resources\logo\Quest_App_Icon_256.png" />
+    <Content Include="resources\logo\Quest_App_Icon_50_transparent.png" />
+    <Content Include="resources\logo\Quest_Logo_RGB.png" />
+    <Content Include="resources\logo\Quest_Logo_RGB.svg" />
+    <Content Include="resources\logo\Quest_Logo_RGB_Reversed.png" />
+    <Content Include="resources\logo\Quest_Logo_RGB_Reversed.svg" />
+    <Content Include="resources\logo\Quest_Q_Reversed_RGB.png" />
+    <Content Include="resources\logo\Quest_Q_Reversed_RGB.svg" />
+    <Content Include="resources\logo\Quest_Q_RGB.png" />
+    <Content Include="resources\logo\Quest_Q_RGB.svg" />
+    <Content Include="ssim\ui\kivy\common.kv" />
+    <Content Include="ssim\ui\kivy\fonts\LICENSE.txt" />
+    <Content Include="ssim\ui\kivy\fonts\OFL.txt" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_down.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_normal.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_normal_transparent.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_normal_transparent_down.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_normal_white.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_tail_disable_normal.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_tail_down.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_button_tail_normal.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_head.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_head_button_down.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_head_button_normal.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_head_transparent.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_tail.png" />
+    <Content Include="ssim\ui\kivy\images\arrow_tail_transparent.png" />
+    <Content Include="ssim\ui\kivy\images\button_down.png" />
+    <Content Include="ssim\ui\kivy\images\button_normal.png" />
+    <Content Include="ssim\ui\kivy\images\gray.png" />
+    <Content Include="ssim\ui\kivy\images\home.png" />
+    <Content Include="ssim\ui\kivy\images\New_DOE_Logo_Color.jpg" />
+    <Content Include="ssim\ui\kivy\images\NNSA Logo 2017_color.png" />
+    <Content Include="ssim\ui\kivy\images\NNSA Logo_Color.png" />
+    <Content Include="ssim\ui\kivy\images\report_multisetbar.png" />
+    <Content Include="ssim\ui\kivy\images\SNL_Stacked_Black_Blue.jpg" />
+    <Content Include="ssim\ui\kivy\images\white.png" />
+    <Content Include="ssim\ui\kivy\ssim.kv" />
+    <Content Include="storage_sim.egg-info\dependency_links.txt" />
+    <Content Include="storage_sim.egg-info\entry_points.txt" />
+    <Content Include="storage_sim.egg-info\requires.txt" />
+    <Content Include="storage_sim.egg-info\SOURCES.txt" />
+    <Content Include="storage_sim.egg-info\top_level.txt" />
+    <Content Include="svr.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\markers.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\requirements.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\specifiers.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\tags.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\utils.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\version.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\_manylinux.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\_musllinux.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\_structures.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\__about__.py" />
+    <Compile Include=".eggs\packaging-21.3-py3.9.egg\packaging\__init__.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\actions.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\common.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\core.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\diagram\__init__.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\exceptions.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\helpers.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\results.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\testing.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\unicode.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\util.py" />
+    <Compile Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\__init__.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\config.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\discover.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\file_finder.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\file_finder_git.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\file_finder_hg.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\git.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\hacks.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\hg.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\hg_git.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\integration.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\scm_workdir.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\utils.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\version.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_cli.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_entrypoints.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_integration\pyproject_reading.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_integration\setuptools.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_integration\__init__.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_overrides.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_types.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_version_cls.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\__init__.py" />
+    <Compile Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\__main__.py" />
+    <Compile Include=".eggs\tomli-2.0.1-py3.9.egg\tomli\_parser.py" />
+    <Compile Include=".eggs\tomli-2.0.1-py3.9.egg\tomli\_re.py" />
+    <Compile Include=".eggs\tomli-2.0.1-py3.9.egg\tomli\_types.py" />
+    <Compile Include=".eggs\tomli-2.0.1-py3.9.egg\tomli\__init__.py" />
+    <Compile Include=".eggs\typing_extensions-4.3.0-py3.9.egg\typing_extensions.py" />
+    <Compile Include="docs\conf.py" />
+    <Compile Include="setup.py" />
+    <Compile Include="ssim\dssutil.py" />
+    <Compile Include="ssim\ems.py" />
+    <Compile Include="ssim\federates\ems.py" />
+    <Compile Include="ssim\federates\loads.py" />
+    <Compile Include="ssim\federates\logger.py" />
+    <Compile Include="ssim\federates\metrics.py" />
+    <Compile Include="ssim\federates\opendss.py" />
+    <Compile Include="ssim\federates\reliability.py" />
+    <Compile Include="ssim\federates\storage.py" />
+    <Compile Include="ssim\federates\timing.py" />
+    <Compile Include="ssim\federates\__init__.py" />
+    <Compile Include="ssim\grid.py" />
+    <Compile Include="ssim\heuristicems.py" />
+    <Compile Include="ssim\loads.py" />
+    <Compile Include="ssim\metrics.py" />
+    <Compile Include="ssim\opendss.py" />
+    <Compile Include="ssim\reliability.py" />
+    <Compile Include="ssim\storage.py" />
+    <Compile Include="ssim\tests\conftest.py" />
+    <Compile Include="ssim\tests\test_dssutil.py" />
+    <Compile Include="ssim\tests\test_ems.py" />
+    <Compile Include="ssim\tests\test_grid.py" />
+    <Compile Include="ssim\tests\test_hashing.py" />
+    <Compile Include="ssim\tests\test_metrics.py" />
+    <Compile Include="ssim\tests\test_opendss.py" />
+    <Compile Include="ssim\tests\test_reilability.py" />
+    <Compile Include="ssim\tests\test_storage_control.py" />
+    <Compile Include="ssim\tests\__init__.py" />
+    <Compile Include="ssim\ui\core.py" />
+    <Compile Include="ssim\ui\kivy\ssimapp.py" />
+    <Compile Include="ssim\ui\libs\garden\garden.matplotlib\backend_kivy.py" />
+    <Compile Include="ssim\ui\libs\garden\garden.matplotlib\backend_kivyagg.py" />
+    <Compile Include="ssim\ui\libs\garden\garden.matplotlib\__init__.py" />
+    <Compile Include="ssim\ui\__init__.py" />
+    <Compile Include="ssim\__init__.py" />
+    <Compile Include="svr.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include=".eggs" />
+    <Folder Include=".eggs\packaging-21.3-py3.9.egg\" />
+    <Folder Include=".eggs\packaging-21.3-py3.9.egg\EGG-INFO" />
+    <Folder Include=".eggs\packaging-21.3-py3.9.egg\packaging" />
+    <Folder Include=".eggs\pyparsing-3.0.9-py3.9.egg\" />
+    <Folder Include=".eggs\pyparsing-3.0.9-py3.9.egg\EGG-INFO" />
+    <Folder Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing" />
+    <Folder Include=".eggs\pyparsing-3.0.9-py3.9.egg\pyparsing\diagram" />
+    <Folder Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\" />
+    <Folder Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\EGG-INFO" />
+    <Folder Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm" />
+    <Folder Include=".eggs\setuptools_scm-7.0.5-py3.9.egg\setuptools_scm\_integration" />
+    <Folder Include=".eggs\tomli-2.0.1-py3.9.egg\" />
+    <Folder Include=".eggs\tomli-2.0.1-py3.9.egg\tomli" />
+    <Folder Include=".eggs\typing_extensions-4.3.0-py3.9.egg" />
+    <Folder Include=".spyproject\" />
+    <Folder Include=".spyproject\config" />
+    <Folder Include=".spyproject\config\defaults" />
+    <Folder Include="docs" />
+    <Folder Include="docs\_build\" />
+    <Folder Include="docs\_build\html" />
+    <Folder Include="docs\_build\html\_images" />
+    <Folder Include="docs\_build\html\_sources" />
+    <Folder Include="docs\_build\html\_static" />
+    <Folder Include="docs\_build\latex" />
+    <Folder Include="resources\" />
+    <Folder Include="resources\fonts\" />
+    <Folder Include="resources\fonts\Exo_2" />
+    <Folder Include="resources\fonts\Open_Sans" />
+    <Folder Include="resources\images" />
+    <Folder Include="resources\logo" />
+    <Folder Include="ssim" />
+    <Folder Include="ssim\federates" />
+    <Folder Include="ssim\tests" />
+    <Folder Include="ssim\ui" />
+    <Folder Include="ssim\ui\kivy" />
+    <Folder Include="ssim\ui\kivy\fonts" />
+    <Folder Include="ssim\ui\kivy\images" />
+    <Folder Include="ssim\ui\libs\" />
+    <Folder Include="ssim\ui\libs\garden\" />
+    <Folder Include="ssim\ui\libs\garden\garden.matplotlib" />
+    <Folder Include="storage_sim.egg-info" />
+  </ItemGroup>
+  <ItemGroup>
+    <InterpreterReference Include="CondaEnv|CondaEnv|ssim_environment" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>

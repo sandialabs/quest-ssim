@@ -197,6 +197,10 @@ class Project:
         return self.storage_devices
 
     @property
+    def pv_assets(self):
+        return [] if self._grid_model is None else self._grid_model.pvsystems
+
+    @property
     def grid_model(self) -> DSSModel:
         return self._grid_model
 

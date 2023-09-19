@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.3.32804.467
+VisualStudioVersion = 17.7.34018.315
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "storage-sim", "storage-sim.pyproj", "{4A78FDAF-83A0-4E0A-86F3-D13E012CEF93}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "storage-sim1", "storage-sim1.pyproj", "{0D804FCD-8473-4696-88BC-A04657014752}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,13 +11,13 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{4A78FDAF-83A0-4E0A-86F3-D13E012CEF93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{4A78FDAF-83A0-4E0A-86F3-D13E012CEF93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0D804FCD-8473-4696-88BC-A04657014752}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0D804FCD-8473-4696-88BC-A04657014752}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
-		SolutionGuid = {49B1DF8D-2372-4967-AD9E-E134FB85C147}
+		SolutionGuid = {07B1153D-1D3E-46B0-8455-A86977F59D34}
 	EndGlobalSection
 EndGlobal
