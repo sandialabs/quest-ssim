@@ -763,16 +763,23 @@
                     size_hint_y: None
                     height: 25
                     orientation: "horizontal"
+                    padding: [0, 0, 20, 0]
+                    canvas.before:
+                        Color:
+                            rgba: ssim_light_blue
+                        Line:
+                            width: 1
+                            rectangle: self.x, self.y, self.width, self.height
 
                     MDLabel:
                         id: required_label
                         text: "Required?"
-
+                        
                     MDSwitch:
-                        #pos_hint: {"left":0.0,"top":0.0}
                         id: required
                         active: False
-
+                        size_hint: [0.08, 1.0]
+                        
                 Button:
                     text: "Edit Control Parameters"
                     size_hint_y: None

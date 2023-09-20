@@ -3,6 +3,7 @@ import itertools
 import math
 import os
 import re
+import sys
 from contextlib import ExitStack
 from math import cos, hypot
 from threading import Thread
@@ -3654,10 +3655,10 @@ class SSimScreen(SSimBaseScreen):
         plt.clf()
 
         dss.plot.enable(show=False)
-        dssdirect.Text.Command('redirect ' + gm._model_file)
+        dssdirect.Text.Command(f"redirect {gm._model_file}")
         #dssdirect.Solution.Solve()
         label_txt = " Labels=Yes" if self.ids.show_bus_labels.active else ""
-        dssdirect.Text.Command('plot circuit dots=Yes' + label_txt)
+        dssdirect.Text.Command(f"plot circuit dots=Yes{label_txt}")
 
         plt.title('')
         plt.xticks([])
@@ -3665,13 +3666,12 @@ class SSimScreen(SSimBaseScreen):
         plt.xlabel('')
         plt.ylabel('')        
         
-        #fig, ax = plt.subplots()
-        ax = plt.gca()
         fig = plt.gcf()
+        ax = plt.gca()
         ax.axis("off")
         
         blocs = self.__get_bus_marker_locations()
-        if blocs is None:            
+        if blocs is None:
             self.ids.grid_diagram.display_plot_error(
                 "Bus locations are not known so no meaningful plot can be " +
                 "produced."
@@ -3703,10 +3703,9 @@ class SSimScreen(SSimBaseScreen):
         cxlims = ax.get_xlim()
         cylims = ax.get_ylim()
         
-        if cxlims[0] != lims[0] or \
-           cxlims[1] != lims[1] or \
-           cylims[0] != lims[2] or \
-           cylims[1] != lims[3]: self.set_plot_limits()
+        if cxlims[0] != lims[0] or cxlims[1] != lims[1] or \
+           cylims[0] != lims[2] or cylims[1] != lims[3]:
+            self.set_plot_limits()
         
     def __get_bus_marker_locations(self):
         gm = self.project.grid_model
@@ -3731,8 +3730,7 @@ class SSimScreen(SSimBaseScreen):
         seg_lines = self.__get_line_segments(gm)
         seg_busses = self.__get_line_segment_busses(gm, seg_lines)
         
-        if plotlines:
-            
+        if plotlines:            
             line_segments = [self.line_bus_coords(line) for line in seg_lines]
             
             if len(line_segments) == 0:
@@ -3750,76 +3748,76 @@ class SSimScreen(SSimBaseScreen):
     
     def refresh_grid_plot(self):
         self.draw_plot_using_dss_plot()
-        return
+        # return
     
-        gm = self.project.grid_model
+        # gm = self.project.grid_model
         
-        plt.clf()
+        # plt.clf()
 
-        if gm is None:
-            self.ids.grid_diagram.display_plot_error(
-                "There is no current grid model."
-                )
-            return
+        # if gm is None:
+        #     self.ids.grid_diagram.display_plot_error(
+        #         "There is no current grid model."
+        #         )
+        #     return
 
-        lines = gm.line_names
-        busses = gm.bus_names
+        # lines = gm.line_names
+        # busses = gm.bus_names
 
-        if len(lines) == 0 and len(busses) == 0:
-            self.ids.grid_diagram.display_plot_error(
-                "There are no lines and no busses in the current grid model."
-                )
-            return
+        # if len(lines) == 0 and len(busses) == 0:
+        #     self.ids.grid_diagram.display_plot_error(
+        #         "There are no lines and no busses in the current grid model."
+        #         )
+        #     return
 
-        # Start by plotting the lines if there are any.  Note that if there are
-        # lines, there must be busses but the opposite may not be true.
-        plotlines = len(lines) > 0
+        # # Start by plotting the lines if there are any.  Note that if there are
+        # # lines, there must be busses but the opposite may not be true.
+        # plotlines = len(lines) > 0
                 
-        fig, ax = plt.subplots()
+        # fig, ax = plt.subplots()
         
-        seg_lines = self.__get_line_segments(gm)
+        # seg_lines = self.__get_line_segments(gm)
 
-        if plotlines:
-            line_segments = [self.line_bus_coords(line) for line in seg_lines]
+        # if plotlines:
+        #     line_segments = [self.line_bus_coords(line) for line in seg_lines]
 
-            if len(line_segments) == 0:
-                self.ids.grid_diagram.display_plot_error(
-                    "There are lines but their bus locations are not known " +
-                    "so no meaningful plot can be produced."
-                    )
-                return
+        #     if len(line_segments) == 0:
+        #         self.ids.grid_diagram.display_plot_error(
+        #             "There are lines but their bus locations are not known " +
+        #             "so no meaningful plot can be produced."
+        #             )
+        #         return
             
-            lc = LineCollection(
-                line_segments, norm=plt.Normalize(1, 3), cmap='tab10'
-                )
+        #     lc = LineCollection(
+        #         line_segments, norm=plt.Normalize(1, 3), cmap='tab10'
+        #         )
 
-            lc.set_capstyle('round')
+        #     lc.set_capstyle('round')
 
-            fig.tight_layout()
+        #     fig.tight_layout()
 
-            ax.add_collection(lc)
-            ax.axis("off")
+        #     ax.add_collection(lc)
+        #     ax.axis("off")
             
-        x, y = self.__get_bus_marker_locations()
-        ax.scatter(x, y)
+        # x, y = self.__get_bus_marker_locations()
+        # ax.scatter(x, y)
         
-        if self.ids.show_storage_options.active:
-            self.__draw_storage_options(ax)
-            self.__make_plot_legend(ax)
+        # if self.ids.show_storage_options.active:
+        #     self.__draw_storage_options(ax)
+        #     self.__make_plot_legend(ax)
             
-        seg_busses = self.__get_line_segment_busses(gm, seg_lines)
+        # seg_busses = self.__get_line_segment_busses(gm, seg_lines)
         
-        if self.ids.show_bus_labels.active:
-            for bus in seg_busses:
-                loc = seg_busses[bus]
-                ax.annotate(bus, (loc[0], loc[1]))
+        # if self.ids.show_bus_labels.active:
+        #     for bus in seg_busses:
+        #         loc = seg_busses[bus]
+        #         ax.annotate(bus, (loc[0], loc[1]))
                 
-        self.curr_x_min, self.curr_x_max = (min(xs), max(xs))
-        self.curr_y_min, self.curr_y_max = (min(ys), max(ys))
-        self.set_plot_limits()
+        # self.curr_x_min, self.curr_x_max = (min(xs), max(xs))
+        # self.curr_y_min, self.curr_y_max = (min(ys), max(ys))
+        # self.set_plot_limits()
 
-        dg = self.ids.grid_diagram
-        dg.reset_plot()
+        # dg = self.ids.grid_diagram
+        # dg.reset_plot()
 
 
 class ValidationError(Exception):
@@ -3892,8 +3890,8 @@ class LineReliabilityParams(ReliabilityModelTab):
         Parameters
         ----------
         params : dict
-            Distionary with optional keys 'enabled', 'mtbf', 'min_repair',
-            and 'max_repair'.
+            Distionary with optional keys 'enabled', 'mtbf', 'min_repair', and
+            'max_repair'.
         """
         self.ids.enabled.active = params.get("enabled", False)
         self.ids.line_mtbf.text = str(params.get("mtbf", ""))
