@@ -2562,6 +2562,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_metric_items['Configuration ' + str(ctr)] = []
             ctr += 1
+        # Clear the figure and variable list on enter to result screen
+        self.ids.metrics_list.clear_widgets()
         
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2832,9 +2834,8 @@ class ResultsDetailScreen(SSimBaseScreen):
         self.list_items = []
         self.selected_list_items_axes_1 = {}
         self.selected_list_items_axes_2 = {}
-        # self.selected_list_items = {}
         self.variable_data = pd.DataFrame()
-        self.figure = None
+        self.figure = None       
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
@@ -2844,6 +2845,9 @@ class ResultsDetailScreen(SSimBaseScreen):
             self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
             self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
             ctr += 1
+        # Clear the figure and variable list on enter to result detail screen
+        self.ids.variable_list_detail_axes_1.clear_widgets()
+        self.ids.variable_list_detail_axes_2.clear_widgets()
 
     def dismiss_popup(self):
         self._popup.dismiss()
