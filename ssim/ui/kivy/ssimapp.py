@@ -3277,6 +3277,18 @@ class RunSimulationScreen(SSimBaseScreen):
         self._config_filters = ConfigurationFilters()
         self._run_thread = None
         self._canceled = False
+        self.ids.simulation_runtime.bind(
+            on_text_validate=self._set_simulation_time
+        )
+
+    def _set_simulation_time(self, textfield):
+        """Sets simulation time for each configuration. If the user
+        does not provide a value, a 24 hour simulation is assumed
+        by default.
+        """
+        if textfield.text_valid():
+            for config in self.configurations:
+                config.sim_duration = float(textfield.text)
 
     def on_enter(self):
         # establishes mappings between config id and config UI ids
@@ -3430,7 +3442,6 @@ class RunSimulationScreen(SSimBaseScreen):
                                     self._config_filters.kwh_filter["max"]
                     if filter_condition_kWh:
                         self.filtered_configurations.append(config)
-
             else:
                 for i, config in enumerate(
                         self.project.current_checkpoint.configurations()
