@@ -3277,18 +3277,9 @@ class RunSimulationScreen(SSimBaseScreen):
         self._config_filters = ConfigurationFilters()
         self._run_thread = None
         self._canceled = False
-        self.ids.simulation_runtime.bind(
-            on_text_validate=self._set_simulation_time
-        )
-
-    def _set_simulation_time(self, textfield):
-        """Sets simulation time for each configuration. If the user
-        does not provide a value, a 24 hour simulation is assumed
-        by default.
-        """
-        if textfield.text_valid():
-            for config in self.configurations:
-                config.sim_duration = float(textfield.text)
+        # self.ids.simulation_runtime.bind(
+        #     on_text_validate=self._set_simulation_time
+        # )
 
     def on_enter(self):
         # establishes mappings between config id and config UI ids
@@ -3391,6 +3382,21 @@ class RunSimulationScreen(SSimBaseScreen):
         self.populate_configurations_recycle_view()
 
         Logger.debug('Configuration Filters Cleared ...')
+
+    def _set_simulation_time(self):
+        """Sets simulation time for each configuration. If the user
+        does not provide a value, a 24 hour simulation is assumed
+        by default.
+        """
+        sim_hours = self.ids.simulation_runtime.text
+        if len(sim_hours) == 0:
+            for config in self.configurations:
+                # run 24-hour simulation if no input is provided
+                config.sim_duration = 24.0
+        else:
+            for config in self.configurations:
+                # assign simulation time based on user input
+                config.sim_duration = float(sim_hours)
 
     def _perform_filtering(self):
         """Performs filtering and repopulates the
@@ -3676,6 +3682,9 @@ class RunSimulationScreen(SSimBaseScreen):
         self._progress_popup.dismiss()
 
     def run_configurations(self):
+        # acquire simulation time
+        self._set_simulation_time()
+
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
         self._progress = RunProgressPopupContent()
