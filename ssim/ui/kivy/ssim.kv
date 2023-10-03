@@ -7,9 +7,102 @@
 
 #:set ssim_light_blue (0.68, 0.85, 0.90, 1.0)
 
-<MatlabPlotBox>
+<MatlabPlotBox>:
     orientation: "vertical"
     pos_hint: {"top":1}
+    
+<BusSearchPanelContent>:
+    orientation: "vertical"
+
+    BoxLayout:
+        orientation: "horizontal"
+                   
+        TextFieldListFilter:
+            id: txt_bus_filter
+            hint_text: "Filter Busses"
+            on_filter_applied: self.parent.parent.changed_text_filter(self)
+
+        Button:
+            id: btn_clear_filter_txt
+            text: "X"
+            size_hint: [.07, 0.5]
+            pos_hint: {"top":0.9}
+            on_press: self.parent.parent.clear_text_filter()
+            
+    BoxLayout:
+        orientation: "horizontal"
+        
+        BoxLayout:
+            orientation: "horizontal"
+            
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            Label:
+                text: "Phase 1"
+                color: C(hex_black)                
+            CheckBox:
+                id: ckb_phase_1
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)
+
+        BoxLayout:
+            orientation: "horizontal"
+            
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            Label:
+                text: "Phase 2"
+                color: C(hex_black)
+            CheckBox:
+                id: ckb_phase_2
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)
+            
+        BoxLayout:
+            orientation: "horizontal"
+            
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            Label:
+                text: "Phase 3"
+                color: C(hex_black)
+            CheckBox:
+                id: ckb_phase_3
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)
+            
+        BoxLayout:
+            orientation: "horizontal"
+            
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            Label:
+                text: "Selected\nOnly"
+                color: C(hex_black)
+            CheckBox:
+                id: ckb_sel_only
+                active: False
+                on_active: self.parent.parent.parent.changed_sel_only_filter(self)
 
 <SSimScreen>:
     name: 'ssim'
@@ -128,6 +221,7 @@
                         active: True
                         on_active: root.changed_show_storage_options(self.active)
 
+
 <DERConfigurationScreen>:
     name: "der-config"
     on_enter: root.load_project_data()
@@ -201,6 +295,7 @@
         id: edit
         icon: "pencil"
 
+
 <ResultsVariableListItemWithCheckbox>:
     id: results_variable_list
 
@@ -214,6 +309,7 @@
     LeftCheckBox:
         id: metrics_selected
         listItem: root
+
 
 <PVListitem>:
 
@@ -734,6 +830,7 @@
                             id: duration_list
 
             BoxLayout:
+                id: bus_list_box
                 orientation: "vertical"
                 padding: 5
                 spacing: 10
@@ -743,8 +840,38 @@
                     size_hint: (1.0, 0.05)
                     underline: True
 
+                BusSearchPanelContent:
+                    id: bus_search_panel
+                    size_hint_y: 0.2
+                   
+                #ScrollView:
+
+                #    MDGridLayout:
+                #        cols: 1
+                #        adaptive_height: True
+                #        id: filter_box
+
+                #        MDExpansionPanel
+                #            id: filter_panel
+                #            panel_cls: MDExpansionPanelThreeLine
+                
+                #BoxLayout:
+                #    orientation: "horizontal"
+                #    size_hint_y: .08
+                  
+                #    TextFieldListFilter:
+                #        id: bus_filter
+                #        hint_text: "Filter Busses"
+
+                #    Button:
+                #        text: "X"
+                #        size_hint: [.07, 0.5]
+                #        pos_hint: {"top":0.9}
+                #        on_press: root.remove_filter()
+                       
                 MDScrollView:
                     size_hint: (1.0, 0.83)
+                    id: bus_scroller
 
                     canvas.before:
                         Color:
@@ -764,12 +891,6 @@
                     height: 25
                     orientation: "horizontal"
                     padding: [0, 0, 20, 0]
-                    canvas.before:
-                        Color:
-                            rgba: ssim_light_blue
-                        Line:
-                            width: 1
-                            rectangle: self.x, self.y, self.width, self.height
 
                     MDLabel:
                         id: required_label

@@ -3,14 +3,12 @@ import itertools
 import math
 import os
 import re
-import sys
 from contextlib import ExitStack
 from math import cos, hypot
 from threading import Thread
 from typing import List
 
 import kivy
-import numpy as np
 import matplotlib as mpl
 mpl.use('module://kivy.garden.matplotlib.backend_kivy')
 from matplotlib.path import Path
@@ -23,6 +21,7 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import dss.plot
 import opendssdirect as dssdirect
 import pandas as pd
+import logging
 from importlib_resources import files, as_file
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
@@ -87,6 +86,7 @@ _IMAGE_FILES = [
 
 _KV_FILES = ["common.kv", "ssim.kv"]
 
+logging.getLogger('matplotlib.font_manager').disabled = True
 
 def make_xy_grid_data(xs: list, ys: list) -> list:
     """A utility method to create a list of dictionaries suitable for use by an
@@ -185,6 +185,67 @@ def try_co_sort(xl: list, yl: list) -> (list, list):
         return (list(t) for t in zip(*sorted(zip(xl, yl))))
     except:
         return (xl, yl)
+
+    
+def refocus_text_field(field):
+    """A method that does nothing more than set the focus property of the
+    supplied widget to true.
+        
+    This is often scheduled for call to manage the focus state of widgets
+    as a form is being initialized.
+
+    Parameters
+    ----------
+    field
+        The widget to set the focus value of.
+    """
+    field.focus = True
+
+
+class BusSearchPanelContent(BoxLayout):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.register_event_type("on_filter_applied")
+
+    def clear_text_filter(self):
+        self.ids.txt_bus_filter.text  = ""
+        self.ids.txt_bus_filter.on_text_validate()
+        
+    def changed_phase_filter(self, instance):
+        self.__raise_filter_applied(instance)
+
+    def changed_sel_only_filter(self, instance):
+        self.__raise_filter_applied(instance)
+
+    def changed_text_filter(self, instance):
+        self.__raise_filter_applied(instance)
+        Clock.schedule_once(
+            lambda dt: refocus_text_field(self.ids.txt_bus_filter), 0.05
+            )
+
+    def get_filter_text(self) -> str:
+        return self.ids.txt_bus_filter.text
+    
+    def get_phase_1_active(self) -> bool:
+        return self.ids.ckb_phase_1.active
+    
+    def get_phase_2_active(self) -> bool:
+        return self.ids.ckb_phase_2.active
+
+    def get_phase_3_active(self) -> bool:
+        return self.ids.ckb_phase_3.active
+    
+    def get_selected_only_active(self) -> bool:
+        return self.ids.ckb_sel_only.active
+    
+    def __raise_filter_applied(self, instance):
+        """Dispatches the on_filter_applied method to anything bound to it.
+        """
+        self.dispatch("on_filter_applied", instance)
+        
+    def on_filter_applied(self, instance):
+        pass
 
 
 class SSimApp(MDApp):
@@ -486,6 +547,27 @@ class EditableSetListItem(OneLineRightIconListItem):
 
     def _delete_item(self, item):
         self.parent.remove_item(self._value)
+        
+
+class TextFieldListFilter(MDTextField):
+    """Text field that filters the elements of an MDList."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper_text_mode = "on_focus"
+        self.helper_text = "Input text and press enter to filter"
+        self.register_event_type("on_filter_applied")
+    
+    def on_text_validate(self):
+        self.__raise_filter_applied()
+                   
+    def __raise_filter_applied(self):
+        """Dispatches the on_filter_applied method to anything bound to it.
+        """
+        self.dispatch("on_filter_applied", self)
+        
+    def on_filter_applied(self, instance):
+        pass
 
 
 class TextFieldOpenDSSName(MDTextField):
@@ -527,6 +609,18 @@ class StorageConfigurationScreen(SSimBaseScreen):
         )
         self.options = ess
         self.initialize_widgets()
+        
+        self.ids.bus_search_panel.bind(
+            on_filter_applied=self.on_bus_filter_applied
+            )
+        
+        # self.ids.bus_list_box.add_widget(
+        #     MDExpansionPanel(
+        #         content=BusSearchPanelContent(),
+        #         panel_cls=MDExpansionPanelOneLine(text="Filter Busses")
+        #     ), 3
+        # )
+
 
     def initialize_widgets(self):
         if self.options is None: return
@@ -538,24 +632,75 @@ class StorageConfigurationScreen(SSimBaseScreen):
             self.ids.duration_list.add_item(duration)
 
         self.ids.device_name.text = self.options.name
-
-        for bus_list_item in self.ids.bus_list.children:
-            if bus_list_item.text in self.options.busses:
-                bus_list_item.ids.selected.active = True
+        
+        self.reload_bus_list()
 
         self.ids.required.active = self.options.required
 
-        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.device_name), 0.05)
+        Clock.schedule_once(
+            lambda dt: refocus_text_field(self.ids.device_name), 0.05
+            )
 
-    def on_kv_post(self, base_widget):
+    def set_bus_list_active_checks(self):
+        for bus_list_item in self.ids.bus_list.children:
+            bus_list_item.ids.selected.active = \
+                bus_list_item.text in self.options.busses
+
+    def on_bus_filter_applied(self, instance, value):
+        self.reload_bus_list()
+
+    def check_bus_filters(self, bus) -> bool:
+        phases = self.project.phases(bus)
+        filter = self.ids.bus_search_panel.get_filter_text()
+
+        if (filter and not filter in bus): return False
+        
+        sel_only = self.ids.bus_search_panel.get_selected_only_active()
+        if sel_only and not bus in self.options.busses: return False        
+
+        p1 = self.ids.bus_search_panel.get_phase_1_active()
+        p2 = self.ids.bus_search_panel.get_phase_2_active()
+        p3 = self.ids.bus_search_panel.get_phase_3_active()
+
+        if p1 and 1 not in phases: return False
+        if p2 and 2 not in phases: return False
+        if p3 and 3 not in phases: return False
+
+        return True
+
+    def check_need_bus_filtering(self) -> bool:
+        filter = self.ids.bus_search_panel.get_filter_text()
+        if filter: return True
+
+        sel_only = self.ids.bus_search_panel.get_selected_only_active()
+        if sel_only: return True
+
+        p1 = self.ids.bus_search_panel.get_phase_1_active()
+        if p1: return True
+        
+        p2 = self.ids.bus_search_panel.get_phase_2_active()
+        if p2: return True
+        
+        p3 = self.ids.bus_search_panel.get_phase_3_active()
+        if p3: return True
+        
+        return False
+
+    def reload_bus_list(self):
         self.ids.bus_list.clear_widgets()
+
+        need_filter = self.check_need_bus_filtering()        
+
         for bus in self.project.bus_names:
-            bus_list_item = BusListItem(bus, self.project.phases(bus))
-            self.ids.bus_list.add_widget(bus_list_item)
+            if not need_filter or self.check_bus_filters(bus):
+                bus_list_item = BusListItem(bus, self.project.phases(bus))
+                self.ids.bus_list.add_widget(bus_list_item)
+                
+        self.set_bus_list_active_checks()
 
     def _check_name(self, textfield):
         if not textfield.text_valid():
-            textfield.helper_text = "invalid name"
+            textfield.helper_text = "Invalid name"
             textfield.error = True
             return False
         existing_names = {name.lower() for name in self.project.storage_names}
@@ -571,23 +716,9 @@ class StorageConfigurationScreen(SSimBaseScreen):
             value = float(textfield.text)
             optionlist.add_item(value)
             textfield.text = ""
-            Clock.schedule_once(lambda dt: self._refocus_field(textfield), 0.05)
+            Clock.schedule_once(lambda dt: refocus_text_field(textfield), 0.05)
         else:
             textfield.set_error_message()
-
-    def _refocus_field(self, field):
-        """A method that does nothing more than set the focus property of the
-        supplied widget to true.
-        
-        This is often scheduled for call to manage the focus state of widgets
-        as a form is being initialized.
-
-        Parameters
-        ----------
-        field
-            The widget to set the focus value of.
-        """
-        field.focus = True
 
     def _add_device_duration(self, textfield):
         self._add_option(self.ids.duration_list, textfield)
@@ -1860,9 +1991,9 @@ class MetricConfigurationScreen(SSimBaseScreen):
         base_widget:
            The base-most widget whose instantiation triggered the kv rules.
         """
-        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
-        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
-        Clock.schedule_once(lambda dt: self._refocus_field(self.ids.objectiveText), 0.05)
+        Clock.schedule_once(lambda dt: refocus_text_field(self.ids.upperLimitText), 0.05)
+        Clock.schedule_once(lambda dt: refocus_text_field(self.ids.lowerLimitText), 0.05)
+        Clock.schedule_once(lambda dt: refocus_text_field(self.ids.objectiveText), 0.05)
 
     def _refocus_field(self, field):
         """Sets the focus of the supplied field.
@@ -1934,21 +2065,21 @@ class MetricConfigurationScreen(SSimBaseScreen):
                 self.ids.lowerLimitText.set_not_set_mode()
         else:
             self.ids.lowerLimitText.text = str(common_lower_limit)
-            Clock.schedule_once(lambda dt: self._refocus_field(self.ids.lowerLimitText), 0.05)
+            Clock.schedule_once(lambda dt: refocus_text_field(self.ids.lowerLimitText), 0.05)
 
         if common_upper_limit is None:
             self.ids.upperLimitText.set_varied_mode() if is_varied else \
                 self.ids.upperLimitText.set_not_set_mode()
         else:
             self.ids.upperLimitText.text = str(common_upper_limit)
-            Clock.schedule_once(lambda dt: self._refocus_field(self.ids.upperLimitText), 0.05)
+            Clock.schedule_once(lambda dt: refocus_text_field(self.ids.upperLimitText), 0.05)
 
         if common_obj is None:
             self.ids.objectiveText.set_varied_mode() if is_varied else \
                 self.ids.objectiveText.set_not_set_mode()
         else:
             self.ids.objectiveText.text = str(common_obj)
-            Clock.schedule_once(lambda dt: self._refocus_field(self.ids.objectiveText), 0.05)
+            Clock.schedule_once(lambda dt: refocus_text_field(self.ids.objectiveText), 0.05)
 
         if common_sense is None:
             self.manage_button_selection_states(None)
@@ -3282,6 +3413,10 @@ class SSimScreen(SSimBaseScreen):
         self.ids.project_name.text = self.project.name
 
     def load_toml_file(self, path, filename):
+        if len(filename) == 0:
+            Logger.debug("Cannot load file.  No file selected.")
+            return
+        
         Logger.debug("loading file %s", filename[0])
         self.project.load_toml_file(filename[0])
         self.set_current_input_file(filename[0])
