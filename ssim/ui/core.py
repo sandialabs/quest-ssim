@@ -1533,7 +1533,7 @@ class Configuration:
         return config
 
     def _configure_grid_model(self, config):
-        config["dss_file"] = self.grid
+        config["dss_file"] = os.path.abspath(self.grid)
         return config
 
     def _configure_storage(self, config):
