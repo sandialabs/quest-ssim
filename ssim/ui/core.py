@@ -112,7 +112,7 @@ class ProjectCheckpoint:
         """
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         self.project.export_grid_model(self.grid_model_dir)
-        self.project.set_grid_model(str(self.grid_model_dir / "master.DSS"))
+        self.project.set_grid_model(str(os.path.abspath(self.grid_model_dir / "master.DSS")))
         self.project.version = self.version_manager.version(self._project_hash)
         with open(self.checkpoint_dir / "project.toml", "w") as f:
             f.write(self.project.write_toml())
