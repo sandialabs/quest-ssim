@@ -819,7 +819,11 @@ class DSSModel:
             An opendss grid model that matches the specification in `gridspec`.
         """
         model = DSSModel(gridspec.file)
-        model.add_voltage_recorder(gridspec.busses_to_log)
+        model.add_voltage_recorder(
+            gridspec.busses_to_log.union(
+                set(bus["name"] for bus in gridspec.busses_to_measure)
+            )
+        )
         model.add_loading_recorder()
         for storage_device in gridspec.storage_devices:
             storage_params = _opendss_storage_params(storage_device)

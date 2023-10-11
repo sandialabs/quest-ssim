@@ -16,6 +16,7 @@ from importlib_resources import files, as_file
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.logger import Logger, LOG_LEVELS
+from kivy.metrics import dp
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
@@ -2555,6 +2556,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # stores the current configuration selected from the dropdown menu
         self.current_configuration = None
         self.metrics_figure = None
+        self._show_voltage_status = True
 
     @property
     def project_results(self):
@@ -2567,6 +2569,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_metric_items['Configuration ' + str(ctr)] = []
             ctr += 1
+        # Clear the figure and variable list on enter to result screen
+        self.ids.metrics_list.clear_widgets()
         
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2580,9 +2584,14 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         matplotlib.Figure:
             Instance of matplotlib figure.
         """
+        plt.style.use('ggplot')
         metrics_fig = plt.figure()
-        plt.clf()
-        ctr = 1
+        if self._show_voltage_status:
+            gs = metrics_fig.add_gridspec(2, hspace=0.05)
+        else:
+            gs = metrics_fig.add_gridspec(1, hspace=0.05)
+        axs = gs.subplots(sharex=True)
+
         for result in self.project_results.results():
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
 
@@ -2591,31 +2600,40 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             _, accumulated_metric, data_metrics = result.metrics_log()
             config_key = self.config_id_to_name[config_dir]
 
+            # obtain voltages
+            _, all_bus_voltages = result.bus_voltages()
+
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
 
             # select the susbset of data based on 'columns_to_plot'
             selected_data = data_metrics[columns_to_plot]
             x_data = data_metrics.loc[:, 'time']
+            x_data_voltage = all_bus_voltages.loc[:, 'time']
+            all_bus_voltages.drop(["time"], axis=1, inplace=True)
 
             # add the selected columns to the plot
             for column in selected_data.keys():
-                plt.plot(x_data, selected_data[column], 
-                         label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                if self._show_voltage_status:
+                    axs[0].plot(x_data, selected_data[column], 
+                                label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                    axs[1].plot(x_data_voltage, all_bus_voltages[column], 
+                                label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                    axs[0].set(ylabel='Voltage Metric')
+                    axs[1].set(ylabel='Voltage [p.u.]')
+                else:
+                    axs.plot(x_data, selected_data[column],
+                             label=config_key + '-' + column + ' :' + str(accumulated_metric))
+                    axs.set(ylabel='Voltage Metric')
 
-            ctr += 1
+        plt.legend()
         
         # x-axis label will always be time and seconds by default
-        plt.xlabel('time [s]')
-        # update y-axis label based on user input
-        if self.ids.detail_figure_ylabel.text is not None:
-            plt.ylabel(self.ids.detail_figure_ylabel.text)
-        plt.legend()
+        metrics_fig.supxlabel('time [s]')
+        
         # update the title based on user input
         if self.ids.detail_figure_title.text is not None:
-            plt.title(self.ids.detail_figure_title.text)
-        else:
-            plt.title('Metrics Plots')
+            metrics_fig.suptitle(self.ids.detail_figure_title.text)
 
         return metrics_fig
 
@@ -2628,12 +2646,18 @@ class ResultsVisualizeScreen(SSimBaseScreen):
                                    'Please select metrics(s) from the \
                                     dropdown menu to update the plot.')
         else:
+            plt.clf()
             self.metrics_figure = self._create_metrics_figure()
             # Add kivy widget to the canvas
             self.ids.summary_canvas.clear_widgets()
             self.ids.summary_canvas.add_widget(
                 FigureCanvasKivyAgg(self.metrics_figure)
             )
+
+    def changed_show_voltage(self, active_state):
+        Logger.debug('Show bus voltage checked!')
+        Logger.debug(active_state)
+        self._show_voltage_status = active_state
 
     def clear_metrics_figure(self):
         """ Clears the metrics figure from the UI canvas.
@@ -2720,14 +2744,38 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         menu_items = []
         for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
+            secondary_detail_text = []
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+
+            for i, config in enumerate(self.project.configurations()):
+                if config_ui_id == f'Configuration {i+1}':
+                    for storage in config.storage:
+                        if storage is not None:
+                            secondary_detail_text.append(
+                                f"name: {storage.name}, bus: {storage.bus}")
+                            tertiary_detail_text.append(
+                                f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+                        else:
+                            secondary_detail_text.append('no storage')
+
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
+
             menu_items.append({
-                "viewclass": "OneLineListItem",
+                "viewclass": "ThreeLineListItem",
                 "text": display_text,
+                "height": dp(90),
+                "secondary_text": final_secondary_text,
+                "tertiary_text": final_tertiary_text,
                 "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
             })
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.config_list_detail_metrics, items=menu_items, width_mult=5
+            caller=self.ids.config_list_detail_metrics, 
+            items=menu_items, 
+            width_mult=10
         )
         self.menu.open()
 
@@ -2814,17 +2862,22 @@ class ResultsDetailScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.list_items = []
-        self.selected_list_items = {}
+        self.selected_list_items_axes_1 = {}
+        self.selected_list_items_axes_2 = {}
         self.variable_data = pd.DataFrame()
-        self.figure = None
+        self.figure = None       
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
         ctr = 1
         for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
-            self.selected_list_items['Configuration ' + str(ctr)] = []
+            self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
+            self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
             ctr += 1
+        # Clear the figure and variable list on enter to result detail screen
+        self.ids.variable_list_detail_axes_1.clear_widgets()
+        self.ids.variable_list_detail_axes_2.clear_widgets()
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -2838,10 +2891,22 @@ class ResultsDetailScreen(SSimBaseScreen):
         matplotlib.Figure:
             Instance of matplotlib figure.
         """
-        fig = plt.figure()
-        plt.clf()
+        # keep track of whether items are selected from the second list
+        _second_list_selected = any(self.selected_list_items_axes_2.values())
+        
+        # use the ggplot theme
+        plt.style.use('ggplot')
+
+        # create subplots based on whether items are selected from 
+        # the second list
+        if _second_list_selected:
+            fig, ax = plt.subplots(2, 1)
+        else:
+            fig, ax = plt.subplots(1, 1)
+        
+        # get the project results
         project_results = self.project.current_checkpoint.results().results()
-        ctr = 1
+
         for result in project_results:
             # obtain pandas dataframe for storage states
             _, data_storage_state = result.storage_state()
@@ -2850,37 +2915,79 @@ class ResultsDetailScreen(SSimBaseScreen):
             _, data_storage_voltage = result.storage_voltages()
             data_storage_voltage.drop(['time'], axis=1, inplace=True)
 
+            _, all_bus_voltage = result.bus_voltages()
+            all_bus_voltage.drop(["time"], axis=1, inplace=True)
+            # rename the columns
+            all_bus_voltage.columns = [
+                col + '_bus_voltage' for col in all_bus_voltage.columns
+            ]
+
             # rename the 'data_storage_voltage' by appending '_voltage' to each header
             new_col_names = [item + '_voltage' for item in data_storage_voltage.columns]
             data_storage_voltage.columns = new_col_names
 
             # combine all data into a single dataframe
-            data = pd.concat([data_storage_state, data_storage_voltage],axis=1)
+            data = pd.concat(
+                [data_storage_state, data_storage_voltage, all_bus_voltage],
+                axis=1
+            )
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
             config_key = self.config_id_to_name[config_dir]
             
             # columns to plot
-            columns_to_plot = self.selected_list_items[config_key]
-
+            columns_to_plot = self.selected_list_items_axes_1[config_key]
+            
             # select subset of data based on columns_to_plot
             selected_data = data[columns_to_plot]
             x_data = data.loc[:, 'time']
             
             # add the selected columns to plot
-            for column in selected_data.keys():
-                plt.plot(x_data, selected_data[column], label=config_key + '-' + column)
-            ctr += 1
+            if _second_list_selected:
+                for column in selected_data.keys():
+                    ax[0].plot(x_data, selected_data[column], label=config_key + '-' + column)
+            else:
+                for column in selected_data.keys():
+                    ax.plot(x_data, selected_data[column], label=config_key + '-' + column)
 
-        plt.xlabel('time')
+            if _second_list_selected:
+                # columns to plot
+                columns_to_plot = self.selected_list_items_axes_2[config_key]
+                # select subset of data based on columns_to_plot
+                selected_data = data[columns_to_plot]
+
+                # add the selected columns to plot
+                for column in selected_data.keys():
+                    ax[1].plot(x_data, selected_data[column], label=config_key + '-' + column)
 
         # update the y-axis labels
         if self.ids.detail_figure_ylabel.text is not None:
-            plt.ylabel(self.ids.detail_figure_ylabel.text)
-        plt.legend()
+            if _second_list_selected:
+                ax[0].set_ylabel(self.ids.detail_figure_ylabel.text)
+            else:
+                ax.set_ylabel(self.ids.detail_figure_ylabel.text)
+
+        if _second_list_selected:
+            if self.ids.detail_figure_ylabel2.text is not None:
+                ax[1].set_ylabel(self.ids.detail_figure_ylabel2.text)
+
         if self.ids.detail_figure_title is not None:
-            plt.title(self.ids.detail_figure_title.text)
+            fig.suptitle(self.ids.detail_figure_title.text, fontsize=14)
         else:
-            plt.title('Detail Plots')
+            fig.suptitle('Detail Plots')
+        
+        # add x-labels
+        if _second_list_selected:
+            ax[0].set_xlabel('time (s)')
+            ax[1].set_xlabel('time (s)')
+        else:
+            ax.set_xlabel('time (s)')
+
+        # add legends
+        if _second_list_selected:
+            ax[0].legend(loc='best')
+            ax[1].legend(loc='best')
+        else:
+            ax.legend(loc='best')
 
         return fig
 
@@ -2969,16 +3076,43 @@ class ResultsDetailScreen(SSimBaseScreen):
         """Checks if at least one of the variables is selected from 
         the dropdown menus.
         """
-        for _, config_variables in self.selected_list_items.items():
+        list_item_axes1_empty = True
+        list_item_axes2_empty = True
+        for _, config_variables in self.selected_list_items_axes_1.items():
             if config_variables != []:
                 # at least one variable is selected, not empty
-                return False
-        return True
+                list_item_axes1_empty = False
+                # return False
+        for _, config_variables in self.selected_list_items_axes_2.items():
+            if config_variables != []:
+                list_item_axes2_empty = False
+
+        if not list_item_axes1_empty or not list_item_axes2_empty:
+            return False
+        else:
+            return True
 
     def clear_figure(self):
         """ Clears the detail figure from the UI canvas.
         """
         self.ids.detail_plot_canvas.clear_widgets()
+
+    # def drop_config_menu(self):
+    #     """Displays the dropdown menu in the visualization screen.
+    #     """
+    #     menu_items = []
+    #     for config_id, config_ui_id in self.config_id_to_name.items():
+    #         display_text = config_ui_id
+    #         menu_items.append({
+    #             "viewclass": "OneLineListItem",
+    #             "text": display_text,
+    #             "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
+    #         })
+
+    #     self.menu = MDDropdownMenu(
+    #         caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+    #     )
+    #     self.menu.open()
 
     def drop_config_menu(self):
         """Displays the dropdown menu in the visualization screen.
@@ -2986,14 +3120,38 @@ class ResultsDetailScreen(SSimBaseScreen):
         menu_items = []
         for config_id, config_ui_id in self.config_id_to_name.items():
             display_text = config_ui_id
+            secondary_detail_text = []
+            tertiary_detail_text = []
+            final_secondary_text = []
+            final_tertiary_text = []
+
+            for i, config in enumerate(self.project.configurations()):
+                if config_ui_id == f'Configuration {i+1}':
+                    for storage in config.storage:
+                        if storage is not None:
+                            secondary_detail_text.append(
+                                f"name: {storage.name}, bus: {storage.bus}")
+                            tertiary_detail_text.append(
+                                f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+                        else:
+                            secondary_detail_text.append('no storage')
+
+            final_secondary_text = "\n".join(secondary_detail_text)
+            final_tertiary_text = "\n".join(tertiary_detail_text)
+
             menu_items.append({
-                "viewclass": "OneLineListItem",
+                "viewclass": "ThreeLineListItem",
                 "text": display_text,
-                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
+                "height": dp(90),
+                "secondary_text": final_secondary_text,
+                "tertiary_text": final_tertiary_text,
+                "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x,y)
             })
 
         self.menu = MDDropdownMenu(
-            caller=self.ids.config_list_detail, items=menu_items, width_mult=5
+            caller=self.ids.config_list_detail, 
+            items=menu_items, 
+            width_mult=10
         )
         self.menu.open()
 
@@ -3005,7 +3163,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         ----------
         value_id : str
             Internal ID of the selected configuration.
-        filename : str
+        value_ui_id : str
             ID displayed in the UI of the selected configuration.
         """
         self.current_configuration = value_ui_id
@@ -3029,6 +3187,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             # extract the data
             storage_state_headers, storage_state_data = current_result.storage_state()
             storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
+            bus_voltage_headers, bus_voltage_data = current_result.bus_voltages()
             
             # remove 'time' from the header list and pandas data frame to prevent
             # duplication
@@ -3036,32 +3195,54 @@ class ResultsDetailScreen(SSimBaseScreen):
                 storage_voltage_headers.pop(0)
             storage_voltage_data.drop(['time'], axis=1, inplace=True)
 
+            if bus_voltage_headers is not None:
+                bus_voltage_headers.pop(0)
+            bus_voltage_data.drop(['time'], axis=1, inplace=True)
+
             # 'storage_voltage_headers' have no indication that these labels
             # represent voltage, append string '_voltage' to each label
-            storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]                                                                                                                            
-            
-            self.list_items = storage_state_headers + storage_voltage_headers
-            self.variable_data = pd.concat([storage_state_data, storage_voltage_data], axis=1)
+            storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]
+            bus_voltage_headers = [item + '_bus_voltage' for item in bus_voltage_headers]
+
+            self.list_items = (
+                storage_state_headers
+                + storage_voltage_headers
+                + bus_voltage_headers
+            )
+            self.variable_data = pd.concat(
+                [storage_state_data, storage_voltage_data, bus_voltage_data],
+                axis=1
+            )
 
             self.x_data = list(self.variable_data.loc[:, 'time'])
 
-            self.ids.variable_list_detail.clear_widgets()
+            self.ids.variable_list_detail_axes_1.clear_widgets()
+            self.ids.variable_list_detail_axes_2.clear_widgets()
+            
             # add the list of variables in the selected configuration
             # into the MDList
-
             for item in self.list_items:
                 # do not add 'time' to the variable list
                 if item == 'time':
                     continue
                 else:
-                    list_item = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-                    list_item.ids.selected.bind(active=self.on_item_check_changed)
-                    self.ids.variable_list_detail.add_widget(list_item)
-                
-                    if item in self.selected_list_items[self.current_configuration]:
-                        list_item.ids.selected.active = True
+                    list_item_axes_1 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
+                    list_item_axes_1.ids.selected.bind(active=self.on_item_check_changed_axes_1)
+                    self.ids.variable_list_detail_axes_1.add_widget(list_item_axes_1)
+
+                    list_item_axes_2 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
+                    list_item_axes_2.ids.selected.bind(active=self.on_item_check_changed_axes_2)
+                    self.ids.variable_list_detail_axes_2.add_widget(list_item_axes_2)
+                                    
+                    if item in self.selected_list_items_axes_1[self.current_configuration]:
+                        list_item_axes_1.ids.selected.active = True
                     else:
-                        list_item.ids.selected.active = False
+                        list_item_axes_1.ids.selected.active = False
+                    
+                    if item in self.selected_list_items_axes_2[self.current_configuration]:
+                        list_item_axes_2.ids.selected.active = True
+                    else:
+                        list_item_axes_2.ids.selected.active = False
 
             # close the drop-down menu
             self.menu.dismiss()
@@ -3070,12 +3251,12 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             Logger.debug('This configuration has not been evaluated')
 
-    def on_item_check_changed(self, ckb, value):
+    def on_item_check_changed_axes_1(self, ckb, value):
         """A callback function for the list items to use when their check 
         state changes.
 
         This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_list_items` 
+        the currently selected variable into `self.selected_list_items_axes_1` 
         if value is true and removes it if value is false.
 
         Parameters
@@ -3086,10 +3267,32 @@ class ResultsDetailScreen(SSimBaseScreen):
             The current check state of the check box (true = checked, false = unchecked).
         """
         if value:
-            if str(ckb.listItem.text) not in self.selected_list_items[str(self.current_configuration)]:
-                self.selected_list_items[str(self.current_configuration)].append(str(ckb.listItem.text))
+            if str(ckb.listItem.text) not in self.selected_list_items_axes_1[str(self.current_configuration)]:
+                self.selected_list_items_axes_1[str(self.current_configuration)].append(str(ckb.listItem.text))
         else:
-            self.selected_list_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
+            self.selected_list_items_axes_1[str(self.current_configuration)].remove(str(ckb.listItem.text))
+
+    # TODO: see if the same function can be resued
+    def on_item_check_changed_axes_2(self, ckb, value):
+        """A callback function for the list items to use when their check 
+        state changes.
+
+        This method looks at the current check state (value) and either adds 
+        the currently selected variable into `self.selected_list_items_axes_2` 
+        if value is true and removes it if value is false.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box (true = checked, false = unchecked).
+        """
+        if value:
+            if str(ckb.listItem.text) not in self.selected_list_items_axes_2[str(self.current_configuration)]:
+                self.selected_list_items_axes_2[str(self.current_configuration)].append(str(ckb.listItem.text))
+        else:
+            self.selected_list_items_axes_2[str(self.current_configuration)].remove(str(ckb.listItem.text))
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
