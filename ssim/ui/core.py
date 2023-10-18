@@ -850,7 +850,8 @@ class StorageOptions:
             self.control.read_toml(tomlData["control-params"])
 
     def add_bus(self, bus: str):
-        """Adds the supplied bus name to the list of bus names in this storage option.
+        """Adds the supplied bus name to the list of bus names in this storage
+            option.
 
         Parameters
         ----------
@@ -858,6 +859,17 @@ class StorageOptions:
             The name of the bus to add to this storage options bus list.
         """
         self.busses.add(bus)
+        
+    def remove_bus(self, bus: str):
+        """Removes the supplied bus name from the list of bus names in this
+            storage option.
+
+        Parameters
+        ----------
+        bus
+            The name of the bus to remove from this storage options bus list.
+        """
+        self.busses.discard(bus)
 
     def add_power(self, power: float) -> bool:
         """Adds a new power value (kW) to the list of allowed power values

@@ -16,10 +16,11 @@
 
     BoxLayout:
         orientation: "horizontal"
+        id: name_panel
                    
         TextFieldListFilter:
-            id: txt_bus_filter
-            hint_text: "Filter Busses"
+            id: txt_bus_name_filter
+            hint_text: "Filter Busses by Name"
             on_filter_applied: self.parent.parent.changed_text_filter(self)
 
         Button:
@@ -31,10 +32,17 @@
             
     BoxLayout:
         orientation: "horizontal"
+        id: yes_phase_panel
         
+        Label:
+            text: "Must Have Phase"
+            color: C(hex_black)
+            size_hint_x: 0.25
+            
         BoxLayout:
             orientation: "horizontal"
-            
+            size_hint_x: 0.25
+        
             canvas.before:
                 Color:
                     rgba: ssim_light_blue
@@ -42,17 +50,40 @@
                     width: 1
                     rectangle: self.x, self.y, self.width, self.height
 
-            Label:
-                text: "Phase 1"
-                color: C(hex_black)                
             CheckBox:
-                id: ckb_phase_1
+                id: ckb_yes_phase_1
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)                
+            Label:
+                text: "1"
+                color: C(hex_black)
+                halign: "left"
+            
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_x: 0.25
+        
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            CheckBox:
+                id: ckb_yes_phase_2
                 active: False
                 on_active: self.parent.parent.parent.changed_phase_filter(self)
+                
+            Label:
+                text: "2"
+                color: C(hex_black)
+                halign: "left"
 
         BoxLayout:
             orientation: "horizontal"
-            
+            size_hint_x: 0.25
+        
             canvas.before:
                 Color:
                     rgba: ssim_light_blue
@@ -60,17 +91,29 @@
                     width: 1
                     rectangle: self.x, self.y, self.width, self.height
 
-            Label:
-                text: "Phase 2"
-                color: C(hex_black)
             CheckBox:
-                id: ckb_phase_2
+                id: ckb_yes_phase_3
                 active: False
                 on_active: self.parent.parent.parent.changed_phase_filter(self)
             
+            Label:
+                text: "3"
+                color: C(hex_black)
+                halign: "left"
+               
+    BoxLayout:
+        orientation: "horizontal"
+        id: no_phase_panel
+        
+        Label:
+            text: "Can't' Have Phase"
+            color: C(hex_black)    
+            size_hint_x: 0.25
+            
         BoxLayout:
             orientation: "horizontal"
-            
+            size_hint_x: 0.25
+        
             canvas.before:
                 Color:
                     rgba: ssim_light_blue
@@ -78,17 +121,39 @@
                     width: 1
                     rectangle: self.x, self.y, self.width, self.height
 
-            Label:
-                text: "Phase 3"
-                color: C(hex_black)
             CheckBox:
-                id: ckb_phase_3
+                id: ckb_no_phase_1
                 active: False
                 on_active: self.parent.parent.parent.changed_phase_filter(self)
-            
+            Label:
+                text: "1"
+                color: C(hex_black)
+                size_hint_x: 0.75
+                
         BoxLayout:
             orientation: "horizontal"
-            
+            size_hint_x: 0.25
+        
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+                    
+            CheckBox:
+                id: ckb_no_phase_2
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)
+            Label:
+                text: "2"
+                color: C(hex_black)
+                size_hint_x: 0.75
+                
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_x: 0.25
+        
             canvas.before:
                 Color:
                     rgba: ssim_light_blue
@@ -96,13 +161,137 @@
                     width: 1
                     rectangle: self.x, self.y, self.width, self.height
 
-            Label:
-                text: "Selected\nOnly"
-                color: C(hex_black)
             CheckBox:
-                id: ckb_sel_only
+                id: ckb_no_phase_3
                 active: False
-                on_active: self.parent.parent.parent.changed_sel_only_filter(self)
+                on_active: self.parent.parent.parent.changed_phase_filter(self)
+            Label:
+                text: "3"
+                color: C(hex_black)
+                size_hint_x: 0.75
+             
+    BoxLayout:
+        orientation: "horizontal"
+        id: phase_ct_panel
+        
+        Label:
+            text: "Allowed Phase Counts"
+            color: C(hex_black)
+            size_hint_x: 0.25
+            
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_x: 0.25
+        
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            CheckBox:
+                id: ckb_1_phase_ct
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)   
+            Label:
+                text: "1-phase"
+                color: C(hex_black)
+            
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_x: 0.25
+        
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            CheckBox:
+                id: ckb_2_phase_ct
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)
+            Label:
+                text: "2-phase"
+                color: C(hex_black)
+                halign: "left"
+
+        BoxLayout:
+            orientation: "horizontal"
+            size_hint_x: 0.25
+        
+            canvas.before:
+                Color:
+                    rgba: ssim_light_blue
+                Line:
+                    width: 1
+                    rectangle: self.x, self.y, self.width, self.height
+
+            CheckBox:
+                id: ckb_3_phase_ct
+                active: False
+                on_active: self.parent.parent.parent.changed_phase_filter(self)
+            Label:
+                text: "3-phase"
+                color: C(hex_black)
+                halign: "left"
+
+    BoxLayout:
+        orientation: "horizontal"
+        id: selected_panel
+
+        canvas.before:
+            Color:
+                rgba: ssim_light_blue
+            Line:
+                width: 1
+                rectangle: self.x, self.y, self.width, self.height
+
+        Label:
+            text: "Selected Only"
+            color: C(hex_black)
+            size_hint_x: 0.25
+        CheckBox:
+            id: ckb_sel_only
+            active: False
+            on_active: self.parent.parent.changed_sel_only_filter(self)
+            
+    BoxLayout:
+        id: voltage_panel
+        
+        canvas.before:
+            Color:
+                rgba: ssim_light_blue
+            Line:
+                width: 1
+                rectangle: self.x, self.y, self.width, self.height
+                
+        Label:
+            text: "Voltage"
+            color: C(hex_black)
+            size_hint_x: 0.25
+           
+        GridLayout:
+            cols: 8
+            id: voltage_check_panel
+            
+    BoxLayout:
+        orientation: "horizontal"
+
+        Button:
+            id: okBtn
+            text: 'Ok'
+
+        Button:
+            id: clearBtn
+            text: 'Clear'
+        
+        Button:
+            id: cancelBtn
+            text: 'Cancel'
+
 
 <SSimScreen>:
     name: 'ssim'
@@ -303,6 +492,7 @@
         id: selected
         listItem: root
 
+
 <ResultsMetricsListItemWithCheckbox>:
     id: results_metrics_list
 
@@ -318,6 +508,8 @@
 
     LeftCheckBox:
         id: selected
+        on_active: root.mark(self, self.active)
+
 
 <DroopTabContent@BoxLayout>
     orientation: "vertical"
@@ -840,52 +1032,15 @@
                     size_hint: (1.0, 0.05)
                     underline: True
 
-                BusSearchPanelContent:
-                    id: bus_search_panel
-                    size_hint_y: 0.2
-                   
-                #ScrollView:
+                Button:
+                    id: filter_busses_btn
+                    text: "Filter Busses"
+                    size_hint: (1.0, 0.05)
+                    on_press: root.open_bus_filters()
 
-                #    MDGridLayout:
-                #        cols: 1
-                #        adaptive_height: True
-                #        id: filter_box
-
-                #        MDExpansionPanel
-                #            id: filter_panel
-                #            panel_cls: MDExpansionPanelThreeLine
-                
-                #BoxLayout:
-                #    orientation: "horizontal"
-                #    size_hint_y: .08
-                  
-                #    TextFieldListFilter:
-                #        id: bus_filter
-                #        hint_text: "Filter Busses"
-
-                #    Button:
-                #        text: "X"
-                #        size_hint: [.07, 0.5]
-                #        pos_hint: {"top":0.9}
-                #        on_press: root.remove_filter()
-                       
-                MDScrollView:
-                    size_hint: (1.0, 0.83)
-                    id: bus_scroller
-
-                    canvas.before:
-                        Color:
-                            rgba: ssim_light_blue
-                        Line:
-                            width: 1
-                            rectangle: self.x, self.y, self.width, self.height
-
-                    MDList:
-                        size_hint_y: None
-                        #md_bg_color: ssim_light_blue
-                        height: 0
-                        id: bus_list
-
+                BusRecycleView:
+                    id: bus_list
+                    
                 BoxLayout:
                     size_hint_y: None
                     height: 25
@@ -1180,6 +1335,21 @@
         multiselect: False
         touch_multiselect: False
 
+
+<BusRecycleView>:
+    viewclass: 'BusListItem'
+    padding: [0, 0, 10, 0]
+    
+    RecycleBoxLayout:
+        padding: [0, 5, 0, 0]
+        default_size: None, dp(56)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
 <XYItemTextField>
     multiline: False
 
@@ -1234,14 +1404,16 @@
                             icon: "plus"
                             on_release: root.configure_voltage_metrics()
 
-                        TwoLineIconListItem:
-                            text: "Some other metric values"
-                            secondary_text: "set ..."
-                            icon: "plus"
-                            on_release: root.configure_some_other_metrics()
+                        #TwoLineIconListItem:
+                        #    text: "Some other metric values"
+                        #    secondary_text: "set ..."
+                        #    icon: "plus"
+                        #    on_release: root.configure_some_other_metrics()
 
             BoxLayout:
+                id: interlistheader
                 orientation: "vertical"
+                spacing: 10
 
                 Label:
                     id: interlabel
@@ -1269,10 +1441,19 @@
                         size: self.parent.width, 10
                         on_release: root.deselect_all_metric_objects()
                         disabled: True
-
-                ScrollView:
-                    MDList:
-                        id: interlist
+                
+                RecycleView:
+                    id: interlist
+    
+                    RecycleBoxLayout:
+                        padding: [0, 5, 0, 0]
+                        default_size: None, dp(56)
+                        default_size_hint: 1, None
+                        size_hint_y: None
+                        height: self.minimum_height
+                        orientation: 'vertical'
+                        multiselect: False
+                        touch_multiselect: False
 
             BoxLayout:
                 orientation: "vertical"

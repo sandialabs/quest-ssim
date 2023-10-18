@@ -1205,6 +1205,19 @@ class DSSModel:
         voltages = dssdirect.Bus.VMagAngle()
         base_voltage = dssdirect.Bus.kVBase() * 1000
         return list(voltage / base_voltage for voltage in voltages[::2])
+    
+    @staticmethod
+    def nominal_voltage(bus):
+        """Return a list of node voltage magnitudes at `bus` [pu]."""
+        dssdirect.Circuit.SetActiveBus(bus)
+        nNodes = dssdirect.Bus.NumNodes()
+        kvb = dssdirect.Bus.kVBase()        
+        if nNodes == 1: return round(kvb, 4)
+        return round(kvb / math.sqrt(3.0) * nNodes, 4)
+    
+    @staticmethod
+    def all_base_voltages():
+        return {DSSModel.nominal_voltage(bus) for bus in dssdirect.Circuit.AllBusNames()}
 
     @staticmethod
     def mean_node_voltage(bus):

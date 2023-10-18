@@ -2,11 +2,13 @@
 import itertools
 import math
 import os
+from pickle import NONE
 import re
 from contextlib import ExitStack
 from math import cos, hypot
 from threading import Thread
 from typing import List
+from ssim.opendss import DSSModel
 
 import kivy
 import matplotlib as mpl
@@ -27,10 +29,11 @@ from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.metrics import dp
-from kivy.properties import ObjectProperty, StringProperty
+from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.popup import Popup
+from kivy.uix.button import Button
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
@@ -40,6 +43,7 @@ from kivy.core.window import Window
 from kivymd.app import MDApp
 from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
+from kivy.uix.label import Label
 from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivymd.uix.list import (
     TwoLineAvatarIconListItem,
@@ -50,6 +54,7 @@ from kivymd.uix.list import (
 )
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.selectioncontrol import MDCheckbox
+from kivy.uix.checkbox import CheckBox
 from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.textfield import MDTextField
 from matplotlib.collections import LineCollection
@@ -133,8 +138,8 @@ def parse_float(strval) -> float:
 
 
 def parse_float_or_str(strval):
-    """A utility method to parse a string into a floating point value or
-     leave it as is if the cast fails.
+    """A utility method to parse a string into a floating point value or leave
+     it as is if the cast fails.
 
     This used parse_float and if that fails, this returns the supplied input
     string.
@@ -202,15 +207,109 @@ def refocus_text_field(field):
     field.focus = True
 
 
+class BusFilters:
+    
+    def __init__(self, *args, **kwargs):
+        self.name_filter = ""
+        self.must_have_phases = set()
+        self.cant_have_phases = set()
+        self.allowed_phase_cts = set()
+        self.voltages = set()
+        self.selected_only = False    
+
+    def is_empty(self) -> bool:
+        if self.name_filter: return False
+        if len(self.voltages) > 0: return False
+        if self.selected_only: return False
+        if len(self.must_have_phases) > 0: return False
+        if len(self.allowed_phase_cts) > 0: return False
+        return len(self.cant_have_phases) == 0
+
+    def summary(self):
+        elems = []
+        if self.name_filter: elems += ["\"" + self.name_filter + "\""]
+        if self.selected_only: elems += ["+Selected"]
+        elems += ["+P"+str(p) for p in self.must_have_phases]
+        elems += ["-P"+str(p) for p in self.cant_have_phases]
+        elems += [str(p) + "-phase" for p in self.allowed_phase_cts]
+
+        vstr = ""
+        if len(self.voltages) > 1:
+            vstr = "(" + " or ".join(self.voltages) + ")"
+        elif len(self.voltages) == 1:
+            vstr = str(next(iter(self.voltages)))
+        
+        if vstr: elems += ["+V"+vstr]
+        
+        return ("[" if len(elems) > 0 else "") + "; ".join(elems) + \
+            ("]" if len(elems) > 0 else "")
+
+    
+    def test_bus(self, bus, project, sel_bus_list) -> bool:
+        nameFilter = self.name_filter
+        if (nameFilter and not nameFilter in bus): return False
+        
+        sel_only = self.selected_only
+        if sel_only and not bus in sel_bus_list: return False        
+
+        phases = project.phases(bus)
+
+        if len(self.allowed_phase_cts) > 0:
+            if len(phases) not in self.allowed_phase_cts: return False
+
+        for mhp in self.must_have_phases:
+            if mhp not in phases: return False
+
+        for chp in self.cant_have_phases:
+            if chp in phases: return False
+        
+        bv = DSSModel.nominal_voltage(bus)
+        selvs = self.voltages
+        if len(selvs) > 0 and str(bv) not in selvs: return False
+
+        return True
+
+
 class BusSearchPanelContent(BoxLayout):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.register_event_type("on_filter_applied")
+        self.filters = BusFilters()
+
+    def apply_filters(self, filters: BusFilters):
+        self.ids.txt_bus_name_filter.text = filters.name_filter
+        self.set_selected_voltages(filters.voltages)
+        self.ids.ckb_yes_phase_1.active = 1 in filters.must_have_phases
+        self.ids.ckb_yes_phase_2.active = 2 in filters.must_have_phases
+        self.ids.ckb_yes_phase_3.active = 3 in filters.must_have_phases
+        self.ids.ckb_no_phase_1.active = 1 in filters.cant_have_phases
+        self.ids.ckb_no_phase_2.active = 2 in filters.cant_have_phases
+        self.ids.ckb_no_phase_3.active = 3 in filters.cant_have_phases
+        self.ids.ckb_1_phase_ct.active = 1 in filters.allowed_phase_cts
+        self.ids.ckb_2_phase_ct.active = 2 in filters.allowed_phase_cts
+        self.ids.ckb_3_phase_ct.active = 3 in filters.allowed_phase_cts
+        self.ids.ckb_sel_only.active = filters.selected_only
+
+    def extract_filters(self) -> BusFilters:
+        ret = BusFilters()
+        ret.name_filter = self.ids.txt_bus_name_filter.text
+        ret.voltages = self.get_selected_voltages()
+        if self.ids.ckb_yes_phase_1.active: ret.must_have_phases.add(1)
+        if self.ids.ckb_yes_phase_2.active: ret.must_have_phases.add(2)
+        if self.ids.ckb_yes_phase_3.active: ret.must_have_phases.add(3)
+        if self.ids.ckb_no_phase_1.active: ret.cant_have_phases.add(1)
+        if self.ids.ckb_no_phase_2.active: ret.cant_have_phases.add(2)
+        if self.ids.ckb_no_phase_3.active: ret.cant_have_phases.add(3)
+        if self.ids.ckb_1_phase_ct.active: ret.allowed_phase_cts.add(1)
+        if self.ids.ckb_2_phase_ct.active: ret.allowed_phase_cts.add(2)
+        if self.ids.ckb_3_phase_ct.active: ret.allowed_phase_cts.add(3)
+        ret.selected_only = self.ids.ckb_sel_only.active
+        return ret
 
     def clear_text_filter(self):
-        self.ids.txt_bus_filter.text  = ""
-        self.ids.txt_bus_filter.on_text_validate()
+        self.ids.txt_bus_name_filter.text  = ""
+        self.ids.txt_bus_name_filter.on_text_validate()
         
     def changed_phase_filter(self, instance):
         self.__raise_filter_applied(instance)
@@ -220,21 +319,68 @@ class BusSearchPanelContent(BoxLayout):
 
     def changed_text_filter(self, instance):
         self.__raise_filter_applied(instance)
-        Clock.schedule_once(
-            lambda dt: refocus_text_field(self.ids.txt_bus_filter), 0.05
-            )
+        Clock.schedule_once(lambda dt: refocus_text_field(instance), 0.05)
 
-    def get_filter_text(self) -> str:
-        return self.ids.txt_bus_filter.text
-    
-    def get_phase_1_active(self) -> bool:
-        return self.ids.ckb_phase_1.active
-    
-    def get_phase_2_active(self) -> bool:
-        return self.ids.ckb_phase_2.active
+    def changed_voltage_check(self, instance, active):
+        self.__raise_filter_applied(instance)
 
-    def get_phase_3_active(self) -> bool:
-        return self.ids.ckb_phase_3.active
+    def get_selected_voltages(self):
+        ret = set()
+        add_next_label = False
+        
+        for w in reversed(self.ids.voltage_check_panel.children):
+            if isinstance(w, CheckBox) and w.active:
+                add_next_label = True
+            elif isinstance(w, Label) and add_next_label:
+                ret.add(w.text)
+                add_next_label = False
+        
+        return ret
+
+    def set_selected_voltages(self, voltages):
+        if voltages is None: return
+        next_check_val = None
+        
+        for w in self.ids.voltage_check_panel.children:
+            if isinstance(w, CheckBox):
+                if next_check_val is not None:
+                    w.active = next_check_val
+                next_check_val = None
+            elif isinstance(w, Label):
+                next_check_val = w.text in voltages
+
+    def get_name_filter_text(self) -> str:
+        return self.ids.txt_bus_name_filter.text
+    
+    #def get_voltage_filter_text(self) -> str:
+    #    return self.ids.txt_bus_volt_filter.text
+    
+    def get_yes_phase_1_active(self) -> bool:
+        return self.ids.ckb_yes_phase_1.active
+    
+    def get_yes_phase_2_active(self) -> bool:
+        return self.ids.ckb_yes_phase_2.active
+
+    def get_yes_phase_3_active(self) -> bool:
+        return self.ids.ckb_yes_phase_3.active
+    
+    def get_no_phase_1_active(self) -> bool:
+        return self.ids.ckb_no_phase_1.active
+    
+    def get_no_phase_2_active(self) -> bool:
+        return self.ids.ckb_no_phase_2.active
+
+    def get_no_phase_3_active(self) -> bool:
+        return self.ids.ckb_no_phase_3.active
+    
+    def get_1_phase_allowed_active(self) -> bool:
+        return self.ids.ckb_1_phase_ct.active
+    
+    def get_2_phase_allowed_active(self) -> bool:
+        return self.ids.ckb_2_phase_ct.active
+
+    def get_3_phase_allowed_active(self) -> bool:
+        return self.ids.ckb_3_phase_ct.active
     
     def get_selected_only_active(self) -> bool:
         return self.ids.ckb_sel_only.active
@@ -246,6 +392,13 @@ class BusSearchPanelContent(BoxLayout):
         
     def on_filter_applied(self, instance):
         pass
+
+    def load_voltage_checks(self, voltages):
+        for v in voltages:
+            ckb = CheckBox(active=False)
+            ckb.bind(active=self.changed_voltage_check)
+            self.ids.voltage_check_panel.add_widget(ckb)
+            self.ids.voltage_check_panel.add_widget(Label(text=str(v), color=(0,0,0)))
 
 
 class SSimApp(MDApp):
@@ -331,24 +484,48 @@ class LeftCheckBox(ILeftBodyTouch, MDCheckbox):
     pass
 
 
-class BusListItem(TwoLineIconListItem):
+class CheckedListItemOwner:
+    def on_selection_changed(self, name, selected):
+        pass
 
-    def __init__(self, busname, busphases, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-        self.text = busname
-        self.secondary_text = str(busphases)
+class BusListItem(TwoLineIconListItem, RecycleDataViewBehavior):
+    
+    active = False
+    owner: CheckedListItemOwner = None 
 
-    def mark(self, check, the_list_item):
-        """mark the task as complete or incomplete"""
-        if check.active:
-            self.parent.parent.parent.add_bus(the_list_item)
-        else:
-            self.parent.parent.parent.remove_bus(the_list_item)
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+        
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed(self.text, self.active)
 
-    @property
-    def active(self):
-        return self.ids.selected.active
+    def on_selected_changed(self, bus, selected):
+        pass
+
+    def mark(self, check, value):
+        self.active = value
+        self.__raise_value_changed()
+            
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
 
 
 class TextFieldFloat(MDTextField):
@@ -555,7 +732,7 @@ class TextFieldListFilter(MDTextField):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper_text_mode = "on_focus"
-        self.helper_text = "Input text and press enter to filter"
+        #self.helper_text = "Input text and press enter to filter"
         self.register_event_type("on_filter_applied")
     
     def on_text_validate(self):
@@ -568,7 +745,7 @@ class TextFieldListFilter(MDTextField):
         
     def on_filter_applied(self, instance):
         pass
-
+    
 
 class TextFieldOpenDSSName(MDTextField):
     """Text field that enforces OpenDSS name requirements."""
@@ -592,8 +769,15 @@ class TextFieldOpenDSSName(MDTextField):
             self.error = False
 
 
-class StorageConfigurationScreen(SSimBaseScreen):
+class BusRecycleView(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
     """Configure a single energy storage device."""
+
+    _bus_filters = BusFilters()
 
     def __init__(self, der_screen, ess: StorageOptions, *args, **kwargs):
         super().__init__(der_screen.project, *args, **kwargs)
@@ -609,19 +793,7 @@ class StorageConfigurationScreen(SSimBaseScreen):
         )
         self.options = ess
         self.initialize_widgets()
-        
-        self.ids.bus_search_panel.bind(
-            on_filter_applied=self.on_bus_filter_applied
-            )
-        
-        # self.ids.bus_list_box.add_widget(
-        #     MDExpansionPanel(
-        #         content=BusSearchPanelContent(),
-        #         panel_cls=MDExpansionPanelOneLine(text="Filter Busses")
-        #     ), 3
-        # )
-
-
+                
     def initialize_widgets(self):
         if self.options is None: return
 
@@ -641,62 +813,78 @@ class StorageConfigurationScreen(SSimBaseScreen):
             lambda dt: refocus_text_field(self.ids.device_name), 0.05
             )
 
-    def set_bus_list_active_checks(self):
-        for bus_list_item in self.ids.bus_list.children:
-            bus_list_item.ids.selected.active = \
-                bus_list_item.text in self.options.busses
+    def on_selection_changed(self, bus, selected):
+        if self.options is None: return
+        if selected:
+            self.options.add_bus(bus)
+        else:
+            self.options.remove_bus(bus)
+
+    def apply_bus_filters(self):
+        self.reload_bus_list()
+        
+    def open_bus_filters(self):
+    
+        content = BusSearchPanelContent()
+        
+        content.load_voltage_checks(
+            self.project.grid_model.all_base_voltages()
+            )
+
+        content.apply_filters(self._bus_filters)
+
+        popup = Popup(
+            title='Filter Busses', content=content, auto_dismiss=False,
+            size_hint=(0.7, 0.7), background_color=(224,224,224),
+            title_color=(0,0,0)
+        )
+
+        def apply(*args):
+            self._bus_filters = content.extract_filters()
+            self.apply_bus_filters()
+            popup.dismiss()
+        
+        def clear(*args):
+            self._bus_filters = BusFilters()
+            self.apply_bus_filters()
+            popup.dismiss()            
+
+        content.ids.okBtn.bind(on_press=apply)
+        content.ids.clearBtn.bind(on_press=clear)
+        content.ids.cancelBtn.bind(on_press=popup.dismiss)
+        popup.open()
 
     def on_bus_filter_applied(self, instance, value):
         self.reload_bus_list()
 
     def check_bus_filters(self, bus) -> bool:
-        phases = self.project.phases(bus)
-        filter = self.ids.bus_search_panel.get_filter_text()
-
-        if (filter and not filter in bus): return False
-        
-        sel_only = self.ids.bus_search_panel.get_selected_only_active()
-        if sel_only and not bus in self.options.busses: return False        
-
-        p1 = self.ids.bus_search_panel.get_phase_1_active()
-        p2 = self.ids.bus_search_panel.get_phase_2_active()
-        p3 = self.ids.bus_search_panel.get_phase_3_active()
-
-        if p1 and 1 not in phases: return False
-        if p2 and 2 not in phases: return False
-        if p3 and 3 not in phases: return False
-
-        return True
+        return self._bus_filters.test_bus(
+            bus, self.project, self.options.busses
+            )
 
     def check_need_bus_filtering(self) -> bool:
-        filter = self.ids.bus_search_panel.get_filter_text()
-        if filter: return True
-
-        sel_only = self.ids.bus_search_panel.get_selected_only_active()
-        if sel_only: return True
-
-        p1 = self.ids.bus_search_panel.get_phase_1_active()
-        if p1: return True
-        
-        p2 = self.ids.bus_search_panel.get_phase_2_active()
-        if p2: return True
-        
-        p3 = self.ids.bus_search_panel.get_phase_3_active()
-        if p3: return True
-        
-        return False
+        return self._bus_filters is not None and \
+            not self._bus_filters.is_empty()
 
     def reload_bus_list(self):
-        self.ids.bus_list.clear_widgets()
-
         need_filter = self.check_need_bus_filtering()        
 
+        bus_data = []
         for bus in self.project.bus_names:
             if not need_filter or self.check_bus_filters(bus):
-                bus_list_item = BusListItem(bus, self.project.phases(bus))
-                self.ids.bus_list.add_widget(bus_list_item)
-                
-        self.set_bus_list_active_checks()
+                bus_data += [{
+                    "text":bus,
+                    "secondary_text":str(self.project.phases(bus)) +
+                        ", " + str(DSSModel.nominal_voltage(bus)) + " kV",
+                    "active":bus in self.options.busses,
+                    "owner":self
+                    }]
+        
+        self.ids.bus_list.data = bus_data
+
+        filtertxt = self._bus_filters.summary()        
+        self.ids.filter_busses_btn.text = "Filter Busses"
+        if filtertxt: self.ids.filter_busses_btn.text += " " + filtertxt
 
     def _check_name(self, textfield):
         if not textfield.text_valid():
@@ -736,11 +924,10 @@ class StorageConfigurationScreen(SSimBaseScreen):
 
     @property
     def _selected_busses(self):
-        return list(
-            bus_item.text
-            for bus_item in self.ids.bus_list.children
-            if bus_item.active
-        )
+        return list(self.ids.bus_list.data[i]["text"]
+            for i in range(len(self.ids.bus_list.data)) \
+                if self.ids.bus_list.data[i]["active"]
+            )
 
     def edit_control_params(self):
         self._record_option_data()
@@ -870,20 +1057,21 @@ class XYGridView(RecycleView):
         self.dispatch("on_item_deleted")
 
     def extract_data_lists(self, sorted: bool = True) -> (list, list):
-        """Reads all values out of the "x" and "y" columns of this control and returns them as
-            pair of lists that may be sorted if requested.
+        """Reads all values out of the "x" and "y" columns of this control and
+           as returns them pair of lists that may be sorted if requested.
 
         Parameters
         ----------
         sorted : bool
-            True if this method should try and c0-sort the extracted x and y lists before
-            returning them and false otherwise.
+            True if this method should try and c0-sort the extracted x and y
+             lists beforereturning them and false otherwise.
 
         Returns
         -------
         tuple:
-            A pair of lists containing the x and y values in this grid.  The lists will be
-            co-sorted using the x list as an index if requested and they can be sorted.
+            A pair of lists containing the x and y values in this grid.  The
+            lists will be co-sorted using the x list as an index if requested
+            and they can be sorted.
         """
         xvs = self.extract_x_vals()
         yvs = self.extract_y_vals()
@@ -896,9 +1084,10 @@ class XYGridView(RecycleView):
         Returns
         -------
         list:
-            A list containing all values in the "x" column of this control.  The values in
-            the list will be of type float if they can be cast as such.  Otherwise, raw text
-            representations will be put in the list in locations where the cast fails.
+            A list containing all values in the "x" column of this control.  The
+            values in the list will be of type float if they can be cast as
+            such.  Otherwise, raw text representations will be put in the list
+            in locations where the cast fails.
         """
         return [child.x_value for child in self.children[0].children]
 
@@ -908,9 +1097,10 @@ class XYGridView(RecycleView):
         Returns
         -------
         list:
-            A list containing all values in the "y" column of this control.  The values in
-            the list will be of type float if they can be cast as such.  Otherwise, raw text
-            representations will be put in the list in locations where the cast fails.
+            A list containing all values in the "y" column of this control. 
+            The values in the list will be of type float if they can be cast as
+            such.  Otherwise, raw text representations will be put in the list
+            in locations where the cast fails.
         """
         return [child.y_value for child in self.children[0].children]
 
@@ -920,6 +1110,9 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
 
     last_text: str = ""
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
     @property
     def x_value(self):
         """Returns the current contents of the x value field of this row.
@@ -927,9 +1120,9 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
         Returns
         -------
         float or str:
-            If the current content of the x value field of this row can be cast to
-            a float, then the float is returned.  Otherwise, the raw string contents
-            of the field are returned.
+            If the current content of the x value field of this row can be cast
+            to a float, then the float is returned.  Otherwise, the raw string
+            contents of the field are returned.
         """
         return parse_float_or_str(self.ids.x_field.text)
 
@@ -940,9 +1133,9 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
         Returns
         -------
         float or str:
-            If the current content of the y value field of this row can be cast to
-            a float, then the float is returned.  Otherwise, the raw string contents
-            of the field are returned.
+            If the current content of the y value field of this row can be cast
+            to a float, then the float is returned.  Otherwise, the raw string
+            contents of the field are returned.
         """
         return parse_float_or_str(self.ids.y_field.text)
 
@@ -952,25 +1145,28 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
         Parameters
         ----------
         rv : RecycleView
-            The RecycleView that owns this row and wants it refreshed (not used in this function).
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
         index: int
             The index of this row.
         data: dict
-            The dictionary of data that constitutes this row.  Should have keys for 'x' and 'y'.
+            The dictionary of data that constitutes this row.  Should have keys
+            for 'x' and 'y'.
         """
         self.index = index
         self.ids.x_field.text = str(data['x'])
         self.ids.y_field.text = str(data['y'])
 
     def on_delete_button(self):
-        """A callback function for the button that deletes the data item represented by
-        this row from the data list"""
+        """A callback function for the button that deletes the data item
+        represented by this row from the data list"""
         self.parent.parent.delete_item(self.index)
 
     def on_x_value_changed(self, instance, text):
         """A callback method used when the value in the x field of an XY grid changes.
 
-        This method notifies the grandparent, which is an XYGridView, of the change.
+        This method notifies the grandparent, which is an XYGridView, of the
+        change.
 
         Parameters
         ----------
@@ -983,12 +1179,13 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
             self.parent.parent.x_value_changed(self.index, self.x_value)
 
     def on_x_focus_changed(self, instance, value):
-        """A callback method used when the focus on the x field of an XY grid changes.
+        """A callback method used when the focus on the x field of an XY grid
+            changes.
 
         This method checks to see if this is a focus event or an unfocus event.
         If focus, it stores the current value in the field for comparison later.
-        If unfocus and the value has not changed, nothing is done.  If the value has changed,
-        then the self.on_x_value_changed method is invoked.
+        If unfocus and the value has not changed, nothing is done.  If the value
+        has changed, then the self.on_x_value_changed method is invoked.
 
         Parameters
         ----------
@@ -1018,12 +1215,13 @@ class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
             self.parent.parent.y_value_changed(self.index, self.y_value)
 
     def on_y_focus_changed(self, instance, value):
-        """A callback method used when the focus on the y field of an XY grid changes.
+        """A callback method used when the focus on the y field of an XY grid
+            changes.
 
         This method checks to see if this is a focus event or an unfocus event.
         If focus, it stores the current value in the field for comparison later.
-        If unfocus and the value has not changed, nothing is done.  If the value has changed,
-        then the self.on_y_value_changed method is invoked.
+        If unfocus and the value has not changed, nothing is done.  If the value
+        has changed, then the self.on_y_value_changed method is invoked.
 
         Parameters
         ----------
@@ -1951,15 +2149,6 @@ class MessagePopupContent(BoxLayout):
     pass
 
 
-class BusListItemWithCheckbox(OneLineAvatarIconListItem):
-    '''Custom list item.'''
-    icon = StringProperty("android")
-
-    def __int__(self, bus):
-        self.text = bus
-        self.bus = bus
-
-
 class MetricListItem(TwoLineAvatarIconListItem):
     pass
 
@@ -1972,18 +2161,21 @@ class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
     pass
 
 
-class MetricConfigurationScreen(SSimBaseScreen):
+class MetricConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
     _selBusses = []
     _currentMetricCategory = "None"
-    _metricIcons = {"Bus Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"}
-
+    _metricIcons = {
+        "Bus Voltage": "lightning-bolt-circle", "Unassigned": "chart-line"
+        }
+    _bus_filters = BusFilters()
     _def_btn_color = '#005376'
+    _filterButton = None
 
     def on_kv_post(self, base_widget):
         """Implemented to manage the states of the upper limit, lower limit,
         and objective fields.
 
-        This schedules calls to "_refocus_field" on each text box.  See that
+        This schedules calls to "refocus_text_field" on each text box.  See that
         method for details.
 
         Parameters
@@ -1991,18 +2183,15 @@ class MetricConfigurationScreen(SSimBaseScreen):
         base_widget:
            The base-most widget whose instantiation triggered the kv rules.
         """
-        Clock.schedule_once(lambda dt: refocus_text_field(self.ids.upperLimitText), 0.05)
-        Clock.schedule_once(lambda dt: refocus_text_field(self.ids.lowerLimitText), 0.05)
-        Clock.schedule_once(lambda dt: refocus_text_field(self.ids.objectiveText), 0.05)
-
-    def _refocus_field(self, field):
-        """Sets the focus of the supplied field.
-
-        For some field types, this has the effect of putting it into an
-        editable state which can change its appearance even if it is
-        subsequently un-focused.
-        """
-        field.focus = True
+        Clock.schedule_once(
+            lambda dt: refocus_text_field(self.ids.upperLimitText), 0.05
+            )
+        Clock.schedule_once(
+            lambda dt: refocus_text_field(self.ids.lowerLimitText), 0.05
+            )
+        Clock.schedule_once(
+            lambda dt: refocus_text_field(self.ids.objectiveText), 0.05
+            )
 
     def manage_store_button_enabled_state(self):
         """Enables or disables the "Store" button depending on how many busses
@@ -2176,14 +2365,18 @@ class MetricConfigurationScreen(SSimBaseScreen):
         elif self.ids.seek_btn.selected:
             sense = ImprovementType.SeekValue
 
-        err = Metric.validate_metric_values(lower_limit, upper_limit, obj, sense, False)
+        err = Metric.validate_metric_values(
+            lower_limit, upper_limit, obj, sense, False
+            )
 
         if err:
             self.__show_invalid_metric_value_popup(err)
             return
 
         for bus in self._selBusses:
-            accum = MetricTimeAccumulator(Metric(lower_limit, upper_limit, obj, sense))
+            accum = MetricTimeAccumulator(
+                Metric(lower_limit, upper_limit, obj, sense)
+                )
             self.project.add_metric(self._currentMetricCategory, bus, accum)
 
         self.reload_metric_list()
@@ -2210,7 +2403,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         If there are items in the list, the buttons are enabled.  If there are
         no items in the list, the buttons are disabled.
         """
-        numCldrn = len(self.ids.interlist.children) == 0
+        numCldrn = len(self.ids.interlist.data) == 0
         self.ids.btnSelectAll.disabled = numCldrn
         self.ids.btnDeselectAll.disabled = numCldrn
 
@@ -2218,10 +2411,13 @@ class MetricConfigurationScreen(SSimBaseScreen):
         """Deselects all the items in the middle list on this form by setting
         the check box active values to False.
         """
-        for wid in self.ids.interlist.children:
-            if isinstance(wid, BusListItemWithCheckbox):
-                wid.ids.check.active = False
-
+        for wid in self.ids.interlist.data:
+            # wid is a dictionary.  If it has an "active" entry, set it's value
+            # to False.
+            if "active" in wid: wid["active"] = False
+            
+        self.ids.interlist.refresh_from_data()
+        
     def select_all_metric_objects(self):
         """Selects all the items in the middle list on this form.
 
@@ -2229,11 +2425,13 @@ class MetricConfigurationScreen(SSimBaseScreen):
         back into the list of selected busses as the checks are set.
         """
         self._selBusses.clear()
-        for wid in self.ids.interlist.children:
-            if isinstance(wid, BusListItemWithCheckbox):
-                wid.ids.check.active = True
-                self._selBusses.append(wid.text)
+        for wid in self.ids.interlist.data:
+            if "active" in wid:
+                wid["active"] = True
+                self._selBusses.append(wid["text"])
 
+        self.ids.interlist.refresh_from_data()
+        
     def reload_metric_list(self):
         """Reloads the list of all defined metrics.
 
@@ -2287,11 +2485,11 @@ class MetricConfigurationScreen(SSimBaseScreen):
         self.reload_metric_list()
         self.reload_metric_values()
 
-    def on_item_check_changed(self, ckb, value):
+    def on_selection_changed(self, name, value):
         """A callback function for the list items to use when their check state
         changes.
 
-        This method looks at teh current check state (value) and either adds
+        This method looks at the current check state (value) and either adds
         the text of the check box into the list of currently selected busses
         if value is true and removes it if value is false.
 
@@ -2306,11 +2504,11 @@ class MetricConfigurationScreen(SSimBaseScreen):
             The current check state of the check box
             (true = checked, false = unchecked).
         """
-        bus = ckb.listItem.text
+        bus = name
         if value:
             self._selBusses.append(bus)
         else:
-            self._selBusses.remove(bus)
+            if bus in self._selBusses: self._selBusses.remove(bus)
 
         self.reload_metric_values()
         self.manage_store_button_enabled_state()
@@ -2325,6 +2523,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         """
         self._currentMetricCategory = "Bus Voltage"
         self.ids.interlabel.text = "Busses"
+        self._selBusses.clear()
         self.load_busses_into_list()
         self.reload_metric_list()
         self.reload_metric_values()
@@ -2336,7 +2535,7 @@ class MetricConfigurationScreen(SSimBaseScreen):
         """
         self._currentMetricCategory = "Unassigned"
         self._selBusses.clear()
-        self.ids.interlist.clear_widgets()
+        self.ids.interlist.data = []
         self.ids.interlabel.text = "Metric Objects"
         self.reload_metric_list()
         self.reload_metric_values()
@@ -2403,32 +2602,97 @@ class MetricConfigurationScreen(SSimBaseScreen):
         content.ids.mainScreenBtn.bind(on_press=popup.dismiss)
         content.ids.mainScreenBtn.bind(on_press=self._return_to_main_screen)
         popup.open()
+        
+    def apply_bus_filters(self):
+        self.load_busses_into_list()
+        
+    def open_bus_filters(self, instance):
+    
+        content = BusSearchPanelContent()
+        
+        content.load_voltage_checks(
+            self.project.grid_model.all_base_voltages()
+            )
+
+        content.apply_filters(self._bus_filters)
+
+        popup = Popup(
+            title='Filter Busses', content=content, auto_dismiss=False,
+            size_hint=(0.7, 0.7), background_color=(224,224,224),
+            title_color=(0,0,0)
+        )
+
+        def apply(*args):
+            self._bus_filters = content.extract_filters()
+            self.apply_bus_filters()
+            popup.dismiss()
+        
+        def clear(*args):
+            self._bus_filters = BusFilters()
+            self.apply_bus_filters()
+            popup.dismiss()            
+
+        content.ids.okBtn.bind(on_press=apply)
+        content.ids.clearBtn.bind(on_press=clear)
+        content.ids.cancelBtn.bind(on_press=popup.dismiss)
+        popup.open()
+
+    def on_bus_filter_applied(self, instance, value):
+        self.load_busses_into_list()
+
+    def check_bus_filters(self, bus) -> bool:
+        return self._bus_filters.test_bus(bus, self.project, self._selBusses)
+
+    def check_need_bus_filtering(self) -> bool:
+        return self._bus_filters is not None and \
+            not self._bus_filters.is_empty()
 
     def load_busses_into_list(self):
         """Purposes the middle list in the form for busses and loads it with
-        newly created BusListItemWithCheckbox instances for each bus in the
-        grid model.
+        new BusListItem instances for each bus in the grid model.
 
         This method clears any current selected busses, clears any contents of
         the center list, and then reloads the list.  If there is no currently
         selected grid model, then __show_no_grid_model_popup is called and the
         method is aborted.
         """
-        self._selBusses.clear()
+        #self._selBusses.clear()
         list = self.ids.interlist
-        list.clear_widgets()
-        list.text = "Busses"
+        list.viewclass = 'BusListItem'
+        #list.clear_widgets()
+        #list.text = "Busses"
+
+        if self._filterButton is None:
+            self._filterButton = Button(text="Filter Busses", size_hint_y=0.05)
+            self._filterButton.bind(on_release=self.open_bus_filters)
+            
+        if self._filterButton not in self.ids.interlistheader.children:
+            self.ids.interlistheader.add_widget(self._filterButton, 1)
 
         if self.project._grid_model is None:
+            list.data = []
             self.__show_no_grid_model_popup()
             return
-
+        
+        need_filter = self.check_need_bus_filtering()      
         busses = self.project._grid_model.bus_names
-        list.active = False
-        for x in busses:
-            bItem = BusListItemWithCheckbox(text=str(x))
-            bItem.ids.check.bind(active=self.on_item_check_changed)
-            list.add_widget(bItem)
+        #list.active = False+
+        bus_data = []
+        for bus in busses:
+            if not need_filter or self.check_bus_filters(bus):
+                bus_data += [{
+                    "text":bus,
+                    "secondary_text":str(self.project.phases(bus)) +
+                        ", " + str(DSSModel.nominal_voltage(bus)) + " kV",
+                    "active":bus in self._selBusses,
+                    "owner":self
+                    }]
+                
+        list.data = bus_data
+        
+        filtertxt = self._bus_filters.summary()        
+        self._filterButton.text = "Filter Busses"
+        if filtertxt: self._filterButton.text += " " + filtertxt
 
         list.active = True
 
