@@ -29,7 +29,7 @@ from kivy.clock import Clock
 from kivy.core.text import LabelBase
 from kivy.logger import Logger, LOG_LEVELS
 from kivy.metrics import dp
-from kivy.properties import ObjectProperty, StringProperty, BooleanProperty
+from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.popup import Popup

@@ -1,0 +1,39 @@
+[Project]
+name = 'unnamed'
+grid_model_path = 'C:\Users\jpeddy\Documents\dev\storage-sim\examples\ieee34_opendss_model\ieee34Mod_PV.dss'
+[reliability]
+[reliability.line]
+enabled = false
+[reliability.switch]
+enabled = false
+[reliability.generator]
+enabled = false
+aging = {enabled = false}
+operating_wear_out = {enabled = false}
+
+[storage-options."NewBESS"]
+phases = 3
+required = true
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['828','802','814']
+power = [200.0, 100.0, 300.0]
+duration = [2.0, 4.0, 7.0]
+
+
+[storage-options."NewBESS".control-params]
+mode = 'droop'
+
+
+[storage-options."NewBESS".control-params.droop]
+"p_droop" = 500.0
+"q_droop" = -300.0
+
+
+[metrics."Bus Voltage"]
+values=[{name="840", lower_limit = 0.975, upper_limit = 1.025, objective = 1.0, sense = "SeekValue"},
+{name="828", lower_limit = 0.975, upper_limit = 1.025, objective = 1.0, sense = "SeekValue"},
+{name="860", lower_limit = 0.975, upper_limit = 1.025, objective = 1.0, sense = "SeekValue"},
+{name="814", lower_limit = 0.975, upper_limit = 1.025, objective = 1.0, sense = "SeekValue"},
+]

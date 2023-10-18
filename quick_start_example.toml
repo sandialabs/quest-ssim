@@ -1,0 +1,110 @@
+[Project]
+name = 'unnamed'
+grid_model_path = 'C:\Users\jpeddy\Documents\dev\storage-sim\examples\ieee34_opendss_model\ieee34Mod_PV.dss'
+[reliability]
+[reliability.line]
+enabled = false
+[reliability.switch]
+enabled = false
+[reliability.generator]
+enabled = false
+aging = {enabled = false}
+operating_wear_out = {enabled = false}
+
+[storage-options."S814"]
+phases = 3
+required = true
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['814']
+power = [200.0, 500.0, 400.0, 300.0]
+duration = [2.0, 3.0, 4.0]
+
+
+[storage-options."S814".control-params]
+mode = 'droop'
+
+
+[storage-options."S814".control-params.droop]
+"p_droop" = 10000.0
+"q_droop" = -5000.0
+
+
+[storage-options."S814".control-params.voltvar]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vars" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S814".control-params.voltwatt]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S814".control-params.varwatt]
+"vars" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S814".control-params.vv_vw]
+"vv_volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vv_vars" = [1.0, 1.0, 0.0, -1.0, -1.0]
+"vw_volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vw_watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S814".control-params.constantpf]
+"pf_val" = 0.99
+
+
+[storage-options."S840"]
+phases = 3
+required = true
+min_soc = 0.2
+max_soc = 0.8
+initial_soc = 0.5
+busses = ['840']
+power = [200.0, 500.0, 400.0, 300.0]
+duration = [2.0, 3.0, 4.0]
+
+
+[storage-options."S840".control-params]
+mode = 'droop'
+
+
+[storage-options."S840".control-params.droop]
+"p_droop" = 10000.0
+"q_droop" = -5000.0
+
+
+[storage-options."S840".control-params.voltvar]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vars" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S840".control-params.voltwatt]
+"volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S840".control-params.varwatt]
+"vars" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S840".control-params.vv_vw]
+"vv_volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vv_vars" = [1.0, 1.0, 0.0, -1.0, -1.0]
+"vw_volts" = [0.5, 0.95, 1.0, 1.05, 1.5]
+"vw_watts" = [1.0, 1.0, 0.0, -1.0, -1.0]
+
+
+[storage-options."S840".control-params.constantpf]
+"pf_val" = 0.99
+
+
+[metrics."Bus Voltage"]
+values=[{name="800", lower_limit = 0.97, upper_limit = 1.05, objective = 1.0, sense = "SeekValue"},
+{name="802", lower_limit = 0.97, upper_limit = 1.05, objective = 1.0, sense = "SeekValue"},
+{name="808", lower_limit = 0.97, upper_limit = 1.05, objective = 1.0, sense = "SeekValue"},
+]
