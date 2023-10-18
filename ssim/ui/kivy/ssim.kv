@@ -1664,11 +1664,11 @@
 
                 Label:
                     size_hint_y: 0.1
-                    text: "Select Variable(s) to Plot:"
+                    text: "Select Variable(s) for Plot 1:"
                     color: 0,0,0,1
 
                 ScrollView:
-                    size_hint_y: 0.8
+                    size_hint_y: 1.5
                     canvas.before:
                         Color:
                             rgba: .5, .5, .5, 1
@@ -1676,26 +1676,47 @@
                             width: 2
                             rectangle: self.x, self.y, self.width, self.height
                     MDList:
-                        id: variable_list_detail
+                        id: variable_list_detail_axes_1
+                        size_hint_y: 1.5
+
+                Label:
+                    size_hint_y: 0.1
+                    text: "Select Variable(s) for Plot 2:"
+                    color: 0,0,0,1
+
+                ScrollView:
+                    size_hint_y: 1.5
+                    canvas.before:
+                        Color:
+                            rgba: .5, .5, .5, 1
+                        Line:
+                            width: 2
+                            rectangle: self.x, self.y, self.width, self.height
+                    MDList:
+                        id: variable_list_detail_axes_2
 
                 MDTextField:
                     id: detail_figure_title
-                    hint_text: 'Enter custom title ...'
+                    hint_text: 'Enter title ...'
 
                 MDTextField:
                     id: detail_figure_ylabel
-                    hint_text: 'Enter custom Y-axis label ...'
+                    hint_text: 'Enter Y-axis-1 label ...'
 
+                MDTextField:
+                    id: detail_figure_ylabel2
+                    hint_text: 'Enter Y-axis-2 label ...'
                 Button:
-                    size_hint_y: 0.1
+                    size_hint_y: 0.3
                     text: "Update Figure"
                     on_release: root.update_figure()
+                
                 Button:
-                    size_hint_y: 0.1
+                    size_hint_y: 0.3
                     text: "Clear Figure"
                     on_release: root.clear_figure()
                 Button:
-                    size_hint_y: 0.1
+                    size_hint_y: 0.3
                     text: "Save Figure"
                     on_release: root.save_figure_options()
 
@@ -1757,7 +1778,26 @@
                                         rectangle: self.x, self.y, self.width, self.height
                                 MDList:
                                     id: metrics_list
-  
+                            
+                            BoxLayout:
+                                id: voltage_controls
+                                orientation: "horizontal"
+                                size_hint_y: None
+                                height: 30
+
+                                MDLabel:
+                                    id: show_voltage_overlay
+                                    size_hint_x: None
+                                    width: 135
+                                    text: "Show Bus Voltage"
+
+                                CheckBox:
+                                    id: show_bus_voltages
+                                    size_hint_x: None
+                                    width: 30
+                                    active: True
+                                    on_active: root.changed_show_voltage(self.active)
+
                 BoxLayout:
                     orientation: "vertical"
                     padding: 5
@@ -1765,9 +1805,6 @@
                     MDTextField:
                         id: detail_figure_title
                         hint_text: 'Enter custom title ...'
-                    MDTextField:
-                        id: detail_figure_ylabel
-                        hint_text: 'Enter custom Y-axis label ...'
                     Button:
                         size_hint_y: 0.1
                         text: "Update Figure"
