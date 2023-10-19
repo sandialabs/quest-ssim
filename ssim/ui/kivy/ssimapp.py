@@ -2564,6 +2564,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
+        self.config_id_to_name = {}
+        self.selected_metric_items = {}
         ctr = 1
         for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
@@ -2869,6 +2871,9 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
+        self.config_id_to_name = {}
+        self.selected_list_items_axes_1 = {}
+        self.selected_list_items_axes_2 = {}
         ctr = 1
         for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
