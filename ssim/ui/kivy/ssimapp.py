@@ -12,7 +12,6 @@ from ssim.opendss import DSSModel
 
 import kivy
 import matplotlib as mpl
-mpl.use('module://kivy.garden.matplotlib.backend_kivy')
 from matplotlib.path import Path
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
