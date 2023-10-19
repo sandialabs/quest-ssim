@@ -2330,6 +2330,7 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def on_enter(self):
         # populate configurations list
+        self.selected_configurations = {}
         self.populate_configurations()
         # update the configurations that are currently selected for 
         # evaluation
