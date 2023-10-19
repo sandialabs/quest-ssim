@@ -2346,7 +2346,7 @@ class RunSimulationScreen(SSimBaseScreen):
         configs = []
         self.ids.config_list.clear_widgets()
         self.ids.config_list.active = False
-        for i, config in enumerate(self.project.configurations()):
+        for i, config in enumerate(self.project.current_checkpoint.configurations()):
             configs.append(config)
             # establish the mappings between config id and config UI_ids
             self.config_id_to_name[config.id] = f'Configuration {i+1}'
@@ -2565,7 +2565,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
         ctr = 1
-        for config in self.project.configurations():
+        for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_metric_items['Configuration ' + str(ctr)] = []
             ctr += 1
@@ -2749,7 +2749,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             final_secondary_text = []
             final_tertiary_text = []
 
-            for i, config in enumerate(self.project.configurations()):
+            for i, config in enumerate(self.project.current_checkpoint.configurations()):
                 if config_ui_id == f'Configuration {i+1}':
                     for storage in config.storage:
                         if storage is not None:
@@ -3125,7 +3125,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             final_secondary_text = []
             final_tertiary_text = []
 
-            for i, config in enumerate(self.project.configurations()):
+            for i, config in enumerate(self.project.current_checkpoint.configurations()):
                 if config_ui_id == f'Configuration {i+1}':
                     for storage in config.storage:
                         if storage is not None:
