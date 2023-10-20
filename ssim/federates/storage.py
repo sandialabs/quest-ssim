@@ -74,9 +74,24 @@ class DroopController(StorageController):
 
     def _limit(self, power):
         # XXX should probably be limited to the kva rating of the device.
-        return complex(min(power.real, self.device.kw_rated),
+        ## TO DO: incorporated p-priority and q-priority modes
+        if power.real < 0.0 and power.imag < 0.0:
+            # both p and q are negative
+            limit_p = min(abs(power.real), self.device.kw_rated)
+            limit_q = min(abs(power.imag), self.device.kw_rated)
+            return complex(-limit_p, -limit_q)
+        elif power.real < 0.0 and power.imag >= 0.0:
+            limit_p = min(abs(power.real), self.device.kw_rated)
+            limit_q = min(abs(power.imag), self.device.kw_rated)
+            return complex(-limit_p, limit_q)
+        elif power.real >= 0.0 and power.imag < 0.0:
+            limit_p = min(abs(power.real), self.device.kw_rated)
+            limit_q = min(abs(power.imag), self.device.kw_rated)
+            return complex(limit_p, -limit_q)
+    
+        return complex(min(power.real, self.device.kw_rated), 
                        min(power.imag, self.device.kw_rated))
-
+    
     def apply_control(self, control_messages: Iterable[dict]):
         # DroopController does not respond to control messages.
         pass
