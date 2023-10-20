@@ -444,7 +444,6 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
-        self.project_results = ProjectResults(self.project)
         self.configurations: List[Configuration] = []
         self.configurations_to_eval: List[Configuration] = []
         self.config_id_to_name= {} # sets up concrete mappings
@@ -2740,6 +2739,7 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def on_enter(self):
         # populate configurations list
+        self.selected_configurations = {}
         self.populate_configurations()
         # update the configurations that are currently selected for 
         # evaluation
@@ -2756,7 +2756,7 @@ class RunSimulationScreen(SSimBaseScreen):
         configs = []
         self.ids.config_list.clear_widgets()
         self.ids.config_list.active = False
-        for i, config in enumerate(self.project.configurations()):
+        for i, config in enumerate(self.project.current_checkpoint.configurations()):
             configs.append(config)
             # establish the mappings between config id and config UI_ids
             self.config_id_to_name[config.id] = f'Configuration {i+1}'
@@ -2810,7 +2810,7 @@ class RunSimulationScreen(SSimBaseScreen):
         self.configurations_to_eval = []
         for wid in self.ids.config_list.children:
             if wid.selected:
-                self.configurations_to_eval.append(self.configurations[ctr])
+                self.configurations_to_eval.append(self.configurations[ctr].id)
             ctr = ctr - 1
         # run all the configurations
         Logger.debug("===================================")
@@ -2911,22 +2911,26 @@ class RunSimulationScreen(SSimBaseScreen):
         # update the configurations that are currently selected for 
         # evaluation
         self._update_configurations_to_eval()
-        
+
     def _evaluate(self):
         """Initiates evaluation of configurations that are currelty selected.
         """
+        checkpoint = self.project.save_checkpoint()
+
         # step 1: get an update on the current selection
         self._update_configurations_to_eval()
 
         # step 2: evaluate the selected configurations
-        for config in self.configurations_to_eval:
+        for config in checkpoint.configurations():
+            if config.id not in self.configurations_to_eval:
+                continue
             if self._canceled:
                 Logger.debug("evaluation canceled")
                 break
             Logger.debug("Currently Running configuration:")
             Logger.debug(self.config_id_to_name[config.id])
             Logger.debug("==========================================")
-            config.evaluate(basepath=self.project.base_dir)
+            config.evaluate(basepath=checkpoint.checkpoint_dir)
             config.wait()
             self._progress_popup.content.increment()
         Logger.debug("clearing progress popup")
@@ -2957,7 +2961,6 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.project_results = ProjectResults(self.project)
         # keeps track of metrics that have been selected for plotting
         self.selected_metric_items = {}
         # stores the current configuration selected from the dropdown menu
@@ -2965,10 +2968,16 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.metrics_figure = None
         self._show_voltage_status = True
 
+    @property
+    def project_results(self):
+        return self.project.current_checkpoint.results()
+
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
+        self.config_id_to_name = {}
+        self.selected_metric_items = {}
         ctr = 1
-        for config in self.project.configurations():
+        for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_metric_items['Configuration ' + str(ctr)] = []
             ctr += 1
@@ -3152,7 +3161,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             final_secondary_text = []
             final_tertiary_text = []
 
-            for i, config in enumerate(self.project.configurations()):
+            for i, config in enumerate(self.project.current_checkpoint.configurations()):
                 if config_ui_id == f'Configuration {i+1}':
                     for storage in config.storage:
                         if storage is not None:
@@ -3264,7 +3273,6 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.current_configuration = None
         self.list_items = []
         self.selected_list_items_axes_1 = {}
         self.selected_list_items_axes_2 = {}
@@ -3273,8 +3281,11 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
+        self.config_id_to_name = {}
+        self.selected_list_items_axes_1 = {}
+        self.selected_list_items_axes_2 = {}
         ctr = 1
-        for config in self.project.configurations():
+        for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
             self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
@@ -3309,7 +3320,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             fig, ax = plt.subplots(1, 1)
         
         # get the project results
-        project_results = self.project_results.results()
+        project_results = self.project.current_checkpoint.results().results()
 
         for result in project_results:
             # obtain pandas dataframe for storage states
@@ -3529,7 +3540,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             final_secondary_text = []
             final_tertiary_text = []
 
-            for i, config in enumerate(self.project.configurations()):
+            for i, config in enumerate(self.project.current_checkpoint.configurations()):
                 if config_ui_id == f'Configuration {i+1}':
                     for storage in config.storage:
                         if storage is not None:
@@ -3579,7 +3590,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         # this will allows the results to be mapped with 
         # corresponding configurations
         simulation_results = {}
-        for result in self.project_results.results():
+        for result in self.project.current_checkpoint.results().results():
             # configuraiton directory of the result
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
             simulation_results[config_dir] = result
