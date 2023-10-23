@@ -813,6 +813,9 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
 
     def on_selection_changed(self, bus, selected):
         if self.options is None: return
+        for b in self.ids.bus_list.data:
+            if b["text"] == bus:
+                b["active"] = selected
         if selected:
             self.options.add_bus(bus)
         else:
@@ -914,18 +917,18 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
 
     @property
     def _ess_powers(self):
-        return list(self.ids.power_list.options)
+        return set(self.ids.power_list.options)
 
     @property
     def _ess_durations(self):
-        return list(self.ids.duration_list.options)
+        return set(self.ids.duration_list.options)
 
     @property
     def _selected_busses(self):
-        return list(self.ids.bus_list.data[i]["text"]
-            for i in range(len(self.ids.bus_list.data)) \
-                if self.ids.bus_list.data[i]["active"]
-            )
+        return set(self.ids.bus_list.data[i]["text"]
+            for i in range(len(self.ids.bus_list.data))
+            if self.ids.bus_list.data[i]["active"]
+        )
 
     def edit_control_params(self):
         self._record_option_data()
