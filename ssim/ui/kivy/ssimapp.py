@@ -892,8 +892,9 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
             textfield.helper_text = "Invalid name"
             textfield.error = True
             return False
-        existing_names = {name.lower() for name in self.project.storage_names}
-        if textfield.text.lower() in existing_names:
+        same_names = [so.name.lower() == textfield.text.lower()
+                      for so in self.project.storage_options]
+        if sum(same_names) > 1:
             textfield.helper_text = "Name already exists"
             textfield.error = True
             return False
@@ -999,6 +1000,9 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
                 f"durations: {self.options.duration}, "
                 f"busses: {self.options.busses}"
             )
+
+        if not self._check_name(self.ids.device_name):
+            return
 
         if self.show_error(self.options.validate_name()): return
         if self.show_error(self.options.validate_soc_values()): return
@@ -2027,7 +2031,12 @@ class DERConfigurationScreen(SSimBaseScreen):
             )
 
     def new_storage(self):
-        ess = StorageOptions("NewBESS", 3, [], [], [])
+        name = "NewBESS"
+        existing_names = {n.lower() for n in self.project.storage_names}
+        i = 1
+        while name.lower() in existing_names:
+            name = "NewBESS" + str(i)
+        ess = StorageOptions(name, 3, [], [], [])
 
         self.add_ess(ess)
 
