@@ -365,6 +365,13 @@ def export(source_dir, output_dir):
 
 
 def fingerprint(model_path):
+    """Hash the grid model, returning a unique fingerprint.
+
+    Parameters
+    ----------
+    model_path : str or pathlike
+        Directory containing the opendss model files.
+    """
     # Get a list of the cannonical file names and read them in
     h = hashlib.sha256()
     datafiles = set()

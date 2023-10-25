@@ -1,19 +1,23 @@
 """Core classes and functions for the user interface."""
-from copy import deepcopy
+from __future__ import annotations
+from copy import copy, deepcopy
 import functools
 import hashlib
 import itertools
 import json
+import logging
 import os
+import shutil
 import subprocess
 from os import path, makedirs
 from pathlib import Path, PurePosixPath
+import tempfile
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import pkg_resources
 import tomli
-from ssim import grid
+from ssim import dssutil, grid
 from ssim.metrics import MetricManager, MetricTimeAccumulator
 from ssim.opendss import DSSModel
 
@@ -75,10 +79,130 @@ _DEFAULT_RELIABILITY = {
 }
 
 
+logger = logging.getLogger(__name__)
+
+
+class ProjectCheckpoint:
+    """A self-contained copy of a project with a version number.
+
+    Parameters
+    ----------
+    project : Project
+        The project instance being checkpointed.
+    version_manager : VersionManager
+        A version manager pointing to the directory where the checkpoint is to
+        be saved.
+    """
+
+    def __init__(self, project: Project, version_manager: VersionManager):
+        self.project = copy(project)
+        self._project_hash = hash(self.project)
+        self.version_manager = version_manager
+        self.checkpoint_dir = version_manager.checkpoint_dir(self._project_hash)
+
+    @property
+    def grid_model_dir(self):
+        return self.checkpoint_dir / "grid_model"
+
+    def save(self):
+        """Save the project checkpoint.
+
+        The checkpoint is saved in the directory specified by the
+        :py:class:`VersionManager`.
+        """
+        os.makedirs(self.checkpoint_dir, exist_ok=True)
+        self.project.export_grid_model(self.grid_model_dir)
+        self.project.set_grid_model(str(os.path.abspath(self.grid_model_dir / "master.DSS")))
+        self.project.version = self.version_manager.version(self._project_hash)
+        with open(self.checkpoint_dir / "project.toml", "w") as f:
+            f.write(self.project.write_toml())
+
+    @classmethod
+    def version(cls, p):
+        with open(os.path.join(p, "project.toml"), "rb") as f:
+            try:
+                proj = tomli.load(f)
+            except tomli.TOMLDecodeError:
+                return None
+            return proj.get("version")
+
+    def configurations(self):
+        return self.project.configurations()
+
+    def results(self):
+        return self.project.results()
+
+
+class VersionManager:
+    """Manage multiple versions of a project.
+
+    This class is responsible for identifying version numbers and for
+    saving checkpoints of project versions in a standard directory
+    structure.
+
+    Parameters
+    ----------
+    basedir : str
+        Path to the directory where project checkpoints are saved.
+    """
+
+    def __init__(self, basedir="."):
+        self.basedir = basedir
+
+    def checkpoint_dir(self, project_hash):
+        """Return the checpoint directory for `project_hash`."""
+        h = f"{project_hash:x}"
+        return Path(os.path.join(self.basedir, h))
+
+    def is_checkpointed(self, project_hash):
+        """Return True if a checkpoint project version with hash `project_hash`
+        exists."""
+        if os.path.exists(
+            os.path.join(self.checkpoint_dir(project_hash), "project.toml")
+        ):
+            return True
+        return False
+
+    def _get_version(self, name):
+        p = os.path.join(self.basedir, name)
+        if not os.path.isdir(p):
+            return None
+        try:
+            return ProjectCheckpoint.version(p)
+        except FileNotFoundError:
+            return None
+
+    @property
+    def all_versions(self):
+        """A dictionary mapping checkpointed hashes to version numbers."""
+        versions = {}
+        if not os.path.exists(self.basedir):
+            return versions
+        for p in os.listdir(self.basedir):
+            v = self._get_version(p)
+            if v is not None:
+                versions[int(p, 16)] = v
+        return versions
+
+    def version(self, project_hash):
+        """Return the version number of the project.
+
+        If the project has not been checkpointed, the version number
+        will be one more than the largest checkpointed version.
+
+        Parameters
+        ----------
+        project : Project
+        """
+        if not self.is_checkpointed(project_hash):
+            return max((0, *self.all_versions.values())) + 1
+        return self.all_versions[project_hash]
+
+
 class Project:
     """A set of grid configurations that make up a complete study."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, version=1):
         self.name = name
         self._grid_model_path = None
         self._grid_model = None
@@ -87,6 +211,9 @@ class Project:
         self.pvsystems = []
         self._metricMgrs = {}
         self.reliability_params = _DEFAULT_RELIABILITY
+        self.version = version
+        self._version_manager = VersionManager(name)
+        self._current_checkpoint = None
 
     def __eq__(self, other):
 
@@ -125,9 +252,12 @@ class Project:
         m = hashlib.sha256()
 
         m.update(self.name.encode())
-        if self._grid_model_path is not None:
+
+        if self._grid_model is not None:
+            m.update(self._model_fingerprint.encode())
+        elif self._grid_model_path is not None:
             m.update(self._grid_model_path.encode())
-                
+
         self.storage_devices.sort(key=lambda x: x.name)
         for so in self.storage_devices:
             m.update(repr(hash(so)).encode())
@@ -139,9 +269,36 @@ class Project:
         for k, v in sorted(self._metricMgrs.items()):
             m.update(k.encode())
             m.update(repr(hash(v)).encode())
-            
+
         h = m.digest()
         return int.from_bytes(h, byteorder='big', signed=False)
+
+    def export_grid_model(self, dest):
+        self._grid_model.export_model(dest)
+
+    @property
+    def current_checkpoint(self):
+        if self._current_checkpoint is None:
+            self._current_checkpoint = ProjectCheckpoint(
+                self, self._version_manager)
+        if hash(self) != hash(self._current_checkpoint.project):
+            self._current_checkpoint = ProjectCheckpoint(
+                self, self._version_manager)
+        return self._current_checkpoint
+
+    def save_checkpoint(self):
+        """Save a checkpoint of the current project state.
+
+        If a checkpoint matching this project version already exists in the
+        output directory then this has no effect.
+        """
+        h = hash(self)
+        checkpoint = ProjectCheckpoint(self, self._version_manager)
+        self._current_checkpoint = checkpoint
+        if self._version_manager.is_checkpointed(h):
+            return checkpoint
+        checkpoint.save()
+        return checkpoint
 
     def load_toml_file(self, filename: str):
         """Reads data for this Project from the supplied TOML file.
@@ -161,6 +318,11 @@ class Project:
 
         tdat = tomli.loads(toml)
         self.read_toml(tdat)
+
+    def results(self):
+        """Return a :py:class:`ProjectResults` object for the current project
+        version."""
+        return ProjectResults(self._version_manager.checkpoint_dir(hash(self)))
 
     @property
     def base_dir(self):
@@ -207,8 +369,25 @@ class Project:
     def phases(self, bus):
         return self._grid_model.available_phases(bus)
 
+    @property
+    def _model_fingerprint(self):
+        if self._grid_model is None:
+            return ""
+        if self._grid_model_fingerprint is None:
+            self._grid_model_fingerprint = self._compute_model_fingerprint()
+        return self._grid_model_fingerprint
+
+    def _compute_model_fingerprint(self):
+        tmppath = tempfile.mkdtemp()
+        self._grid_model.export_model(tmppath)
+        fingerprint = dssutil.fingerprint(tmppath)
+        shutil.rmtree(tmppath)
+        return fingerprint
+
     def set_grid_model(self, model_path):
         self._grid_model_path = model_path
+        self._grid_model = None
+        self._grid_model_fingerprint = None
         if model_path and path.exists(model_path):
             self._grid_model = DSSModel(model_path)
 
@@ -223,6 +402,7 @@ class Project:
         """
         ret = "[Project]\n"
         ret += f"name = \'{self.name}\'\n"
+        ret += f"version = {self.version}\n"
         ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
 
         ret += self._reliability_to_toml()
@@ -248,6 +428,7 @@ class Project:
         projdict = tomlData["Project"]
         self.name = projdict["name"]
         self.set_grid_model(projdict["grid_model_path"])
+        self._current_checkpoint = None
 
         sodict = tomlData["storage-options"]
         for sokey in sodict:
@@ -1372,7 +1553,7 @@ class Configuration:
         return config
 
     def _configure_grid_model(self, config):
-        config["dss_file"] = self.grid
+        config["dss_file"] = os.path.abspath(self.grid)
         return config
 
     def _configure_storage(self, config):
@@ -1524,8 +1705,8 @@ class ProjectResults:
        Project that the results belong to.
     """
 
-    def __init__(self, project):
-        self.base_dir = project.base_dir
+    def __init__(self, base_dir):
+        self.base_dir = base_dir
 
     def results(self):
         # Iterate over the resulted configurations and yield iterator of Results
