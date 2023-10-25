@@ -2036,6 +2036,7 @@ class DERConfigurationScreen(SSimBaseScreen):
         i = 1
         while name.lower() in existing_names:
             name = "NewBESS" + str(i)
+            i += 1
         ess = StorageOptions(name, 3, [], [], [])
 
         self.add_ess(ess)
