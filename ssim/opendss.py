@@ -751,6 +751,7 @@ class DSSModel:
                  dss_file: PathLike,
                  loadshape_class: LoadShapeClass = LoadShapeClass.DAILY):
         dssutil.load_model(dss_file)
+        dssutil.run_command("calcv")
         dssutil.run_command(
             "set mode=time controlmode=time number=1 stepsize=15m"
         )
@@ -1469,13 +1470,9 @@ def _count_lines(file_path):
 def _mean_node_voltage(bus):
     """Return the mean voltage at every node in `bus`. [pu]"""
     dssdirect.Circuit.SetActiveBus(bus)
-    v_complex_pu = dssdirect.Bus.PuVoltage()
+    v_complex_pu = dssdirect.Bus.puVmagAngle()
     num_nodes = len(v_complex_pu) // 2
-    return sum(
-        dssdirect.CmathLib.cabs(real, imag)
-        for real, imag in zip(
-            v_complex_pu[::2], v_complex_pu[1::2])
-    ) / num_nodes
+    return sum(v_complex_pu[::2]) / num_nodes
 
 
 def _action_time(action):
