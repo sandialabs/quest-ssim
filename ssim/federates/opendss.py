@@ -248,8 +248,12 @@ class LoadInterface:
 
     def publish(self):
         """Send status updates to the EMS federate control endpoint"""
-        for load in self._model.loads():
-            self._send_to_ems(load.status)
+        pass
+        # TODO the performance of both _send_to_ems() and Load.status is
+        #      too poor to use. Since we aren't using the EMS right now
+        #      we don't actually need to send these messages
+        # for load in self._model.loads():
+        #     self._send_to_ems(load.status)
 
 
 class GridFederate:
