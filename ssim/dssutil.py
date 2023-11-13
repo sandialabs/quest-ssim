@@ -103,7 +103,7 @@ def load_model(file):
     OpenDSSErrror
         If the file does not exist
     """
-    run_command(f"redirect {file}")
+    run_command(ascii(f"redirect ({file})"))
 
 
 def _get_properties(property_accessors: Iterable) -> Iterable:
