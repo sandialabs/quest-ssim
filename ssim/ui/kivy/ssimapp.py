@@ -2148,6 +2148,10 @@ class NoGridPopupContent(BoxLayout):
     pass
 
 
+class NoGridFilePopupContent(BoxLayout):
+    pass
+
+
 class NoFigurePopupContent(BoxLayout):
     pass
 
@@ -3795,8 +3799,36 @@ class SSimScreen(SSimBaseScreen):
     def dismiss_popup(self):
         self._popup.dismiss()
 
+        
+    def _show_no_grid_file_popup(dismiss_screen=None, manager=None):
+        """Show a popup dialog warning that no grid model file is selected.
+
+        Parameters
+        ----------
+        dismiss_screen : str, optional
+
+        """
+        poppup_content = NoGridFilePopupContent()
+        poppup_content.orientation = "vertical"
+        popup = Popup(title='No Grid Model File Selected',
+                      content=poppup_content,
+                      auto_dismiss=False, size_hint=(0.4, 0.4))
+
+        def dismiss(*args):
+            popup.dismiss()
+            if (dismiss_screen is not None) and (manager is not None):
+                manager.current = dismiss_screen
+
+        poppup_content.ids.dismissBtn.bind(on_press=dismiss)
+        # open the popup
+        popup.open()
+
+
     def load_grid(self, path, filename):
-        Logger.debug("loading file %s", filename[0])
+        if len(filename) == 0:
+            self._show_no_grid_file_popup()
+            return
+
         self.project.set_grid_model(filename[0])
         self.reset_grid_model_label()
         self.refresh_grid_plot()

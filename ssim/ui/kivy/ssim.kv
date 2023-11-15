@@ -1990,6 +1990,18 @@
         text: 'Dismiss'
         size_hint: 1, 0.2
 
+
+<NoGridFilePopupContent>:
+    Label:
+        text: 'A grid model file was not selected.  You must choose an OpenDSS file as the grid model.'
+        text_size: self.width, None
+        height: self.texture_size[1]
+
+    Button:
+        id: dismissBtn
+        text: 'Dismiss'
+        size_hint: 1, 0.2
+
 <NoFigurePopupContent>:
     Label:
         text: 'No figure(s) created. Please return to the Results page to create a figure first before saving.'
