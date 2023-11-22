@@ -8,25 +8,25 @@
     },
     {
       "directory": ".",
-      "exec": "storage-federate S1 --hours 1025 grid-demo632.json ../federate-config/generic-storage.json",
+      "exec": "storage-federate S1 --hours 1025 grid-demo632.json ../../ssim/federates/storage.json",
       "host": "localhost",
       "name": "s1"
     },
     {
       "directory": ".",
-      "exec": "grid-federate --hours 1025 grid-demo632.json ../federate-config/grid-federate.json",
+      "exec": "grid-federate --hours 1025 grid-demo632.json ../../ssim/federates/grid.json",
       "host": "localhost",
       "name": "grid"
     },
     {
       "directory": ".",
-      "exec": "reliability-federate --hours 1025 grid-demo632.json ../federate-config/reliability.json",
+      "exec": "reliability-federate --hours 1025 grid-demo632.json ../../ssim/federates/reliability.json",
       "host": "localhost",
       "name": "reliability"
     },
     {
       "directory": ".",
-      "exec": "logger-federate --hours 1025 grid-demo632.json ../federate-config/logger.json",
+      "exec": "logger-federate --hours 1025 --show-plots grid-demo632.json ../../ssim/federates/logger.json",
       "host": "localhost",
       "name": "logger"
     }
