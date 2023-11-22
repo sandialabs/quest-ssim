@@ -4223,8 +4223,6 @@ class SSimScreen(SSimBaseScreen):
         plt.clf()
 
         dss.plot.enable(show=False)
-        dssdirect.Text.Command(f"redirect {gm._model_file}")
-        #dssdirect.Solution.Solve()
         label_txt = " Labels=Yes" if self.ids.show_bus_labels.active else ""
         dssdirect.Text.Command(f"plot circuit dots=Yes{label_txt}")
 
