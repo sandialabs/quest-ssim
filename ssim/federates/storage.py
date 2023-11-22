@@ -2,6 +2,7 @@ import json
 from abc import ABC, abstractmethod
 import argparse
 from typing import Optional, Iterable
+import math
 
 from helics import (
     helics_time_maxtime,
@@ -97,7 +98,7 @@ class DroopController(StorageController):
         pass
 
     def next_update(self):
-        return helics_time_maxtime
+        return math.inf
 
 
 def pending_messages(endpoint):

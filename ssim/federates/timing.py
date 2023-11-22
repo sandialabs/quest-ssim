@@ -29,6 +29,8 @@ def schedule(federate, next_update=None, max_time=None):
     while granted_time < max_time:
         if next_update is not None:
             request_time = next_update()
+        if request_time > max_time:
+            request_time = max_time
         federate.log_message(f"requesting time: {request_time}",
                              HelicsLogLevel.TRACE)
         granted_time = federate.request_time(request_time)
