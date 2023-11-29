@@ -2,10 +2,10 @@
     "dss_file": "../ieee34demo/ieee34Mod_temp.dss",
     "busses_to_log": ["814", "828", "860", "840"],
      "busses_to_measure": [
-        {"name":  "814", "objective":  1.0, "limit":  0.975},
-        {"name":  "828", "objective":  1.0, "limit":  0.975},
-        {"name":  "860", "objective":  1.0, "limit":  0.975},
-        {"name":  "840", "objective":  1.0, "limit":  0.975}
+        {"name":  "814", "objective":  1.0, "lower_limit":  0.975, "upper_limit": 1.025, "sense": "SeekValue"},
+        {"name":  "828", "objective":  1.0, "lower_limit":  0.975, "upper_limit": 1.025, "sense": "SeekValue"},
+        {"name":  "860", "objective":  1.0, "lower_limit":  0.975, "upper_limit": 1.025, "sense": "SeekValue"},
+        {"name":  "840", "objective":  1.0, "lower_limit":  0.975, "upper_limit": 1.025, "sense": "SeekValue"}
     ],
     "storage": [
         {

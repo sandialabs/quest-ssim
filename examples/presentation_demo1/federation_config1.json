@@ -1,11 +1,6 @@
 {
   "federates": [
-    {
-      "directory": ".",
-      "exec": "helics_broker -f 8",
-      "host": "localhost",
-      "name": "broker"
-    },
+
     {
       "directory": ".",
       "exec": "storage-federate S814 --hours 24 grid_config1.json ../../ssim/federates/storage.json",
