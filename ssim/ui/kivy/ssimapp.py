@@ -209,6 +209,8 @@ def refocus_text_field(field):
 class BusFilters:
     
     def __init__(self, *args, **kwargs):
+        ''' Initializes a new BusFilters object to an empty set of filters.
+        '''
         self.name_filter = ""
         self.must_have_phases = set()
         self.cant_have_phases = set()
@@ -234,13 +236,28 @@ class BusFilters:
         if len(self.allowed_phase_cts) > 0: return False
         return len(self.cant_have_phases) == 0
 
-    def summary(self):
+    def summary(self) -> str:
+        ''' Creates a string indicating what active filters are part of this
+        BusFilters object.
+        
+        The components of the resulting string will include:
+        1 - Any name filter entered in quotes.
+        2 - +Selected if the selected only filter is active.
+        3 - +P# for each "must have" phase.
+        4 - -P# for each "can't have" phase.
+        5 - #-phase for each allowed phase count specified.
+        6 - +V for any specified required voltage levels separated by " or ".
+            If only 1 voltage, then +V#, if more, then +V(#1 or #2 or... ).
+        
+        The final string will have all appropriate elements above separated by
+        semicolons.
+        '''
         elems = []
         if self.name_filter: elems += ["\"" + self.name_filter + "\""]
         if self.selected_only: elems += ["+Selected"]
         elems += ["+P"+str(p) for p in self.must_have_phases]
         elems += ["-P"+str(p) for p in self.cant_have_phases]
-        elems += [str(p) + "-phase" for p in self.allowed_phase_cts]
+        elems += [str(c) + "-phase" for c in self.allowed_phase_cts]
 
         vstr = ""
         if len(self.voltages) > 1:
