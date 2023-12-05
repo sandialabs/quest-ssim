@@ -208,6 +208,10 @@ def refocus_text_field(field):
 
 class BusFilters:
     
+    '''
+    A class that stores filters that can be applied to a list of busses.
+    '''
+
     def __init__(self, *args, **kwargs):
         ''' Initializes a new BusFilters object to an empty set of filters.
         '''
@@ -251,6 +255,11 @@ class BusFilters:
         
         The final string will have all appropriate elements above separated by
         semicolons.
+
+        Returns
+        -------
+        str
+            The summary string representing the filters stored in this object.
         '''
         elems = []
         if self.name_filter: elems += ["\"" + self.name_filter + "\""]
@@ -539,22 +548,64 @@ class CheckedListItemOwner:
 
 class BusListItem(TwoLineIconListItem, RecycleDataViewBehavior):
     
+    '''
+    A class that serves as a list item representing a bus for use in a
+    RecycleView.
+    
+    Attributes
+    ----------
+    active : bool
+        An indicator of the checked state of this item.
+    owner : CheckedListItemOwner, optional
+        If supplied, the owner receives call-backs about selection changes on
+        this item.
+    '''
+
     active = False
     owner: CheckedListItemOwner = None 
 
     def __init__(self, **kwargs):
+        ''' Initializes a new instance of a BusListItem.
+        '''
         super().__init__(**kwargs)
         self.register_event_type("on_selected_changed")
         self.ids.selected.active = self.active
         
     def __raise_value_changed(self):
+        ''' Dispatches the on_selected_changed message and also calls the
+        on_selection_changed method of the owner if an owner is known.
+        '''
         self.dispatch("on_selected_changed", self.text, self.active)
         if self.owner: self.owner.on_selection_changed(self.text, self.active)
 
     def on_selected_changed(self, bus, selected):
+        ''' This is the stub method required to register an event of this name.
+        It doesn't do anything.
+        
+        Parameters
+        ----------
+        bus
+            The name of the bus represented by this list item and supplied to
+            handlers of this message.
+        selected
+            True if this item is now selected and false otherwise.
+        '''
         pass
 
     def mark(self, check, value):
+        ''' Sets the active state of this item to the supplied value and raises
+        the value changed message.
+        
+        This method is used as a callback for the a check box on_active message.
+        
+        Parameters
+        ----------
+        check
+            The check box that called this method with it's on_active message.
+        value
+            The current value of the check box.  True if checked and false
+            otherwise.
+        '''
         self.active = value
         self.__raise_value_changed()
             
