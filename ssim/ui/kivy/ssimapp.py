@@ -217,6 +217,16 @@ class BusFilters:
         self.selected_only = False    
 
     def is_empty(self) -> bool:
+        ''' A method to indicate whether or not this BusFilters item will
+        actually filter anything.
+        
+        Filtering will only take place if a name is given, some voltages ar
+        chosen, phase restrictions are given, etc.
+        
+        Returns
+        -------
+        True if this filter will result in any filtering and false otherwise.
+        '''
         if self.name_filter: return False
         if len(self.voltages) > 0: return False
         if self.selected_only: return False
@@ -245,6 +255,29 @@ class BusFilters:
 
     
     def test_bus(self, bus, project, sel_bus_list) -> bool:
+        ''' A method to test a given bus against the filters represented by this
+        BusFilters item.
+
+        This will check the bus properties against all filters to see if it
+        passes or should be filtered out.
+
+        Parameters
+        ----------
+        bus
+            The name of the bus to test.
+        project
+            The current project object.  This is used to access aspects of the
+            DSSModel.
+        sel_bus_list
+            The list of all currently selected busses.  This is used only if the
+            selected_only filter is active.
+            
+        Returns
+        -------
+        True if the bus passes all filters and should not be filtered out and
+        false if it triggered at least one filter and thus should be filtered
+        out.
+        '''
         nameFilter = self.name_filter
         if (nameFilter and not nameFilter in bus): return False
         
@@ -4636,10 +4669,7 @@ class ReliabilityConfigurationScreen(SSimBaseScreen):
 def _show_error_popup(message):
     content = MessagePopupContent()
     content.ids.msg_label.text = message
-    popup = Popup(
-        title="Configuration error!",
-        content=content
-    )
+    popup = Popup(title="Configuration error!", content=content)
     content.ids.dismissBtn.bind(on_press=popup.dismiss)
     popup.open()
 
@@ -4647,10 +4677,16 @@ def _show_error_popup(message):
 def _show_no_grid_popup(dismiss_screen=None, manager=None):
     """Show a popup dialog warning that no grid model is selected.
 
+    If the dismiss screen or manager are null, then no screen is set upon
+    dismissal.  Whatever screen was visible when this popup was created will
+    become visible again.
+    
     Parameters
     ----------
     dismiss_screen : str, optional
-
+        The name of the screen to return to when the popup is dismissed.
+    manager : ScreenManager, optional
+        The screen manager that is used to set the dismiss screen.
     """
     poppup_content = NoGridPopupContent()
     poppup_content.orientation = "vertical"
@@ -4672,8 +4708,8 @@ def _make_xy_matlab_plot(
     title: str
     ):
     
-    """A utility method to plot the xs and ys in the given box.  The supplied title
-    and axis labels are installed.
+    """A utility method to plot the xs and ys in the given box.  The supplied
+    title and axis labels are installed.
 
     Parameters
     ----------

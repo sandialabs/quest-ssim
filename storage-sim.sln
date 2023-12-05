@@ -3,7 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34018.315
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "storage-sim1", "storage-sim1.pyproj", "{0D804FCD-8473-4696-88BC-A04657014752}"
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "storage-sim", "storage-sim.pyproj", "{0D804FCD-8473-4696-88BC-A04657014752}"
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "ssim_opt", "..\ssim_opt\ssim_opt.pyproj", "{3B40DF00-0590-4293-812D-5BC913E10893}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -13,6 +15,8 @@ Global
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{0D804FCD-8473-4696-88BC-A04657014752}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{0D804FCD-8473-4696-88BC-A04657014752}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B40DF00-0590-4293-812D-5BC913E10893}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B40DF00-0590-4293-812D-5BC913E10893}.Release|Any CPU.ActiveCfg = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
