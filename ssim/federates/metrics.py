@@ -101,7 +101,7 @@ class MetricsFederate:
 
         self.csv_writer.writerow(values)
 
-    def run(self):
+    def run(self, hours):
         """Run for `hours` and invoke loggers whenever HELICS grants a time.
 
         Parameters
@@ -109,7 +109,7 @@ class MetricsFederate:
         hours : float
             Total time to log. [hours]
         """
-        schedule = timing.schedule(self._federate)
+        schedule = timing.schedule(self._federate, max_time=hours * 3600)
         for time in schedule:
             if time == helics_time_maxtime:
                 # Don't update since this is the signal that all other
@@ -118,7 +118,7 @@ class MetricsFederate:
             self._update_metrics(time)
 
 
-def run_federate(federate, grid_config):
+def run_federate(federate, grid_config, hours):
     """Run a metrics federate as `federate`.
 
     Parameters
@@ -130,7 +130,7 @@ def run_federate(federate, grid_config):
     logging.debug("federate: %s", federate)
     metrics_federate = MetricsFederate(federate, grid_config)
     metrics_federate.initialize()
-    metrics_federate.run()
+    metrics_federate.run(hours)
     metrics_federate.finalize()
 
 
@@ -146,15 +146,15 @@ def run():
         type=str,
         help="path to the federate config file"
     )
-    # parser.add_argument(
-    #    "--hours",
-    #    type=float,
-    #    help="how long to log"
-    # )
+    parser.add_argument(
+       "--hours",
+       type=float,
+       help="how long to log"
+    )
 
     args = parser.parse_args()
     federate = helicsCreateMessageFederateFromConfig(args.federate_config)
-    run_federate(federate, args.grid_config)
+    run_federate(federate, args.grid_config, args.hours)
 
 
 if __name__ == '__main__':
