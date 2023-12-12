@@ -10,6 +10,32 @@
 <MatlabPlotBox>:
     orientation: "vertical"
     pos_hint: {"top":1}
+
+<ConfigurationFilterPanel>:
+    orientation: "vertical"
+
+    BoxLayout:
+        orientation: "horizontal"
+        id: filter_options
+
+        Label:
+            text: "Filter Configuration Options ..."
+            color: C(hex_black)
+
+    BoxLayout:
+        orientation: "horizontal"
+
+        Button:
+            id: okBtn
+            text: 'Ok'
+
+        Button:
+            id: clearBtn
+            text: 'Clear'
+        
+        Button:
+            id: cancelBtn
+            text: 'Cancel'
     
 <BusSearchPanelContent>:
     orientation: "vertical"
@@ -1585,6 +1611,12 @@
                         size: self.parent.width, 10
                         on_release: root.deselect_all_configurations()
                         disabled: True
+                
+                Button:
+                    id: filter_busses_btn
+                    text: "Filter Configuration"
+                    size_hint: (1.0, 0.05)
+                    on_press: root.open_config_filters()
 
                 MDScrollView:
                     canvas.before:

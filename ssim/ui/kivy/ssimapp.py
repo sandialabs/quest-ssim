@@ -269,6 +269,12 @@ class BusFilters:
         return True
 
 
+class ConfigurationFilterPanel(BoxLayout):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
 class BusSearchPanelContent(BoxLayout):
 
     def __init__(self, *args, **kwargs):
@@ -2781,6 +2787,33 @@ class RunSimulationScreen(SSimBaseScreen):
             self._add_config_to_ui(config)
 
         self.configurations = configs
+
+    def open_config_filters(self):
+    
+        content = ConfigurationFilterPanel()
+        
+        popup = Popup(
+            title='Filter Configurations', content=content, auto_dismiss=False,
+            size_hint=(0.7, 0.7), background_color=(224,224,224),
+            title_color=(0,0,0)
+        )
+
+        def apply(*args):
+            # self._bus_filters = content.extract_filters()
+            # self.apply_bus_filters()
+            Logger.debug('Configuration Filter Applied ... ')
+            popup.dismiss()
+        
+        def clear(*args):
+            # self._bus_filters = BusFilters()
+            # self.apply_bus_filters()
+            Logger.debug('Configuration Filters Cleared ...')
+            popup.dismiss()            
+
+        content.ids.okBtn.bind(on_press=apply)
+        content.ids.clearBtn.bind(on_press=clear)
+        content.ids.cancelBtn.bind(on_press=popup.dismiss)
+        popup.open()
 
     def _add_config_to_ui(self, config):
         """Populates the UI with details on the Configuration `config`.
