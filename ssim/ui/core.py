@@ -1606,6 +1606,7 @@ class Configuration:
                                   _federate_spec(
                                       "metrics",
                                       f"metrics-federate"
+                                      f" --hours {self.sim_duration}"
                                       f" {self._grid_path}"
                                       f" {_get_federate_config('metrics')}"
                                   ),
