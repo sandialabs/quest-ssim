@@ -147,9 +147,10 @@ def run():
         help="path to the federate config file"
     )
     parser.add_argument(
-       "--hours",
-       type=float,
-       help="how long to log"
+        "--hours",
+        type=float,
+        help="how long to log",
+        default=helics_time_maxtime
     )
 
     args = parser.parse_args()
