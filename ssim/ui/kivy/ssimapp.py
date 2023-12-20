@@ -330,12 +330,26 @@ class BusFilters:
 
 class BusSearchPanelContent(BoxLayout):
 
+    """ A panel that houses controls for configuring a BusFilters object.
+    """
+
     def __init__(self, *args, **kwargs):
+        """ Constructs a new BusSearchPanelContent with an empty set of bus
+        filters.
+        """
         super().__init__(*args, **kwargs)
         self.register_event_type("on_filter_applied")
         self.filters = BusFilters()
 
     def apply_filters(self, filters: BusFilters):
+        """ Updates the fields on this panel to display the status of the
+        supplied filters object.
+        
+        Parameters
+        ----------
+        filters
+            The bus filters to display in this form.
+        """
         self.ids.txt_bus_name_filter.text = filters.name_filter
         self.set_selected_voltages(filters.voltages)
         self.ids.ckb_yes_phase_1.active = 1 in filters.must_have_phases
@@ -350,6 +364,15 @@ class BusSearchPanelContent(BoxLayout):
         self.ids.ckb_sel_only.active = filters.selected_only
 
     def extract_filters(self) -> BusFilters:
+        """ Reads the status of the fields of this form and stores the
+        information in a new BusFilters object and returns it.
+        
+        Returns
+        -------
+        BusFilters
+            A new BusFilters object created and loaded with the information
+            entered in this form.
+        """
         ret = BusFilters()
         ret.name_filter = self.ids.txt_bus_name_filter.text
         ret.voltages = self.get_selected_voltages()
@@ -366,23 +389,78 @@ class BusSearchPanelContent(BoxLayout):
         return ret
 
     def clear_text_filter(self):
+        """ Clears the content of the text filter field in this form.
+        """
         self.ids.txt_bus_name_filter.text  = ""
         self.ids.txt_bus_name_filter.on_text_validate()
         
     def changed_phase_filter(self, instance):
+        """ A callback that is used whenever a change to phase filter inputs
+        occurs.
+        
+        This includes both the must have, can't have, and number of phase
+        requirements.
+
+        This method just dispatches the "on_filter_applied" callback.
+        
+        Parameters
+        ----------
+        instance
+            The widget instance that was used to cause this callback.
+        """
         self.__raise_filter_applied(instance)
 
     def changed_sel_only_filter(self, instance):
+        """ A callback that is used whenever a change to the "selected only"
+        filter occurs.
+        
+        This method just dispatches the "on_filter_applied" callback.
+        
+        Parameters
+        ----------
+        instance
+            The widget instance that was used to cause this callback.
+        """
         self.__raise_filter_applied(instance)
 
     def changed_text_filter(self, instance):
+        """ A callback that is used whenever a change to the bus name text
+        filter occurs.
+        
+        This method just dispatches the "on_filter_applied" callback.
+        
+        Parameters
+        ----------
+        instance
+            The widget instance that was used to cause this callback.
+        """
         self.__raise_filter_applied(instance)
         Clock.schedule_once(lambda dt: refocus_text_field(instance), 0.05)
 
     def changed_voltage_check(self, instance, active):
+        """ A callback that is used whenever the check state of a voltage
+        level check box changes.
+        
+        This method just dispatches the "on_filter_applied" callback.
+        
+        Parameters
+        ----------
+        instance
+            The check box instance that was used to cause this callback.
+        """
         self.__raise_filter_applied(instance)
 
-    def get_selected_voltages(self):
+    def get_selected_voltages(self) -> set:
+        """ Gathers the voltages of all checked voltage boxes and returns them
+        as a set.
+        
+        Returns
+        -------
+        set
+           The set of all chosen voltages.  That is, those for which the
+           corresponding check boxes are checked.  The set will contain text
+           objects but they will represent numeric values.
+        """
         ret = set()
         add_next_label = False
         
@@ -396,6 +474,15 @@ class BusSearchPanelContent(BoxLayout):
         return ret
 
     def set_selected_voltages(self, voltages):
+        """ Sets the check state of the check boxes associated with the voltages
+        in the provided list.
+        
+        Parameters
+        ----------
+        voltages
+            The list of voltages that are to be checked as the only ones allowed
+            through a filter.
+        """
         if voltages is None: return
         next_check_val = None
         
@@ -408,55 +495,163 @@ class BusSearchPanelContent(BoxLayout):
                 next_check_val = w.text in voltages
 
     def get_name_filter_text(self) -> str:
+        """ Returns the text currently in the bus name filter field.
+
+        Returns
+        -------
+        str
+            The current bus name filter which may be a null or empty string.
+        """
         return self.ids.txt_bus_name_filter.text
     
-    #def get_voltage_filter_text(self) -> str:
-    #    return self.ids.txt_bus_volt_filter.text
-    
     def get_yes_phase_1_active(self) -> bool:
+        """ Returns true if the check box indicating that phase 1 is required
+        is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if phase 1 is marked as required and false otherwise.
+        """
         return self.ids.ckb_yes_phase_1.active
     
     def get_yes_phase_2_active(self) -> bool:
+        """ Returns true if the check box indicating that phase 2 is required
+        is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if phase 2 is marked as required and false otherwise.
+        """
         return self.ids.ckb_yes_phase_2.active
 
     def get_yes_phase_3_active(self) -> bool:
+        """ Returns true if the check box indicating that phase 3 is required
+        is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if phase 3 is marked as required and false otherwise.
+        """
         return self.ids.ckb_yes_phase_3.active
     
     def get_no_phase_1_active(self) -> bool:
+        """ Returns true if the check box indicating that busses with phase 1
+        are not allowed is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if phase 1 busses are not allowed and false otherwise.
+        """
         return self.ids.ckb_no_phase_1.active
     
     def get_no_phase_2_active(self) -> bool:
+        """ Returns true if the check box indicating that busses with phase 2
+        are not allowed is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if phase 2 busses are not allowed and false otherwise.
+        """
         return self.ids.ckb_no_phase_2.active
 
     def get_no_phase_3_active(self) -> bool:
+        """ Returns true if the check box indicating that busses with phase 3
+        are not allowed is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if phase 3 busses are not allowed and false otherwise.
+        """
         return self.ids.ckb_no_phase_3.active
     
     def get_1_phase_allowed_active(self) -> bool:
+        """ Returns true if the check box indicating that busses with 1 phases
+        are allowed is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if 1 phase busses are allowed and false otherwise.
+        """
         return self.ids.ckb_1_phase_ct.active
     
-    def get_2_phase_allowed_active(self) -> bool:
+    def get_2_phase_required_active(self) -> bool:
+        """ Returns true if the check box indicating that busses with 2 phases
+        are allowed is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if 2 phase busses are allowed and false otherwise.
+        """
         return self.ids.ckb_2_phase_ct.active
 
     def get_3_phase_allowed_active(self) -> bool:
+        """ Returns true if the check box indicating that busses with 3 phases
+        are allowed is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if 3 phase busses are allowed and false otherwise.
+        """
         return self.ids.ckb_3_phase_ct.active
     
     def get_selected_only_active(self) -> bool:
+        """ Returns true if the check box indicating that only selected busses
+        are to pass the filter is checked and false otherwise.
+
+        Returns
+        -------
+        bool
+            True if the "selected only" check box is marked and false otherwise.
+        """
         return self.ids.ckb_sel_only.active
     
     def __raise_filter_applied(self, instance):
         """Dispatches the on_filter_applied method to anything bound to it.
+        
+        Parameters
+        ----------
+        instance
+            The widget that was changed resulting in the call to this method.
         """
         self.dispatch("on_filter_applied", instance)
         
     def on_filter_applied(self, instance):
+        """ The required stub of the on_filter_applied method that will be the
+        callback to any changes to the widgets on this form.
+        
+        Parameters
+        ----------
+        instance
+            The widget that was changed resulting in the call to this method.
+        """
         pass
 
     def load_voltage_checks(self, voltages):
+        """ Creates voltage check boxes, 1 for each value in the supplied list
+        of voltages.
+       
+        Parameters
+        ----------
+        voltages
+            The list of all voltages for which there should be a check box in
+            this panel.
+        """
         for v in voltages:
             ckb = CheckBox(active=False)
             ckb.bind(active=self.changed_voltage_check)
             self.ids.voltage_check_panel.add_widget(ckb)
-            self.ids.voltage_check_panel.add_widget(Label(text=str(v), color=(0,0,0)))
+            self.ids.voltage_check_panel.add_widget(
+                Label(text=str(v), color=(0,0,0))
+                )
 
 
 class SSimApp(MDApp):
