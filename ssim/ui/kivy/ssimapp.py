@@ -4032,7 +4032,7 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
         self.tertiary_text = tert_text
 
     def delete_item(self, the_list_item):
-        print("Delete icon was button was pressed")
+        print("Delete icon button was pressed")
         print(the_list_item)
         self.parent.remove_widget(the_list_item)
         
