@@ -269,10 +269,17 @@ class BusFilters:
         return True
 
 
-class ConfigurationFilterPanel(BoxLayout):
-    
+class ConfigurationFilters:
+
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+        self.storage_name = ""
+        self.kw_filter = {"min": None, "max": None}
+        self.kwh_filter = {"min": None, "max": None}
+
+    def is_empty(self) -> bool:
+        if self.storage_name: return False
+        if any(self.kw_filter.values()): return False
+        if any(self.kwh_filter.values()): return False
 
 
 class BusSearchPanelContent(BoxLayout):
@@ -406,6 +413,36 @@ class BusSearchPanelContent(BoxLayout):
             self.ids.voltage_check_panel.add_widget(Label(text=str(v), color=(0,0,0)))
 
 
+class ConfigurationPanelContent(BoxLayout):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.register_event_type("on_filter_applied")
+        self.filters = ConfigurationFilters()
+
+    def extract_filters(self) -> ConfigurationFilters:
+        ret = ConfigurationFilters()
+        # Validate the data is of type float
+        # TextField itself should not allow other data types
+        ret.kw_filter["min"] = self.ids.txt_min_kw_filter.text
+        ret.kw_filter["max"] = self.ids.txt_max_kw_filter.text
+        ret.kwh_filter["min"] = self.ids.txt_min_kwh_filter.text
+        ret.kwh_filter["max"] = self.ids.txt_max_kwh_filter.text
+        return ret
+    
+    def changed_text_filter(self, instance):
+        print('changed_text_filter INVOKED')
+        self.__raise_filter_applied(instance)
+        Clock.schedule_once(lambda dt: refocus_text_field(instance), 0.05)
+
+    def __raise_filter_applied(self, instance):
+        """Dispatches the on_filter_applied method to anything bound to it.
+        """
+        self.dispatch("on_filter_applied", instance)
+
+    def on_filter_applied(self, instance):
+        pass
+    
 class SSimApp(MDApp):
 
     def __init__(self, *args, **kwargs):
@@ -2756,7 +2793,9 @@ class RunSimulationScreen(SSimBaseScreen):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.configurations: List[Configuration] = []
+        self.filtered_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
+        self._config_filters = ConfigurationFilters()
         self._run_thread = None
         self._canceled = False
 
@@ -2788,9 +2827,34 @@ class RunSimulationScreen(SSimBaseScreen):
 
         self.configurations = configs
 
+    def apply_config_filters(self):
+        self.filtered_configurations = []
+        self.ids.config_list.clear_widgets()
+        self.ids.config_list.active = False
+        self.load_configs_into_list()
+        Logger.debug('Filters applied!')
+
+    def load_configs_into_list(self):    
+        configs = []
+        for i, config in enumerate(self.project.current_checkpoint.configurations()):
+            configs.append(config)
+
+            Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
+            Logger.debug(config.storage) 
+            
+            filter_condition_kW = config.storage[0].kw_rated >= float(self._config_filters.kw_filter["min"]) and config.storage[0].kw_rated <= float(self._config_filters.kw_filter["max"])
+            filter_condition_kWh = config.storage[0].kwh_rated >= float(self._config_filters.kwh_filter["min"]) and config.storage[0].kwh_rated <= float(self._config_filters.kwh_filter["max"])
+
+            if filter_condition_kW and filter_condition_kWh:
+                self.filtered_configurations.append(config)
+        
+        for config in self.filtered_configurations:
+            # load the filtered configs into the MDList
+            self._add_config_to_ui(config)
+
     def open_config_filters(self):
     
-        content = ConfigurationFilterPanel()
+        content = ConfigurationPanelContent()
         
         popup = Popup(
             title='Filter Configurations', content=content, auto_dismiss=False,
@@ -2799,8 +2863,12 @@ class RunSimulationScreen(SSimBaseScreen):
         )
 
         def apply(*args):
-            # self._bus_filters = content.extract_filters()
-            # self.apply_bus_filters()
+            # extract the filter options based on user selection/entry
+            self._config_filters = content.extract_filters()
+            
+            # apply the filters and update the displayed configurations 
+            self.apply_config_filters()
+
             Logger.debug('Configuration Filter Applied ... ')
             popup.dismiss()
         
@@ -2827,6 +2895,9 @@ class RunSimulationScreen(SSimBaseScreen):
         tertiary_detail_text = []
         final_secondary_text = []
         final_tertiary_text = []
+
+        print("???")
+        print(config)
 
         for storage in config.storage:
             if storage is not None:

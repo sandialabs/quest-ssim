@@ -11,16 +11,57 @@
     orientation: "vertical"
     pos_hint: {"top":1}
 
-<ConfigurationFilterPanel>:
+<ConfigurationPanelContent>:
     orientation: "vertical"
 
     BoxLayout:
         orientation: "horizontal"
-        id: filter_options
+        id: filter_options_storage_name
 
         Label:
-            text: "Filter Configuration Options ..."
+            text: "Filter by Storage Name ..."
             color: C(hex_black)
+
+        TextFieldListFilter:
+            id: txt_name_filter
+            hint_text: "Storage Device Name"
+            on_filter_applied: self.parent.parent.changed_text_filter(self)
+    
+    BoxLayout:
+        orientation: "horizontal"
+        id: filter_options_kW
+
+        Label:
+            text: "Filter by Storage Size ..."
+            color: C(hex_black)
+
+        TextFieldListFilter:
+            id: txt_min_kw_filter
+            hint_text: "Minimum kW"
+            on_filter_applied: self.parent.parent.changed_text_filter(self)
+
+        TextFieldListFilter:
+            id: txt_max_kw_filter
+            hint_text: "Maximum kW"
+            on_filter_applied: self.parent.parent.changed_text_filter(self)
+
+    BoxLayout:
+        orientation: "horizontal"
+        id: filter_options_kWh
+
+        Label:
+            text: "Filter by Storage Capacity ..."
+            color: C(hex_black)
+
+        TextFieldListFilter:
+            id: txt_min_kwh_filter
+            hint_text: "Minimum kWh"
+            on_filter_applied: self.parent.parent.changed_text_filter(self)
+
+        TextFieldListFilter:
+            id: txt_max_kwh_filter
+            hint_text: "Maximum kWh"
+            on_filter_applied: self.parent.parent.changed_text_filter(self)
 
     BoxLayout:
         orientation: "horizontal"
