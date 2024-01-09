@@ -2792,7 +2792,6 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.configurations: List[Configuration] = []
         self.filtered_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
         self._config_filters = ConfigurationFilters()
@@ -2802,6 +2801,9 @@ class RunSimulationScreen(SSimBaseScreen):
     def on_enter(self):
         # populate configurations list
         self.selected_configurations = {}
+        # establishes mappings between config id and config UI ids
+        self._establish_mappings()
+        # populate the UI with configurations list
         self.populate_configurations()
         # update the configurations that are currently selected for 
         # evaluation
@@ -2811,24 +2813,38 @@ class RunSimulationScreen(SSimBaseScreen):
         # enable/disable run button
         self.manage_run_button_enabled_state()
 
+    def _establish_mappings(self):
+        """Creates mappings between internal configurations IDs and once that 
+           are displayed in the UI.
+        """
+        for i, config in enumerate(self.project.current_checkpoint.configurations()):
+            # establish the mappings between config id and config UI_ids
+            self.config_id_to_name[config.id] = f'Configuration {i+1}'
+
     def populate_configurations(self):
-        """Populates the configurations list. Also creates mappings between
-           internal configurations IDs and once that are displayed in the UI.
+        """Populates the configurations list.
         """
         configs = []
         self.ids.config_list.clear_widgets()
         self.ids.config_list.active = False
-        for i, config in enumerate(self.project.current_checkpoint.configurations()):
-            configs.append(config)
-            # establish the mappings between config id and config UI_ids
-            self.config_id_to_name[config.id] = f'Configuration {i+1}'
-            # populate the UI with the configuration
-            self._add_config_to_ui(config)
 
-        self.configurations = configs
+        # NOTE: this probably won't work if configurations are changed 
+        # may need to link this project checkpoints
+        if not self.filtered_configurations:
+            # this happens when no filters have been initialzed
+            # i.e., when the RunSimulation screen is opened for the first time
+            for i, config in enumerate(self.project.current_checkpoint.configurations()):
+                configs.append(config)
+                # populate the UI with the configuration
+                self._add_config_to_ui(config)
+            # initially no filters are present so all configurations are 
+            # included in self.filtered_configurations
+            self.filtered_configurations = configs
+        else:
+            for config in self.filtered_configurations:
+                self._add_config_to_ui(config)
 
     def apply_config_filters(self):
-        self.filtered_configurations = []
         self.ids.config_list.clear_widgets()
         self.ids.config_list.active = False
         self.load_configs_into_list()
@@ -2836,21 +2852,30 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def load_configs_into_list(self):    
         configs = []
+        # reset filtered configs everytime a new filter action is performed
+        self.filtered_configurations = []
         for i, config in enumerate(self.project.current_checkpoint.configurations()):
             configs.append(config)
-
-            Logger.debug(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
-            Logger.debug(config.storage) 
             
-            filter_condition_kW = config.storage[0].kw_rated >= float(self._config_filters.kw_filter["min"]) and config.storage[0].kw_rated <= float(self._config_filters.kw_filter["max"])
-            filter_condition_kWh = config.storage[0].kwh_rated >= float(self._config_filters.kwh_filter["min"]) and config.storage[0].kwh_rated <= float(self._config_filters.kwh_filter["max"])
+            # kw filtering
+            filter_condition_kW = \
+                config.storage[0].kw_rated >= \
+                    float(self._config_filters.kw_filter["min"]) \
+                        and config.storage[0].kw_rated <= \
+                            float(self._config_filters.kw_filter["max"])
+            # kwh filtering
+            filter_condition_kWh = \
+                config.storage[0].kwh_rated >= \
+                    float(self._config_filters.kwh_filter["min"]) \
+                        and config.storage[0].kwh_rated <= \
+                            float(self._config_filters.kwh_filter["max"])
 
             if filter_condition_kW and filter_condition_kWh:
                 self.filtered_configurations.append(config)
         
         for config in self.filtered_configurations:
             # load the filtered configs into the MDList
-            self._add_config_to_ui(config)
+            self._add_config_to_ui(config)                   
 
     def open_config_filters(self):
     
@@ -2896,9 +2921,6 @@ class RunSimulationScreen(SSimBaseScreen):
         final_secondary_text = []
         final_tertiary_text = []
 
-        print("???")
-        print(config)
-
         for storage in config.storage:
             if storage is not None:
                 secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
@@ -2926,12 +2948,12 @@ class RunSimulationScreen(SSimBaseScreen):
         track of current selection in the UI for configurations to 
         be evaluated.
         """
-        no_of_configurations = len(self.configurations)
+        no_of_configurations = len(self.filtered_configurations)
         ctr = no_of_configurations - 1
         self.configurations_to_eval = []
         for wid in self.ids.config_list.children:
             if wid.selected:
-                self.configurations_to_eval.append(self.configurations[ctr].id)
+                self.configurations_to_eval.append(self.filtered_configurations[ctr].id)
             ctr = ctr - 1
         # run all the configurations
         Logger.debug("===================================")
