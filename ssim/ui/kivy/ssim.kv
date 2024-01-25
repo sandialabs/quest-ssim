@@ -572,11 +572,15 @@
 
 
 <BusListItem>:
-
     LeftCheckBox:
         id: selected
         on_active: root.mark(self, self.active)
 
+<ConfigListItem>:
+    size_hint: 1.0, 0.5
+    LeftCheckBox:
+        id: selected
+        on_active: root.mark(self, self.active)
 
 <DroopTabContent@BoxLayout>
     orientation: "vertical"
@@ -1417,6 +1421,20 @@
         multiselect: False
         touch_multiselect: False
 
+<ConfigurationRecycleView>:
+    viewclass: 'ConfigListItem'
+    padding: [0, 0, 30, 0]
+
+    RecycleBoxLayout:
+        padding: [5, 25, 5, 5]
+        default_size: None, dp(80)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
 <XYItemTextField>
     multiline: False
 
@@ -1659,16 +1677,19 @@
                     size_hint: (1.0, 0.05)
                     on_press: root.open_config_filters()
 
-                MDScrollView:
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
-                    MDList:
-                        id: config_list
+                # MDScrollView:
+                #     canvas.before:
+                #         Color:
+                #             rgba: .5, .5, .5, 1
+                #         Line:
+                #             width: 2
+                #             rectangle: self.x, self.y, self.width, self.height
+                #     MDList:
+                #         id: config_list   
 
+                ConfigurationRecycleView:
+                    id: config_list_recycle
+                
             BoxLayout:
                 orientation: "vertical"
                 padding: 5
