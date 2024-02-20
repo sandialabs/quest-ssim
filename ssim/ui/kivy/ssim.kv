@@ -1651,23 +1651,19 @@
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint: None, None
-                    size: self.parent.width, 10
-                    padding: 5
-                    spacing: 5
+                    size: self.parent.width, 50
                     
                     Button:
                         id: btnSelectAll
                         text: "Select All"
-                        size_hint: 0.5, None
-                        size: self.parent.width, 10
+                        size_hint: 0.5, 1.0
                         on_release: root.select_all_configurations()
                         disabled: True
 
                     Button:
                         id: btnDeselectAll
                         text: "Deselect All"
-                        size_hint: 0.5, None
-                        size: self.parent.width, 10
+                        size_hint: 0.5, 1.0
                         on_release: root.deselect_all_configurations()
                         disabled: True
                 
@@ -1676,16 +1672,6 @@
                     text: "Filter Configuration"
                     size_hint: (1.0, 0.05)
                     on_press: root.open_config_filters()
-
-                # MDScrollView:
-                #     canvas.before:
-                #         Color:
-                #             rgba: .5, .5, .5, 1
-                #         Line:
-                #             width: 2
-                #             rectangle: self.x, self.y, self.width, self.height
-                #     MDList:
-                #         id: config_list   
 
                 ConfigurationRecycleView:
                     id: config_list_recycle

@@ -2866,6 +2866,8 @@ class RunSimulationScreen(SSimBaseScreen):
         self.manage_run_button_enabled_state()
 
     def populate_configurations_recycle_view(self):
+        """Populates the recycle view with the list of configurations.
+        """
         config_data = []
 
         # extract ids of filtered configurations
@@ -2910,8 +2912,10 @@ class RunSimulationScreen(SSimBaseScreen):
             self.config_id_to_name[config.id] = f'Configuration {i+1}'
 
     def apply_config_filters(self):
-        # clear the selected configurations and 
-        # configurations to evalulate lists
+        """Apply selected filters to the configurations list.
+        """
+        # clear the selected configurations and configurations 
+        # to evalulate lists
         self.selected_configurations.clear()
         self.configurations_to_eval.clear()
         # perform the filtering based on user selections
@@ -2920,6 +2924,9 @@ class RunSimulationScreen(SSimBaseScreen):
         self.populate_configurations_recycle_view()
 
     def _perform_filtering(self):
+        """Performs filtering and repopulates the 
+           list filtered_configurations.
+        """
         # reset filtered_configurations List everytime a new filtering
         # action is performed
         self.filtered_configurations = []
@@ -2942,7 +2949,25 @@ class RunSimulationScreen(SSimBaseScreen):
             if filter_condition_kW and filter_condition_kWh:
                 self.filtered_configurations.append(config)
 
-    def on_selection_changed(self, config, selected):         
+    def on_selection_changed(self, config, selected):
+        """A callback function for the list items to use when their check state
+        changes.
+
+        This method looks at the current check state (value) and either adds
+        the text of the check box into the list of currently selected 
+        configurations if value is true and removes it if value is false.
+
+        This results in a resetting of the metric values and the associated
+        fields.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box
+            (true = checked, false = unchecked).
+        """     
         for c in self.ids.config_list_recycle.data:
             if c["text"] == config:
                 c["active"] = selected
@@ -2966,7 +2991,8 @@ class RunSimulationScreen(SSimBaseScreen):
         self.manage_run_button_enabled_state()
                
     def open_config_filters(self):
-    
+        """ Opens the configuration filter panel.
+        """
         content = ConfigurationPanelContent()
         
         popup = Popup(
@@ -3031,43 +3057,15 @@ class RunSimulationScreen(SSimBaseScreen):
                 return key
         return('Configuration Not Found')
     
-    def on_item_check_changed(self, ckb, value):
-        """A callback function for the config list items to use when their
-        check state changes.
-
-        This method looks at the current check state (value) and either 
-        adds configuration UI id into the dict of currently selected 
-        configurations (`self.selected_configurations`) if value is true 
-        and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box 
-            (true = checked, false = unchecked).
-        """
-        config_key = self._get_config_key(self.config_id_to_name,
-                                          ckb.listItem.text)
-
-        if value:
-            self.selected_configurations[config_key] = ckb.listItem.text
-        else:
-            del self.selected_configurations[config_key]
-
-        # update the configurations that are currently selected for 
-        # evaluation
-        self._update_configurations_to_eval()
-        # enable/disable run button
-        self.manage_run_button_enabled_state()
-
-    def on_delete_config(self, value):
         Logger.debug("???????")
         Logger.debug(value)
         Logger.debug("Delete pressed")
 
     def manage_run_button_enabled_state(self):
+        """Enables or disables the run simulation button. Esnures at least
+        one configuration is selected before the UI allows the 
+        simulation to run.
+        """
         numCldrn = len(self.configurations_to_eval) == 0
         self.ids.run_configuration_btn.disabled = numCldrn
 
