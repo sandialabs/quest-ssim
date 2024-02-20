@@ -35,15 +35,17 @@
             text: "Filter by Storage Size ..."
             color: C(hex_black)
 
-        TextFieldListFilter:
+        TextFieldPositiveFloat:
             id: txt_min_kw_filter
-            hint_text: "Minimum kW"
-            on_filter_applied: self.parent.parent.changed_text_filter(self)
-
-        TextFieldListFilter:
+            hint_text: "Enter minimum kW"
+            size_hint_y: None
+            height: 25
+        
+        TextFieldPositiveFloat:
             id: txt_max_kw_filter
-            hint_text: "Maximum kW"
-            on_filter_applied: self.parent.parent.changed_text_filter(self)
+            hint_text: "Enter maximum kW"
+            size_hint_y: None
+            height: 25
 
     BoxLayout:
         orientation: "horizontal"
@@ -53,15 +55,17 @@
             text: "Filter by Storage Capacity ..."
             color: C(hex_black)
 
-        TextFieldListFilter:
+        TextFieldPositiveFloat:
             id: txt_min_kwh_filter
-            hint_text: "Minimum kWh"
-            on_filter_applied: self.parent.parent.changed_text_filter(self)
-
-        TextFieldListFilter:
+            hint_text: "Enter minimum kWh"
+            size_hint_y: None
+            height: 25
+        
+        TextFieldPositiveFloat:
             id: txt_max_kwh_filter
-            hint_text: "Maximum kWh"
-            on_filter_applied: self.parent.parent.changed_text_filter(self)
+            hint_text: "Enter maximum kWh"
+            size_hint_y: None
+            height: 25
 
     BoxLayout:
         orientation: "horizontal"

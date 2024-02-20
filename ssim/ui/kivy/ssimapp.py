@@ -281,6 +281,19 @@ class ConfigurationFilters:
         if self.storage_name: return False
         if any(self.kw_filter.values()): return False
         if any(self.kwh_filter.values()): return False
+        return True
+    
+    def is_empty_name(self) -> bool:
+        if self.storage_name: return False
+        return True
+    
+    def is_empty_kW(self) -> bool:
+        if any(self.kw_filter.values()): return False
+        return True
+    
+    def is_empty_kWh(self) -> bool:
+        if any(self.kwh_filter.values()): return False
+        return True
 
 
 class BusSearchPanelContent(BoxLayout):
@@ -418,31 +431,24 @@ class ConfigurationPanelContent(BoxLayout):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.register_event_type("on_filter_applied")
         self.filters = ConfigurationFilters()
 
     def extract_filters(self) -> ConfigurationFilters:
         ret = ConfigurationFilters()
-        # Validate the data is of type float
-        # TextField itself should not allow other data types
-        ret.kw_filter["min"] = self.ids.txt_min_kw_filter.text
-        ret.kw_filter["max"] = self.ids.txt_max_kw_filter.text
-        ret.kwh_filter["min"] = self.ids.txt_min_kwh_filter.text
-        ret.kwh_filter["max"] = self.ids.txt_max_kwh_filter.text
+        
+        if self.ids.txt_min_kw_filter.text_valid():
+            ret.kw_filter['min'] = float(self.ids.txt_min_kw_filter.text)
+
+        if self.ids.txt_max_kw_filter.text_valid():
+            ret.kw_filter['max'] = float(self.ids.txt_max_kw_filter.text)
+
+        if self.ids.txt_min_kwh_filter.text_valid():
+            ret.kwh_filter['min'] = float(self.ids.txt_min_kwh_filter.text)
+
+        if self.ids.txt_max_kwh_filter.text_valid():
+            ret.kwh_filter['max'] = float(self.ids.txt_max_kwh_filter.text)
+       
         return ret
-    
-    def changed_text_filter(self, instance):
-        print('changed_text_filter INVOKED')
-        self.__raise_filter_applied(instance)
-        Clock.schedule_once(lambda dt: refocus_text_field(instance), 0.05)
-
-    def __raise_filter_applied(self, instance):
-        """Dispatches the on_filter_applied method to anything bound to it.
-        """
-        self.dispatch("on_filter_applied", instance)
-
-    def on_filter_applied(self, instance):
-        pass
     
 class SSimApp(MDApp):
 
@@ -2923,31 +2929,90 @@ class RunSimulationScreen(SSimBaseScreen):
         # update the UI based on user selections
         self.populate_configurations_recycle_view()
 
+    def clear_config_filters(self):
+        # clear the selected configurations and configurations 
+        # to evalulate lists
+        self.selected_configurations.clear()
+        self.configurations_to_eval.clear()
+        # clear all the filters
+        self._clear_filtering()
+        self._perform_filtering()
+        # update the UI based on user selections
+        self.populate_configurations_recycle_view()
+
+        Logger.debug('Configuration Filters Cleared ...')
+
     def _perform_filtering(self):
         """Performs filtering and repopulates the 
            list filtered_configurations.
         """
         # reset filtered_configurations List everytime a new filtering
         # action is performed
+        filter_condition_kW = None
+        filter_condition_kWh = None
         self.filtered_configurations = []
 
-        for i, config in enumerate(self.project.current_checkpoint.configurations()):
-            # perform filtering based on kW range
-            filter_condition_kW = \
-                config.storage[0].kw_rated >= \
-                    float(self._config_filters.kw_filter["min"]) \
-                        and config.storage[0].kw_rated <= \
-                            float(self._config_filters.kw_filter["max"])
-            # perform filtering based on kWh range
-            filter_condition_kWh = \
-                config.storage[0].kwh_rated >= \
-                    float(self._config_filters.kwh_filter["min"]) \
-                        and config.storage[0].kwh_rated <= \
-                            float(self._config_filters.kwh_filter["max"])
+        Logger.debug('> :::::::::::::::::::::::::::::::::::::::::::::::::::::::')
+        Logger.debug(self._config_filters.kw_filter["min"])
+        Logger.debug(self._config_filters.kw_filter["max"])
+        Logger.debug(self._config_filters.kwh_filter["min"])
+        Logger.debug(self._config_filters.kwh_filter["max"])
+        Logger.debug(type(self._config_filters.kw_filter["max"]))
+        Logger.debug(self._config_filters.is_empty())
+        Logger.debug('::::::::::::::::::::::::::::::::::::::::::::::::::::::::::')
 
-            # populate self.filtered_configuration list
-            if filter_condition_kW and filter_condition_kWh:
-                self.filtered_configurations.append(config)
+        if not self._config_filters.is_empty():
+
+            if self._config_filters.is_empty_kWh():
+                for i, config in enumerate(self.project.current_checkpoint.configurations()):
+                    # perform filtering based ONLY on kW range
+                    filter_condition_kW = \
+                        config.storage[0].kw_rated >= \
+                            self._config_filters.kw_filter["min"] \
+                                and config.storage[0].kw_rated <= \
+                                    self._config_filters.kw_filter["max"]
+                    if filter_condition_kW:
+                        self.filtered_configurations.append(config)
+                    
+            elif self._config_filters.is_empty_kW():
+                for i, config in enumerate(self.project.current_checkpoint.configurations()):
+                    # perform filtering based ONLY on kWh range
+                    filter_condition_kWh = \
+                        config.storage[0].kwh_rated >= \
+                            self._config_filters.kwh_filter["min"] \
+                                and config.storage[0].kwh_rated <= \
+                                    self._config_filters.kwh_filter["max"]
+                    if filter_condition_kWh:
+                        self.filtered_configurations.append(config)
+
+            else:
+                for i, config in enumerate(self.project.current_checkpoint.configurations()):
+                    # perform filtering based on kW and kWh range
+                    filter_condition_kW = \
+                        config.storage[0].kw_rated >= \
+                            self._config_filters.kw_filter["min"] \
+                                and config.storage[0].kw_rated <= \
+                                    self._config_filters.kw_filter["max"]
+                    
+                    filter_condition_kWh = \
+                        config.storage[0].kwh_rated >= \
+                            self._config_filters.kwh_filter["min"] \
+                                and config.storage[0].kwh_rated <= \
+                                    self._config_filters.kwh_filter["max"]
+                    
+                    # populate self.filtered_configuration list
+                    if filter_condition_kW and filter_condition_kWh:
+                        self.filtered_configurations.append(config)
+        else:
+            Logger.debug('No Filters Specified. Filterting not performed!')
+            for i, config in enumerate(self.project.current_checkpoint.configurations()):
+                self.filtered_configurations.append(config)              
+
+    def _clear_filtering(self):
+        self._config_filters.kw_filter["min"] = None
+        self._config_filters.kw_filter["max"] = None
+        self._config_filters.kwh_filter["min"] = None
+        self._config_filters.kwh_filter["max"] = None
 
     def on_selection_changed(self, config, selected):
         """A callback function for the list items to use when their check state
@@ -3013,7 +3078,7 @@ class RunSimulationScreen(SSimBaseScreen):
         
         def clear(*args):
             # self._bus_filters = BusFilters()
-            # self.apply_bus_filters()
+            self.clear_config_filters()
             Logger.debug('Configuration Filters Cleared ...')
             popup.dismiss()            
 
