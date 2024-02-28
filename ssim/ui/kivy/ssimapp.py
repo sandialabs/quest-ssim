@@ -3397,6 +3397,9 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         self.menu.dismiss()
         
     def on_selection_changed(self, result_list_item, selected):
+        """Refreshes 'self.selected_metric_items' with current selection
+        """
+        # ensure selection is checked in the UI
         for r in self.ids.metrics_list_recycle.data:
             if r["text"] == result_list_item:
                 r["active"] = selected
@@ -3588,7 +3591,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         filename : str
             Filename for the figure to be saved.
         """
-
         fullpath = selection[0]
 
         # by default, the figures are currently saved in PNG format
@@ -3759,31 +3761,6 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             self.x_data = list(self.variable_data.loc[:, 'time'])
 
-            # add the list of variables in the selected configuration
-            # into the MDList
-            # for item in self.list_items:
-            #     # do not add 'time' to the variable list
-            #     if item == 'time':
-            #         continue
-            #     else:
-            #         list_item_axes_1 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-            #         list_item_axes_1.ids.selected.bind(active=self.on_item_check_changed_axes_1)
-            #         self.ids.variable_list_detail_axes_1.add_widget(list_item_axes_1)
-
-            #         list_item_axes_2 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-            #         list_item_axes_2.ids.selected.bind(active=self.on_item_check_changed_axes_2)
-            #         self.ids.variable_list_detail_axes_2.add_widget(list_item_axes_2)
-                                    
-            #         if item in self.selected_list_items_axes_1[self.current_configuration]:
-            #             list_item_axes_1.ids.selected.active = True
-            #         else:
-            #             list_item_axes_1.ids.selected.active = False
-                    
-            #         if item in self.selected_list_items_axes_2[self.current_configuration]:
-            #             list_item_axes_2.ids.selected.active = True
-            #         else:
-            #             list_item_axes_2.ids.selected.active = False
-
             for item in self.list_items:
                 # do not add 'time' to the variable liist
                 if item == 'time':
@@ -3805,12 +3782,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             self.ids.variable_list_detail_axes_1_recycle.refresh_from_data()
             self.ids.variable_list_detail_axes_2_recycle.data = results_detail_item_data_2
             self.ids.variable_list_detail_axes_2_recycle.refresh_from_data()
-
-            Logger.debug('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-            Logger.debug(results_detail_item_data_1)         
-            Logger.debug('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')      
-
-
+            
             # close the drop-down menu
             self.menu.dismiss()
 
@@ -3819,6 +3791,9 @@ class ResultsDetailScreen(SSimBaseScreen):
             Logger.debug('This configuration has not been evaluated')
 
     def on_selection_changed_1(self, result_list_item, selected):
+        """Refreshes 'self.selected_list_items_axes_1' with current selection
+        """
+        # ensure selection is checked in the UI
         for r in self.ids.variable_list_detail_axes_1_recycle.data:
             if r["text"] == result_list_item:
                 r["active"] = selected
@@ -3833,6 +3808,9 @@ class ResultsDetailScreen(SSimBaseScreen):
                     self.selected_list_items_axes_1[self.current_configuration].remove(r["text"])
 
     def on_selection_changed_2(self, result_list_item, selected):     
+        """Refreshes 'self.selected_list_items_axes_2' with current selection
+        """
+        # ensure selection is checked in the UI
         for r in self.ids.variable_list_detail_axes_2_recycle.data:
             if r["text"] == result_list_item:
                 r["active"] = selected
