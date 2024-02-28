@@ -46,6 +46,7 @@ from kivy.uix.label import Label
 from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivymd.uix.list import (
     TwoLineAvatarIconListItem,
+    OneLineIconListItem,
     TwoLineIconListItem,
     ILeftBodyTouch,
     OneLineRightIconListItem,
@@ -526,6 +527,123 @@ class BusListItem(TwoLineIconListItem, RecycleDataViewBehavior):
         self.ids.selected.active = self.active
 
 
+class ResultsListItem(OneLineIconListItem, RecycleDataViewBehavior):
+    
+    active = False
+    owner: CheckedListItemOwner = None 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+        
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed(self.text, self.active)
+
+    def on_selected_changed(self, result_list_item, selected):
+        pass
+
+    def mark(self, check, value):
+        self.active = value
+        self.__raise_value_changed()
+            
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
+
+
+class ResultsDetailListItem1(OneLineIconListItem, RecycleDataViewBehavior):
+    
+    active = False
+    owner: CheckedListItemOwner = None 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+        
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed_1(self.text, self.active)
+
+    def on_selected_changed(self, result_list_item, selected):
+        pass
+
+    def mark(self, check, value):
+        self.active = value
+        self.__raise_value_changed()
+            
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
+
+
+class ResultsDetailListItem2(OneLineIconListItem, RecycleDataViewBehavior):
+    
+    active = False
+    owner: CheckedListItemOwner = None 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+        
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed_2(self.text, self.active)
+
+    def on_selected_changed(self, result_list_item, selected):
+        pass
+
+    def mark(self, check, value):
+        self.active = value
+        self.__raise_value_changed()
+            
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
+
+
 class TextFieldFloat(MDTextField):
     SIMPLE_FLOAT = re.compile(r"(\+|-)?\d*(\.\d*)?$")
 
@@ -771,6 +889,20 @@ class BusRecycleView(RecycleView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+
+class ResultsListRecycleView(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class ResultsDetailListRecycleView1(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class ResultsDetailListRecycleView2(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
     """Configure a single energy storage device."""
@@ -2992,15 +3124,16 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
         self.config_id_to_name = {}
+        self._reset_selected_metrics_items()
+
+    def _reset_selected_metrics_items(self):
         self.selected_metric_items = {}
         ctr = 1
         for config in self.project.current_checkpoint.configurations():
             self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
             self.selected_metric_items['Configuration ' + str(ctr)] = []
-            ctr += 1
-        # Clear the figure and variable list on enter to result screen
-        self.ids.metrics_list.clear_widgets()
-        
+            ctr += 1 
+    
     def dismiss_popup(self):
         self._popup.dismiss()
         
@@ -3219,6 +3352,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         filename : str
             ID displayed in the UI of the selected configuration.
         """
+        results_item_data = []
+
         self.current_configuration = value_ui_id
         
         # read the current selected configuration
@@ -3239,49 +3374,42 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # extract the data
         metrics_headers, metrics_accumulated, metrics_data = current_result.metrics_log()
         
-        # add the list of metrics in the selected configuration into the MDList
-        # clear the variable list
-        self.ids.metrics_list.clear_widgets()
-    
+        Logger.debug('------------------------------------------------------------')
+        Logger.debug(self.selected_metric_items)
+        Logger.debug('------------------------------------------------------------')
+
+        # add the list of metrics in the selected configuration into the RecycleView        
         for item in metrics_headers:
             # do not add 'time' to the variable list
             if item == 'time':
                 continue
             else:
-                metrics_item = ResultsMetricsListItemWithCheckbox(variable_name=str(item))
-                metrics_item.ids.metrics_selected.bind(active=self.on_item_check_changed)
-                self.ids.metrics_list.add_widget(metrics_item)
+                results_item_data +=[{
+                    "text": item,
+                    "active": item in self.selected_metric_items[self.current_configuration],
+                    "owner": self
+                }]
 
-                # Check if the variable in already selected.
-                if item in self.selected_metric_items[self.current_configuration]:
-                    metrics_item.ids.metrics_selected.active = True
-                else:
-                    metrics_item.ids.metrics_selected.active = False     
-
+                self.ids.metrics_list_recycle.data = results_item_data
+                self.ids.metrics_list_recycle.refresh_from_data()
+        
         # close the drop-down menu
         self.menu.dismiss()
-
-    def on_item_check_changed(self, ckb, value):
-        """A callback function for the list items to use when their check 
-        state changes.
-
-        This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_metric_items` 
-        if value is true and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box (true = checked, false = unchecked).
-        """
-        if value:
-            if str(ckb.listItem.text) not in self.selected_metric_items[str(self.current_configuration)]:
-                self.selected_metric_items[str(self.current_configuration)].append(str(ckb.listItem.text))
-        else:
-            self.selected_metric_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
         
+    def on_selection_changed(self, result_list_item, selected):
+        for r in self.ids.metrics_list_recycle.data:
+            if r["text"] == result_list_item:
+                r["active"] = selected
+
+        # refresh `selected_metric_items` with current selection
+        for r in self.ids.metrics_list_recycle.data:
+            if r["active"]:
+                if r["text"] not in self.selected_metric_items[self.current_configuration]:
+                    self.selected_metric_items[self.current_configuration].append(r["text"])
+            else:
+                if r["text"] in self.selected_metric_items[self.current_configuration]:
+                    self.selected_metric_items[self.current_configuration].remove(r["text"])
+                
     def open_results_detail(self):
         self.manager.current = "results-detail"
 
@@ -3307,9 +3435,6 @@ class ResultsDetailScreen(SSimBaseScreen):
             self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
             self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
             ctr += 1
-        # Clear the figure and variable list on enter to result detail screen
-        self.ids.variable_list_detail_axes_1.clear_widgets()
-        self.ids.variable_list_detail_axes_2.clear_widgets()
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -3529,23 +3654,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         """
         self.ids.detail_plot_canvas.clear_widgets()
 
-    # def drop_config_menu(self):
-    #     """Displays the dropdown menu in the visualization screen.
-    #     """
-    #     menu_items = []
-    #     for config_id, config_ui_id in self.config_id_to_name.items():
-    #         display_text = config_ui_id
-    #         menu_items.append({
-    #             "viewclass": "OneLineListItem",
-    #             "text": display_text,
-    #             "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
-    #         })
-
-    #     self.menu = MDDropdownMenu(
-    #         caller=self.ids.config_list_detail, items=menu_items, width_mult=5
-    #     )
-    #     self.menu.open()
-
     def drop_config_menu(self):
         """Displays the dropdown menu in the visualization screen.
         """
@@ -3598,6 +3706,9 @@ class ResultsDetailScreen(SSimBaseScreen):
         value_ui_id : str
             ID displayed in the UI of the selected configuration.
         """
+        results_detail_item_data_1 = []
+        results_detail_item_data_2 = []
+
         self.current_configuration = value_ui_id
                
         # read the current selected configuration
@@ -3648,33 +3759,57 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             self.x_data = list(self.variable_data.loc[:, 'time'])
 
-            self.ids.variable_list_detail_axes_1.clear_widgets()
-            self.ids.variable_list_detail_axes_2.clear_widgets()
-            
             # add the list of variables in the selected configuration
             # into the MDList
+            # for item in self.list_items:
+            #     # do not add 'time' to the variable list
+            #     if item == 'time':
+            #         continue
+            #     else:
+            #         list_item_axes_1 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
+            #         list_item_axes_1.ids.selected.bind(active=self.on_item_check_changed_axes_1)
+            #         self.ids.variable_list_detail_axes_1.add_widget(list_item_axes_1)
+
+            #         list_item_axes_2 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
+            #         list_item_axes_2.ids.selected.bind(active=self.on_item_check_changed_axes_2)
+            #         self.ids.variable_list_detail_axes_2.add_widget(list_item_axes_2)
+                                    
+            #         if item in self.selected_list_items_axes_1[self.current_configuration]:
+            #             list_item_axes_1.ids.selected.active = True
+            #         else:
+            #             list_item_axes_1.ids.selected.active = False
+                    
+            #         if item in self.selected_list_items_axes_2[self.current_configuration]:
+            #             list_item_axes_2.ids.selected.active = True
+            #         else:
+            #             list_item_axes_2.ids.selected.active = False
+
             for item in self.list_items:
-                # do not add 'time' to the variable list
+                # do not add 'time' to the variable liist
                 if item == 'time':
                     continue
                 else:
-                    list_item_axes_1 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-                    list_item_axes_1.ids.selected.bind(active=self.on_item_check_changed_axes_1)
-                    self.ids.variable_list_detail_axes_1.add_widget(list_item_axes_1)
+                    results_detail_item_data_1 +=[{
+                        "text": item,
+                        "active": item in self.selected_list_items_axes_1[self.current_configuration],
+                        "owner": self
+                    }]
 
-                    list_item_axes_2 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-                    list_item_axes_2.ids.selected.bind(active=self.on_item_check_changed_axes_2)
-                    self.ids.variable_list_detail_axes_2.add_widget(list_item_axes_2)
-                                    
-                    if item in self.selected_list_items_axes_1[self.current_configuration]:
-                        list_item_axes_1.ids.selected.active = True
-                    else:
-                        list_item_axes_1.ids.selected.active = False
-                    
-                    if item in self.selected_list_items_axes_2[self.current_configuration]:
-                        list_item_axes_2.ids.selected.active = True
-                    else:
-                        list_item_axes_2.ids.selected.active = False
+                    results_detail_item_data_2 +=[{
+                        "text": item,
+                        "active": item in self.selected_list_items_axes_2[self.current_configuration],
+                        "owner": self
+                    }]
+
+            self.ids.variable_list_detail_axes_1_recycle.data = results_detail_item_data_1
+            self.ids.variable_list_detail_axes_1_recycle.refresh_from_data()
+            self.ids.variable_list_detail_axes_2_recycle.data = results_detail_item_data_2
+            self.ids.variable_list_detail_axes_2_recycle.refresh_from_data()
+
+            Logger.debug('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            Logger.debug(results_detail_item_data_1)         
+            Logger.debug('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<')      
+
 
             # close the drop-down menu
             self.menu.dismiss()
@@ -3683,48 +3818,33 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             Logger.debug('This configuration has not been evaluated')
 
-    def on_item_check_changed_axes_1(self, ckb, value):
-        """A callback function for the list items to use when their check 
-        state changes.
+    def on_selection_changed_1(self, result_list_item, selected):
+        for r in self.ids.variable_list_detail_axes_1_recycle.data:
+            if r["text"] == result_list_item:
+                r["active"] = selected
+        
+        # refresh 'selected_list_items_axes_1' with current selection
+        for r in self.ids.variable_list_detail_axes_1_recycle.data:
+            if r["active"]:
+                if r["text"] not in self.selected_list_items_axes_1[self.current_configuration]:
+                    self.selected_list_items_axes_1[self.current_configuration].append(r["text"])
+            else:
+                if r["text"] in self.selected_list_items_axes_1[self.current_configuration]:
+                    self.selected_list_items_axes_1[self.current_configuration].remove(r["text"])
 
-        This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_list_items_axes_1` 
-        if value is true and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box (true = checked, false = unchecked).
-        """
-        if value:
-            if str(ckb.listItem.text) not in self.selected_list_items_axes_1[str(self.current_configuration)]:
-                self.selected_list_items_axes_1[str(self.current_configuration)].append(str(ckb.listItem.text))
-        else:
-            self.selected_list_items_axes_1[str(self.current_configuration)].remove(str(ckb.listItem.text))
-
-    # TODO: see if the same function can be resued
-    def on_item_check_changed_axes_2(self, ckb, value):
-        """A callback function for the list items to use when their check 
-        state changes.
-
-        This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_list_items_axes_2` 
-        if value is true and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box (true = checked, false = unchecked).
-        """
-        if value:
-            if str(ckb.listItem.text) not in self.selected_list_items_axes_2[str(self.current_configuration)]:
-                self.selected_list_items_axes_2[str(self.current_configuration)].append(str(ckb.listItem.text))
-        else:
-            self.selected_list_items_axes_2[str(self.current_configuration)].remove(str(ckb.listItem.text))
+    def on_selection_changed_2(self, result_list_item, selected):     
+        for r in self.ids.variable_list_detail_axes_2_recycle.data:
+            if r["text"] == result_list_item:
+                r["active"] = selected
+        
+        # refresh 'selected_list_items_axes_2' with current selection
+        for r in self.ids.variable_list_detail_axes_2_recycle.data:
+            if r["active"]:
+                if r["text"] not in self.selected_list_items_axes_2[self.current_configuration]:
+                    self.selected_list_items_axes_2[self.current_configuration].append(r["text"])
+            else:
+                if r["text"] in self.selected_list_items_axes_2[self.current_configuration]:
+                    self.selected_list_items_axes_2[self.current_configuration].remove(r["text"])       
 
 
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
