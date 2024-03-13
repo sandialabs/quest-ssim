@@ -3122,17 +3122,31 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         return self.project.current_checkpoint.results()
 
     def on_enter(self):
-        # TO DO: Replace with evaluated configurations
         self.config_id_to_name = {}
         self._reset_selected_metrics_items()
 
     def _reset_selected_metrics_items(self):
         self.selected_metric_items = {}
         ctr = 1
+
+        # extract base directory       
+        _current_checkpoint_base_dir = \
+            self.project.current_checkpoint.results().base_dir
+
+        # a list that keep track of configurations that have
+        # been evaluated
+        _evaluated_configs = []       
+        for item in os.listdir(_current_checkpoint_base_dir):
+            if os.path.exists(_current_checkpoint_base_dir / item / "evaluated"):
+                _evaluated_configs.append(item)
+
         for config in self.project.current_checkpoint.configurations():
-            self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
-            self.selected_metric_items['Configuration ' + str(ctr)] = []
-            ctr += 1 
+            # check if the configuration has been completely evaluated
+            # before creating the mapping
+            if config.id in _evaluated_configs:
+                self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
+                self.selected_metric_items['Configuration ' + str(ctr)] = []
+                ctr += 1 
     
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -3430,14 +3444,33 @@ class ResultsDetailScreen(SSimBaseScreen):
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
         self.config_id_to_name = {}
+        self._reset_selected_list_items()
+
+    def _reset_selected_list_items(self):
         self.selected_list_items_axes_1 = {}
         self.selected_list_items_axes_2 = {}
         ctr = 1
+
+        # extract base directory       
+        _current_checkpoint_base_dir = \
+            self.project.current_checkpoint.results().base_dir
+
+        # a list that keep track of configurations that have
+        # been evaluated
+        _evaluated_configs = []       
+        for item in os.listdir(_current_checkpoint_base_dir):
+            if os.path.exists(_current_checkpoint_base_dir / item / "evaluated"):
+                _evaluated_configs.append(item)
+
         for config in self.project.current_checkpoint.configurations():
-            self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
-            self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
-            self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
-            ctr += 1
+            # check if the configuration has been completely evaluated
+            # before creating the mapping
+            if config.id in _evaluated_configs:
+                self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
+                self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
+                self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
+                ctr += 1
+
 
     def dismiss_popup(self):
         self._popup.dismiss()
