@@ -1293,7 +1293,7 @@ class StorageOptions:
         Yields tuples where the first element is a
         :py:class:`grid.StorageSpecification` and the second element
         is a :py:class:`grid.InvControlSpecification`. If no inverter
-        control is defined then the sencond element will be None.
+        control is defined then the second element will be None.
 
         """
         inv_control = self._inverter_control
