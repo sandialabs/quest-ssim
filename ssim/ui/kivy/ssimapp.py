@@ -750,8 +750,7 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
-        self.configurations: List[Configuration] = []
-        self.configurations_to_eval: List[Configuration] = []
+        self.configurations_to_eval: List[str] = []
         self.config_id_to_name= {} # sets up concrete mappings
         self.selected_configurations = {}
         super().__init__(*args, **kwargs)
@@ -3388,15 +3387,10 @@ class RunSimulationScreen(SSimBaseScreen):
         does not provide a value, a 24 hour simulation is assumed
         by default.
         """
-        sim_hours = self.ids.simulation_runtime.text
-        if sim_hours.replace(".", "").isnumeric():
-            for config in self.configurations:
-                # assign simulation time based on user input
-                config.sim_duration = float(sim_hours)
-        else:
-            for config in self.configurations:
-                # run 24-hour simulation if no input is provided
-                config.sim_duration = 24.0
+        sim_duration = 24.0
+        if self.ids.simulation_runtime.text_valid():
+            sim_duration = float(self.ids.simulation_runtime.text)
+        self.project.sim_duration = sim_duration
 
     def _perform_filtering(self):
         """Performs filtering and repopulates the

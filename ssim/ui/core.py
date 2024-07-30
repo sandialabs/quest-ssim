@@ -204,6 +204,7 @@ class Project:
 
     def __init__(self, name: str, version=1):
         self.name = name
+        self.sim_duration = 24
         self._grid_model_path = None
         self._grid_model = None
         self._input_file_path = None
@@ -594,7 +595,8 @@ class Project:
                 self.pvsystems,
                 storage_devices,
                 inv_controls,
-                reliability=self.reliability_params
+                reliability=self.reliability_params,
+                sim_duration=self.sim_duration
             )
 
     def _storage_configurations(self):
