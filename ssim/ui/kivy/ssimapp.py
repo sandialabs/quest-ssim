@@ -750,8 +750,7 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
-        self.configurations: List[Configuration] = []
-        self.configurations_to_eval: List[Configuration] = []
+        self.configurations_to_eval: List[str] = []
         self.config_id_to_name= {} # sets up concrete mappings
         self.selected_configurations = {}
         super().__init__(*args, **kwargs)
@@ -3277,6 +3276,9 @@ class RunSimulationScreen(SSimBaseScreen):
         self._config_filters = ConfigurationFilters()
         self._run_thread = None
         self._canceled = False
+        # self.ids.simulation_runtime.bind(
+        #     on_text_validate=self._set_simulation_time
+        # )
 
     def on_enter(self):
         # establishes mappings between config id and config UI ids
@@ -3380,6 +3382,16 @@ class RunSimulationScreen(SSimBaseScreen):
 
         Logger.debug('Configuration Filters Cleared ...')
 
+    def _set_simulation_time(self):
+        """Sets simulation time for each configuration. If the user
+        does not provide a value, a 24 hour simulation is assumed
+        by default.
+        """
+        sim_duration = 24.0
+        if self.ids.simulation_runtime.text_valid():
+            sim_duration = float(self.ids.simulation_runtime.text)
+        self.project.sim_duration = sim_duration
+
     def _perform_filtering(self):
         """Performs filtering and repopulates the
            list filtered_configurations.
@@ -3430,7 +3442,6 @@ class RunSimulationScreen(SSimBaseScreen):
                                     self._config_filters.kwh_filter["max"]
                     if filter_condition_kWh:
                         self.filtered_configurations.append(config)
-
             else:
                 for i, config in enumerate(
                         self.project.current_checkpoint.configurations()
@@ -3665,6 +3676,9 @@ class RunSimulationScreen(SSimBaseScreen):
         self._progress_popup.dismiss()
 
     def run_configurations(self):
+        # acquire simulation time
+        self._set_simulation_time()
+
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
         self._progress = RunProgressPopupContent()
