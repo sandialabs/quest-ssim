@@ -96,3 +96,5 @@ pytestresults.txt
 /svr.py
 /svr.txt
 /1-s2.0-S0306261917302581-main.pdf
+/unnamed
+*.user

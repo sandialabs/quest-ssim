@@ -2,6 +2,7 @@
 import itertools
 import math
 import os
+import sys
 from pickle import NONE
 import re
 from contextlib import ExitStack
@@ -659,12 +660,12 @@ class SSimApp(MDApp):
     def __init__(self, *args, **kwargs):
         self.project = Project("unnamed")
         super().__init__(*args, **kwargs)
-
+        
     def build(self):
         Window.size = (1000, 800)
 
         screen_manager = ScreenManager()
-        screen_manager.add_widget(SSimScreen(self.project, name="ssim"))
+        screen_manager.add_widget(SSimScreen(self.project, [sys.argv[1]] if len(sys.argv) > 0 else None, name="ssim"))
         screen_manager.add_widget(
             DERConfigurationScreen(self.project, name="der-config"))
         screen_manager.add_widget(
@@ -680,7 +681,7 @@ class SSimApp(MDApp):
         screen_manager.add_widget(
             ResultsDetailScreen(self.project, name="results-detail"))
         screen_manager.current = "ssim"
-
+                    
         return screen_manager
 
 
@@ -4085,16 +4086,27 @@ class SSimScreen(SSimBaseScreen):
     curr_x_max = 0.0
     curr_y_min = 0.0
     curr_y_max = 0.0
-    
+        
+    def __init__(self, project, filename, *args, **kwargs):
+        super().__init__(project, *args, **kwargs)
+        self._popup = None
+        self.init_file = filename
+        if self.init_file:
+            Clock.schedule_once(lambda dt: self.load_input_file(dt), 1000)
+                
+    def load_input_file(self, dt):        
+        if self.init_file:
+            self.load_toml_file(None, self.init_file)
+            self.init_file = None
+
     def on_kv_post(self, base_widget):
-        self.refresh_grid_plot()
+        self.refresh_grid_plot()        
 
     def report(self, message):
         Logger.debug("button pressed: %s", message)
 
     def dismiss_popup(self):
-        self._popup.dismiss()
-
+        if self._popup: self._popup.dismiss()
         
     def _show_no_grid_file_popup(dismiss_screen=None, manager=None):
         """Show a popup dialog warning that no grid model file is selected.
@@ -4509,7 +4521,6 @@ class SSimScreen(SSimBaseScreen):
 
     def draw_plot_using_dss_plot(self):        
         gm = self.project.grid_model
-        
         if gm is None:
             self.ids.grid_diagram.display_plot_error(
                 "There is no current grid model."

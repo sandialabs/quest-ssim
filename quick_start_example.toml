@@ -1,5 +1,5 @@
 [Project]
-name = 'unnamed'
+name = 'test'
 grid_model_path = 'C:\Users\jpeddy\Documents\dev\storage-sim\examples\ieee34_opendss_model\ieee34Mod_PV.dss'
 [reliability]
 [reliability.line]
