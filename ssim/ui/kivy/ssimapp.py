@@ -47,7 +47,9 @@ from kivy.uix.label import Label
 from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivymd.uix.list import (
     TwoLineAvatarIconListItem,
+    OneLineIconListItem,
     TwoLineIconListItem,
+    ThreeLineIconListItem,
     ILeftBodyTouch,
     OneLineRightIconListItem,
     MDList
@@ -226,10 +228,10 @@ class BusFilters:
     def is_empty(self) -> bool:
         ''' A method to indicate whether or not this BusFilters item will
         actually filter anything.
-        
+
         Filtering will only take place if a name is given, some voltages ar
         chosen, phase restrictions are given, etc.
-        
+
         Returns
         -------
         True if this filter will result in any filtering and false otherwise.
@@ -244,7 +246,7 @@ class BusFilters:
     def summary(self) -> str:
         ''' Creates a string indicating what active filters are part of this
         BusFilters object.
-        
+
         The components of the resulting string will include:
         1 - Any name filter entered in quotes.
         2 - +Selected if the selected only filter is active.
@@ -253,7 +255,7 @@ class BusFilters:
         5 - #-phase for each allowed phase count specified.
         6 - +V for any specified required voltage levels separated by " or ".
             If only 1 voltage, then +V#, if more, then +V(#1 or #2 or... ).
-        
+
         The final string will have all appropriate elements above separated by
         semicolons.
 
@@ -298,7 +300,7 @@ class BusFilters:
         sel_bus_list
             The list of all currently selected busses.  This is used only if the
             selected_only filter is active.
-            
+
         Returns
         -------
         True if the bus passes all filters and should not be filtered out and
@@ -329,6 +331,32 @@ class BusFilters:
         return True
 
 
+class ConfigurationFilters:
+
+    def __init__(self, *args, **kwargs):
+        self.storage_name = ""
+        self.kw_filter = {"min": None, "max": None}
+        self.kwh_filter = {"min": None, "max": None}
+
+    def is_empty(self) -> bool:
+        if self.storage_name: return False
+        if any(self.kw_filter.values()): return False
+        if any(self.kwh_filter.values()): return False
+        return True
+
+    def is_empty_name(self) -> bool:
+        if self.storage_name: return False
+        return True
+
+    def is_empty_kW(self) -> bool:
+        if any(self.kw_filter.values()): return False
+        return True
+
+    def is_empty_kWh(self) -> bool:
+        if any(self.kwh_filter.values()): return False
+        return True
+
+
 class BusSearchPanelContent(BoxLayout):
 
     """ A panel that houses controls for configuring a BusFilters object.
@@ -345,7 +373,7 @@ class BusSearchPanelContent(BoxLayout):
     def apply_filters(self, filters: BusFilters):
         """ Updates the fields on this panel to display the status of the
         supplied filters object.
-        
+
         Parameters
         ----------
         filters
@@ -367,7 +395,7 @@ class BusSearchPanelContent(BoxLayout):
     def extract_filters(self) -> BusFilters:
         """ Reads the status of the fields of this form and stores the
         information in a new BusFilters object and returns it.
-        
+
         Returns
         -------
         BusFilters
@@ -398,12 +426,12 @@ class BusSearchPanelContent(BoxLayout):
     def changed_phase_filter(self, instance):
         """ A callback that is used whenever a change to phase filter inputs
         occurs.
-        
+
         This includes both the must have, can't have, and number of phase
         requirements.
 
         This method just dispatches the "on_filter_applied" callback.
-        
+
         Parameters
         ----------
         instance
@@ -414,9 +442,9 @@ class BusSearchPanelContent(BoxLayout):
     def changed_sel_only_filter(self, instance):
         """ A callback that is used whenever a change to the "selected only"
         filter occurs.
-        
+
         This method just dispatches the "on_filter_applied" callback.
-        
+
         Parameters
         ----------
         instance
@@ -427,9 +455,9 @@ class BusSearchPanelContent(BoxLayout):
     def changed_text_filter(self, instance):
         """ A callback that is used whenever a change to the bus name text
         filter occurs.
-        
+
         This method just dispatches the "on_filter_applied" callback.
-        
+
         Parameters
         ----------
         instance
@@ -441,9 +469,9 @@ class BusSearchPanelContent(BoxLayout):
     def changed_voltage_check(self, instance, active):
         """ A callback that is used whenever the check state of a voltage
         level check box changes.
-        
+
         This method just dispatches the "on_filter_applied" callback.
-        
+
         Parameters
         ----------
         instance
@@ -454,7 +482,7 @@ class BusSearchPanelContent(BoxLayout):
     def get_selected_voltages(self) -> set:
         """ Gathers the voltages of all checked voltage boxes and returns them
         as a set.
-        
+
         Returns
         -------
         set
@@ -617,7 +645,7 @@ class BusSearchPanelContent(BoxLayout):
     
     def __raise_filter_applied(self, instance):
         """Dispatches the on_filter_applied method to anything bound to it.
-        
+
         Parameters
         ----------
         instance
@@ -628,7 +656,7 @@ class BusSearchPanelContent(BoxLayout):
     def on_filter_applied(self, instance):
         """ The required stub of the on_filter_applied method that will be the
         callback to any changes to the widgets on this form.
-        
+
         Parameters
         ----------
         instance
@@ -639,7 +667,7 @@ class BusSearchPanelContent(BoxLayout):
     def load_voltage_checks(self, voltages):
         """ Creates voltage check boxes, 1 for each value in the supplied list
         of voltages.
-       
+
         Parameters
         ----------
         voltages
@@ -653,6 +681,30 @@ class BusSearchPanelContent(BoxLayout):
             self.ids.voltage_check_panel.add_widget(
                 Label(text=str(v), color=(0,0,0))
                 )
+
+
+class ConfigurationPanelContent(BoxLayout):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filters = ConfigurationFilters()
+
+    def extract_filters(self) -> ConfigurationFilters:
+        ret = ConfigurationFilters()
+
+        if self.ids.txt_min_kw_filter.text_valid():
+            ret.kw_filter['min'] = float(self.ids.txt_min_kw_filter.text)
+
+        if self.ids.txt_max_kw_filter.text_valid():
+            ret.kw_filter['max'] = float(self.ids.txt_max_kw_filter.text)
+
+        if self.ids.txt_min_kwh_filter.text_valid():
+            ret.kwh_filter['min'] = float(self.ids.txt_min_kwh_filter.text)
+
+        if self.ids.txt_max_kwh_filter.text_valid():
+            ret.kwh_filter['max'] = float(self.ids.txt_max_kwh_filter.text)
+
+        return ret
 
 
 class SSimApp(MDApp):
@@ -699,8 +751,7 @@ class SSimBaseScreen(Screen):
 
     def __init__(self, project, *args, **kwargs):
         self.project = project
-        self.configurations: List[Configuration] = []
-        self.configurations_to_eval: List[Configuration] = []
+        self.configurations_to_eval: List[str] = []
         self.config_id_to_name= {} # sets up concrete mappings
         self.selected_configurations = {}
         super().__init__(*args, **kwargs)
@@ -747,7 +798,7 @@ class BusListItem(TwoLineIconListItem, RecycleDataViewBehavior):
     '''
     A class that serves as a list item representing a bus for use in a
     RecycleView.
-    
+
     Attributes
     ----------
     active : bool
@@ -777,7 +828,7 @@ class BusListItem(TwoLineIconListItem, RecycleDataViewBehavior):
     def on_selected_changed(self, bus, selected):
         ''' This is the stub method required to register an event of this name.
         It doesn't do anything.
-        
+
         Parameters
         ----------
         bus
@@ -791,9 +842,9 @@ class BusListItem(TwoLineIconListItem, RecycleDataViewBehavior):
     def mark(self, check, value):
         ''' Sets the active state of this item to the supplied value and raises
         the value changed message.
-        
+
         This method is used as a callback for the a check box on_active message.
-        
+
         Parameters
         ----------
         check
@@ -802,6 +853,162 @@ class BusListItem(TwoLineIconListItem, RecycleDataViewBehavior):
             The current value of the check box.  True if checked and false
             otherwise.
         '''
+        self.active = value
+        self.__raise_value_changed()
+            
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
+
+
+class ResultsListItem(OneLineIconListItem, RecycleDataViewBehavior):
+    
+    active = False
+    owner: CheckedListItemOwner = None 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed(self.text, self.active)
+
+    def on_selected_changed(self, result_list_item, selected):
+        pass
+
+    def mark(self, check, value):
+        self.active = value
+        self.__raise_value_changed()
+            
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
+
+
+class ConfigListItem(ThreeLineIconListItem, RecycleDataViewBehavior):
+
+    active = False
+    owner: CheckedListItemOwner = None
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed(self.text, self.active)
+
+    def on_selected_changed(self, bus, selected):
+        pass
+
+    def mark(self, check, value):
+        self.active = value
+        self.__raise_value_changed()
+
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
+
+
+class ResultsDetailListItem1(OneLineIconListItem, RecycleDataViewBehavior):
+    
+    active = False
+    owner: CheckedListItemOwner = None 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+        
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed_1(self.text, self.active)
+
+    def on_selected_changed(self, result_list_item, selected):
+        pass
+
+    def mark(self, check, value):
+        self.active = value
+        self.__raise_value_changed()
+            
+    def refresh_view_attrs(self, rv, index, data):
+        """A method of the RecycleView called automatically to refresh the
+            content of the view.
+
+        Parameters
+        ----------
+        rv : RecycleView
+            The RecycleView that owns this row and wants it refreshed (not used
+            in this function).
+        index: int
+            The index of this row.
+        data: dict
+            The dictionary of data that constitutes this row.  Not needed here.
+        """
+        super().refresh_view_attrs(rv, index, data)
+        self.ids.selected.active = self.active
+
+
+class ResultsDetailListItem2(OneLineIconListItem, RecycleDataViewBehavior):
+    
+    active = False
+    owner: CheckedListItemOwner = None 
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.register_event_type("on_selected_changed")
+        self.ids.selected.active = self.active
+        
+    def __raise_value_changed(self):
+        self.dispatch("on_selected_changed", self.text, self.active)
+        if self.owner: self.owner.on_selection_changed_2(self.text, self.active)
+
+    def on_selected_changed(self, result_list_item, selected):
+        pass
+
+    def mark(self, check, value):
         self.active = value
         self.__raise_value_changed()
             
@@ -1068,6 +1275,25 @@ class BusRecycleView(RecycleView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+
+class ResultsListRecycleView(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class ConfigurationRecycleView(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class ResultsDetailListRecycleView1(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+
+class ResultsDetailListRecycleView2(RecycleView):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
 
 class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
     """Configure a single energy storage device."""
@@ -3046,91 +3272,296 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.configurations: List[Configuration] = []
+        self.filtered_configurations: List[Configuration] = []
         self.storage_options: List[StorageOptions] = []
+        self._config_filters = ConfigurationFilters()
         self._run_thread = None
         self._canceled = False
+        # self.ids.simulation_runtime.bind(
+        #     on_text_validate=self._set_simulation_time
+        # )
 
     def on_enter(self):
-        # populate configurations list
-        self.selected_configurations = {}
-        self.populate_configurations()
+        # establishes mappings between config id and config UI ids
+        self._establish_mappings()
+
+        # if no filtering has been applied
+        if not self.filtered_configurations:
+            for _, config in enumerate(
+                    self.project.current_checkpoint.configurations()
+            ):
+                self.filtered_configurations.append(config)
+
+        # recycle view setup
+        self.populate_configurations_recycle_view()
+
         # update the configurations that are currently selected for 
         # evaluation
         self._update_configurations_to_eval()
+
         # enable/disable selection buttons
         self.manage_selection_buttons_enabled_state()
+
         # enable/disable run button
         self.manage_run_button_enabled_state()
 
-    def populate_configurations(self):
-        """Populates the configurations list. Also creates mappings between
-           internal configurations IDs and once that are displayed in the UI.
+    def populate_configurations_recycle_view(self):
+        """Populates the recycle view with the list of configurations.
         """
-        configs = []
-        self.ids.config_list.clear_widgets()
-        self.ids.config_list.active = False
+        config_data = []
+
+        # extract ids of filtered configurations
+        filtered_config_ids = []
+        for config in self.filtered_configurations:
+            filtered_config_ids.append(config.id)
+
+        for _, config in enumerate(
+                self.project.current_checkpoint.configurations()
+        ):
+            if config.id in filtered_config_ids:
+                secondary_detail_text = []
+                tertiary_detail_text = []
+                final_secondary_text = []
+                final_tertiary_text = []
+
+                for storage in config.storage:
+                    if storage is not None:
+                        secondary_detail_text.append(
+                            f"name: {storage.name}, bus: {storage.bus}"
+                        )
+                        tertiary_detail_text.append(
+                            f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}"
+                        )
+                    else:
+                        secondary_detail_text.append('no storage')
+
+                final_secondary_text = "\n".join(secondary_detail_text)
+                final_tertiary_text = "\n".join(tertiary_detail_text)
+
+                config_data += [{
+                    "text": self.config_id_to_name[config.id],
+                    "secondary_text": final_secondary_text,
+                    "tertiary_text": final_tertiary_text,
+                    "active": self.config_id_to_name[config.id] \
+                        in self.selected_configurations.values(),
+                    "owner": self
+                }]
+
+        self.ids.config_list_recycle.data = config_data
+        self.ids.config_list_recycle.refresh_from_data()
+
+    def _establish_mappings(self):
+        """Creates mappings between internal configurations IDs and once that
+           are displayed in the UI.
+        """
         for i, config in enumerate(self.project.current_checkpoint.configurations()):
-            configs.append(config)
             # establish the mappings between config id and config UI_ids
             self.config_id_to_name[config.id] = f'Configuration {i+1}'
-            # populate the UI with the configuration
-            self._add_config_to_ui(config)
 
-        self.configurations = configs
-
-    def _add_config_to_ui(self, config):
-        """Populates the UI with details on the Configuration `config`.
-
-        Parameter
-        ---------
-        config: Configuration
-            The configuration to be added to the UI.
+    def apply_config_filters(self):
+        """Apply selected filters to the configurations list.
         """
-        secondary_detail_text = []
-        tertiary_detail_text = []
-        final_secondary_text = []
-        final_tertiary_text = []
+        # clear the selected configurations and configurations
+        # to evalulate lists
+        self.selected_configurations.clear()
+        self.configurations_to_eval.clear()
+        # perform the filtering based on user selections
+        self._perform_filtering()
+        # update the UI based on user selections
+        self.populate_configurations_recycle_view()
 
-        for storage in config.storage:
-            if storage is not None:
-                secondary_detail_text.append(f"name: {storage.name}, bus: {storage.bus}")
-                tertiary_detail_text.append(f"kw: {storage.kw_rated}, kwh: {storage.kwh_rated}")
+    def clear_config_filters(self):
+        # clear the selected configurations and configurations
+        # to evalulate lists
+        self.selected_configurations.clear()
+        self.configurations_to_eval.clear()
+        # clear all the filters
+        self._clear_filtering()
+        self._perform_filtering()
+        # update the UI based on user selections
+        self.populate_configurations_recycle_view()
+
+        Logger.debug('Configuration Filters Cleared ...')
+
+    def _set_simulation_time(self):
+        """Sets simulation time for each configuration. If the user
+        does not provide a value, a 24 hour simulation is assumed
+        by default.
+        """
+        sim_duration = 24.0
+        if self.ids.simulation_runtime.text_valid():
+            sim_duration = float(self.ids.simulation_runtime.text)
+        self.project.sim_duration = sim_duration
+
+    def _perform_filtering(self):
+        """Performs filtering and repopulates the
+           list filtered_configurations.
+        """
+        # reset filtered_configurations List everytime a new filtering
+        # action is performed
+        filter_condition_kW = None
+        filter_condition_kWh = None
+        self.filtered_configurations = []
+
+        Logger.debug(
+            '> :::::::::::::::::::::::::::::::::::::::::::::::::::::::'
+        )
+        Logger.debug(self._config_filters.kw_filter["min"])
+        Logger.debug(self._config_filters.kw_filter["max"])
+        Logger.debug(self._config_filters.kwh_filter["min"])
+        Logger.debug(self._config_filters.kwh_filter["max"])
+        Logger.debug(type(self._config_filters.kw_filter["max"]))
+        Logger.debug(self._config_filters.is_empty())
+        Logger.debug(
+            '::::::::::::::::::::::::::::::::::::::::::::::::::::::::::'
+        )
+
+        if not self._config_filters.is_empty():
+
+            if self._config_filters.is_empty_kWh():
+                for i, config in enumerate(
+                        self.project.current_checkpoint.configurations()
+                ):
+                    # perform filtering based ONLY on kW range
+                    filter_condition_kW = \
+                        config.storage[0].kw_rated >= \
+                            self._config_filters.kw_filter["min"] \
+                                and config.storage[0].kw_rated <= \
+                                    self._config_filters.kw_filter["max"]
+                    if filter_condition_kW:
+                        self.filtered_configurations.append(config)
+
+            elif self._config_filters.is_empty_kW():
+                for i, config in enumerate(
+                        self.project.current_checkpoint.configurations()
+                ):
+                    # perform filtering based ONLY on kWh range
+                    filter_condition_kWh = \
+                        config.storage[0].kwh_rated >= \
+                            self._config_filters.kwh_filter["min"] \
+                                and config.storage[0].kwh_rated <= \
+                                    self._config_filters.kwh_filter["max"]
+                    if filter_condition_kWh:
+                        self.filtered_configurations.append(config)
             else:
-                secondary_detail_text.append('no storage')
-        final_secondary_text = "\n".join(secondary_detail_text)
-        final_tertiary_text = "\n".join(tertiary_detail_text)
+                for i, config in enumerate(
+                        self.project.current_checkpoint.configurations()
+                ):
+                    # perform filtering based on kW and kWh range
+                    filter_condition_kW = \
+                        config.storage[0].kw_rated >= \
+                            self._config_filters.kw_filter["min"] \
+                                and config.storage[0].kw_rated <= \
+                                    self._config_filters.kw_filter["max"]
 
-        config_item = ListItemWithCheckbox(text=self.config_id_to_name[config.id], 
-                                           sec_text=final_secondary_text, 
-                                           tert_text=final_tertiary_text)
-        config_item.ids.selected.bind(active=self.on_item_check_changed)
-        config_item.ids.delete_config.bind(on_release=self.on_delete_config)
-        self.ids.config_list.add_widget(config_item)
+                    filter_condition_kWh = \
+                        config.storage[0].kwh_rated >= \
+                            self._config_filters.kwh_filter["min"] \
+                                and config.storage[0].kwh_rated <= \
+                                    self._config_filters.kwh_filter["max"]
 
-        # update the items that are currently selected
-        if config.id in self.selected_configurations.keys():
-            config_item.ids.selected.active = True
+                    # populate self.filtered_configuration list
+                    if filter_condition_kW and filter_condition_kWh:
+                        self.filtered_configurations.append(config)
         else:
-            config_item.ids.selected.active = False
+            Logger.debug('No Filters Specified. Filterting not performed!')
+            for i, config in enumerate(
+                    self.project.current_checkpoint.configurations()
+            ):
+                self.filtered_configurations.append(config)
+
+    def _clear_filtering(self):
+        self._config_filters.kw_filter["min"] = None
+        self._config_filters.kw_filter["max"] = None
+        self._config_filters.kwh_filter["min"] = None
+        self._config_filters.kwh_filter["max"] = None
+
+    def on_selection_changed(self, config, selected):
+        """A callback function for the list items to use when their check state
+        changes.
+
+        This method looks at the current check state (value) and either adds
+        the text of the check box into the list of currently selected
+        configurations if value is true and removes it if value is false.
+
+        This results in a resetting of the metric values and the associated
+        fields.
+
+        Parameters
+        ----------
+        ckb:
+            The check box whose check state has changed.
+        value:
+            The current check state of the check box
+            (true = checked, false = unchecked).
+        """
+        for c in self.ids.config_list_recycle.data:
+            if c["text"] == config:
+                c["active"] = selected
+
+        # populate selected_configurations with current selection
+        for c in self.ids.config_list_recycle.data:
+            if c["active"]:
+                config_key = self._get_config_key(self.config_id_to_name,
+                                                  c["text"])
+                self.selected_configurations[config_key] = c["text"]
+            else:
+                config_key = self._get_config_key(self.config_id_to_name,
+                                                  c["text"])
+                if config_key in self.selected_configurations:
+                    del self.selected_configurations[config_key]
+
+        # update the configurations that are currently selected for
+        # evaluation
+        self._update_configurations_to_eval()
+        # enable/disable run button
+        self.manage_run_button_enabled_state()
+
+    def open_config_filters(self):
+        """ Opens the configuration filter panel.
+        """
+        content = ConfigurationPanelContent()
+
+        popup = Popup(
+            title='Filter Configurations', content=content, auto_dismiss=False,
+            size_hint=(0.7, 0.7), background_color=(224,224,224),
+            title_color=(0,0,0)
+        )
+
+        def apply(*args):
+            # extract the filter options based on user selection/entry
+            self._config_filters = content.extract_filters()
+
+            # apply the filters and update the displayed configurations
+            self.apply_config_filters()
+
+            Logger.debug('Configuration Filter Applied ... ')
+            popup.dismiss()
+
+        def clear(*args):
+            # self._bus_filters = BusFilters()
+            self.clear_config_filters()
+            Logger.debug('Configuration Filters Cleared ...')
+            popup.dismiss()
+
+        content.ids.okBtn.bind(on_press=apply)
+        content.ids.clearBtn.bind(on_press=clear)
+        content.ids.cancelBtn.bind(on_press=popup.dismiss)
+        popup.open()
 
     def _update_configurations_to_eval(self):
         """Updates the list (`self.configurations_to_eval`) that keeps 
         track of current selection in the UI for configurations to 
         be evaluated.
         """
-        no_of_configurations = len(self.configurations)
-        ctr = no_of_configurations - 1
+        ctr = 0
         self.configurations_to_eval = []
-        for wid in self.ids.config_list.children:
-            if wid.selected:
-                self.configurations_to_eval.append(self.configurations[ctr].id)
-            ctr = ctr - 1
-        # run all the configurations
-        Logger.debug("===================================")
-        Logger.debug('Selected Configurations:')
-        Logger.debug(self.selected_configurations)
-        Logger.debug("===================================")
+        for wid in self.ids.config_list_recycle.data:
+            if wid["active"]:
+                self.configurations_to_eval.append(
+                    self.filtered_configurations[ctr].id
+                )
+            ctr = ctr + 1
 
     def _get_config_key(self, config_dict, config_UI_id):
         """Returns the internal configuration ID.
@@ -3155,43 +3586,15 @@ class RunSimulationScreen(SSimBaseScreen):
                 return key
         return('Configuration Not Found')
     
-    def on_item_check_changed(self, ckb, value):
-        """A callback function for the config list items to use when their
-        check state changes.
-
-        This method looks at the current check state (value) and either 
-        adds configuration UI id into the dict of currently selected 
-        configurations (`self.selected_configurations`) if value is true 
-        and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box 
-            (true = checked, false = unchecked).
-        """
-        config_key = self._get_config_key(self.config_id_to_name,
-                                          ckb.listItem.text)
-
-        if value:
-            self.selected_configurations[config_key] = ckb.listItem.text
-        else:
-            del self.selected_configurations[config_key]
-
-        # update the configurations that are currently selected for 
-        # evaluation
-        self._update_configurations_to_eval()
-        # enable/disable run button
-        self.manage_run_button_enabled_state()
-
-    def on_delete_config(self, value):
         Logger.debug("???????")
         Logger.debug(value)
         Logger.debug("Delete pressed")
 
     def manage_run_button_enabled_state(self):
+        """Enables or disables the run simulation button. Esnures at least
+        one configuration is selected before the UI allows the
+        simulation to run.
+        """
         numCldrn = len(self.configurations_to_eval) == 0
         self.ids.run_configuration_btn.disabled = numCldrn
 
@@ -3203,25 +3606,47 @@ class RunSimulationScreen(SSimBaseScreen):
         If there are items in the list, the buttons are enabled.  
         If there are no items in the list, the buttons are disabled.
         """
-        numCldrn = len(self.ids.config_list.children) == 0
+        numCldrn = len(self.ids.config_list_recycle.data) == 0
         self.ids.btnSelectAll.disabled = numCldrn
         self.ids.btnDeselectAll.disabled = numCldrn
 
     def deselect_all_configurations(self):
         """Deselects all the items in the configuration list."""
-        for wid in self.ids.config_list.children:
-            if isinstance(wid, ListItemWithCheckbox):
-                wid.ids.selected.active = False
-        # update the configurations to be evaluated list
+        for c in self.ids.config_list_recycle.data:
+            if "active" in c:
+                c["active"] = False
+
+        # refresh the list to reflect all selection changes
+        self.ids.config_list_recycle.refresh_from_data()
+
+        # update the configurations that are currently selected for
+        # evaluation
         self._update_configurations_to_eval()
 
     def select_all_configurations(self):
         """Selects all the items in configuration list.
+
+        This clears the currently selected configs and then appends each
+        back into the dictionary of selected configurations as the checks
+        are set.
         """
+        # clear configurations to eval and dictionary of
+        # selected configurations
         self.configurations_to_eval.clear()
-        for wid in self.ids.config_list.children:
-            if isinstance(wid, ListItemWithCheckbox):
-                wid.ids.selected.active = True
+        self.selected_configurations.clear()
+
+        # make all the configurations active and update
+        # dictionary of selected configurations accordingly
+        for c in self.ids.config_list_recycle.data:
+            config_key = self._get_config_key(self.config_id_to_name,
+                                              c["text"])
+            if "active" in c:
+                c["active"] = True
+                self.selected_configurations[config_key] = c["text"]
+
+        # refresh the list to reflect all selection changes
+        self.ids.config_list_recycle.refresh_from_data()
+
         # update the configurations that are currently selected for 
         # evaluation
         self._update_configurations_to_eval()
@@ -3252,6 +3677,9 @@ class RunSimulationScreen(SSimBaseScreen):
         self._progress_popup.dismiss()
 
     def run_configurations(self):
+        # acquire simulation time
+        self._set_simulation_time()
+
         self._run_thread = Thread(target=self._evaluate)
         self._run_thread.start()
         self._progress = RunProgressPopupContent()
@@ -3287,17 +3715,32 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         return self.project.current_checkpoint.results()
 
     def on_enter(self):
-        # TO DO: Replace with evaluated configurations
         self.config_id_to_name = {}
+        self._reset_selected_metrics_items()
+
+    def _reset_selected_metrics_items(self):
         self.selected_metric_items = {}
         ctr = 1
+
+        # extract base directory       
+        _current_checkpoint_base_dir = \
+            self.project.current_checkpoint.results().base_dir
+
+        # a list that keep track of configurations that have
+        # been evaluated
+        _evaluated_configs = []       
+        for item in os.listdir(_current_checkpoint_base_dir):
+            if os.path.exists(_current_checkpoint_base_dir / item / "evaluated"):
+                _evaluated_configs.append(item)
+
         for config in self.project.current_checkpoint.configurations():
-            self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
-            self.selected_metric_items['Configuration ' + str(ctr)] = []
-            ctr += 1
-        # Clear the figure and variable list on enter to result screen
-        self.ids.metrics_list.clear_widgets()
-        
+            # check if the configuration has been completely evaluated
+            # before creating the mapping
+            if config.id in _evaluated_configs:
+                self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
+                self.selected_metric_items['Configuration ' + str(ctr)] = []
+                ctr += 1 
+    
     def dismiss_popup(self):
         self._popup.dismiss()
         
@@ -3516,6 +3959,8 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         filename : str
             ID displayed in the UI of the selected configuration.
         """
+        results_item_data = []
+
         self.current_configuration = value_ui_id
         
         # read the current selected configuration
@@ -3536,49 +3981,45 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # extract the data
         metrics_headers, metrics_accumulated, metrics_data = current_result.metrics_log()
         
-        # add the list of metrics in the selected configuration into the MDList
-        # clear the variable list
-        self.ids.metrics_list.clear_widgets()
-    
+        Logger.debug('------------------------------------------------------------')
+        Logger.debug(self.selected_metric_items)
+        Logger.debug('------------------------------------------------------------')
+
+        # add the list of metrics in the selected configuration into the RecycleView        
         for item in metrics_headers:
             # do not add 'time' to the variable list
             if item == 'time':
                 continue
             else:
-                metrics_item = ResultsMetricsListItemWithCheckbox(variable_name=str(item))
-                metrics_item.ids.metrics_selected.bind(active=self.on_item_check_changed)
-                self.ids.metrics_list.add_widget(metrics_item)
+                results_item_data +=[{
+                    "text": item,
+                    "active": item in self.selected_metric_items[self.current_configuration],
+                    "owner": self
+                }]
 
-                # Check if the variable in already selected.
-                if item in self.selected_metric_items[self.current_configuration]:
-                    metrics_item.ids.metrics_selected.active = True
-                else:
-                    metrics_item.ids.metrics_selected.active = False     
-
+                self.ids.metrics_list_recycle.data = results_item_data
+                self.ids.metrics_list_recycle.refresh_from_data()
+        
         # close the drop-down menu
         self.menu.dismiss()
-
-    def on_item_check_changed(self, ckb, value):
-        """A callback function for the list items to use when their check 
-        state changes.
-
-        This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_metric_items` 
-        if value is true and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box (true = checked, false = unchecked).
-        """
-        if value:
-            if str(ckb.listItem.text) not in self.selected_metric_items[str(self.current_configuration)]:
-                self.selected_metric_items[str(self.current_configuration)].append(str(ckb.listItem.text))
-        else:
-            self.selected_metric_items[str(self.current_configuration)].remove(str(ckb.listItem.text))
         
+    def on_selection_changed(self, result_list_item, selected):
+        """Refreshes 'self.selected_metric_items' with current selection
+        """
+        # ensure selection is checked in the UI
+        for r in self.ids.metrics_list_recycle.data:
+            if r["text"] == result_list_item:
+                r["active"] = selected
+
+        # refresh `selected_metric_items` with current selection
+        for r in self.ids.metrics_list_recycle.data:
+            if r["active"]:
+                if r["text"] not in self.selected_metric_items[self.current_configuration]:
+                    self.selected_metric_items[self.current_configuration].append(r["text"])
+            else:
+                if r["text"] in self.selected_metric_items[self.current_configuration]:
+                    self.selected_metric_items[self.current_configuration].remove(r["text"])
+                
     def open_results_detail(self):
         self.manager.current = "results-detail"
 
@@ -3596,17 +4037,33 @@ class ResultsDetailScreen(SSimBaseScreen):
     def on_enter(self):
         # TO DO: Replace with evaluated configurations
         self.config_id_to_name = {}
+        self._reset_selected_list_items()
+
+    def _reset_selected_list_items(self):
         self.selected_list_items_axes_1 = {}
         self.selected_list_items_axes_2 = {}
         ctr = 1
+
+        # extract base directory       
+        _current_checkpoint_base_dir = \
+            self.project.current_checkpoint.results().base_dir
+
+        # a list that keep track of configurations that have
+        # been evaluated
+        _evaluated_configs = []       
+        for item in os.listdir(_current_checkpoint_base_dir):
+            if os.path.exists(_current_checkpoint_base_dir / item / "evaluated"):
+                _evaluated_configs.append(item)
+
         for config in self.project.current_checkpoint.configurations():
-            self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
-            self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
-            self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
-            ctr += 1
-        # Clear the figure and variable list on enter to result detail screen
-        self.ids.variable_list_detail_axes_1.clear_widgets()
-        self.ids.variable_list_detail_axes_2.clear_widgets()
+            # check if the configuration has been completely evaluated
+            # before creating the mapping
+            if config.id in _evaluated_configs:
+                self.config_id_to_name[config.id] = 'Configuration ' + str(ctr)
+                self.selected_list_items_axes_1['Configuration ' + str(ctr)] = []
+                self.selected_list_items_axes_2['Configuration ' + str(ctr)] = []
+                ctr += 1
+
 
     def dismiss_popup(self):
         self._popup.dismiss()
@@ -3760,7 +4217,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         filename : str
             Filename for the figure to be saved.
         """
-
         fullpath = selection[0]
 
         # by default, the figures are currently saved in PNG format
@@ -3826,23 +4282,6 @@ class ResultsDetailScreen(SSimBaseScreen):
         """
         self.ids.detail_plot_canvas.clear_widgets()
 
-    # def drop_config_menu(self):
-    #     """Displays the dropdown menu in the visualization screen.
-    #     """
-    #     menu_items = []
-    #     for config_id, config_ui_id in self.config_id_to_name.items():
-    #         display_text = config_ui_id
-    #         menu_items.append({
-    #             "viewclass": "OneLineListItem",
-    #             "text": display_text,
-    #             "on_release": lambda x=config_id, y=config_ui_id : self.set_config(x, y)
-    #         })
-
-    #     self.menu = MDDropdownMenu(
-    #         caller=self.ids.config_list_detail, items=menu_items, width_mult=5
-    #     )
-    #     self.menu.open()
-
     def drop_config_menu(self):
         """Displays the dropdown menu in the visualization screen.
         """
@@ -3895,6 +4334,9 @@ class ResultsDetailScreen(SSimBaseScreen):
         value_ui_id : str
             ID displayed in the UI of the selected configuration.
         """
+        results_detail_item_data_1 = []
+        results_detail_item_data_2 = []
+
         self.current_configuration = value_ui_id
                
         # read the current selected configuration
@@ -3945,34 +4387,28 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             self.x_data = list(self.variable_data.loc[:, 'time'])
 
-            self.ids.variable_list_detail_axes_1.clear_widgets()
-            self.ids.variable_list_detail_axes_2.clear_widgets()
-            
-            # add the list of variables in the selected configuration
-            # into the MDList
             for item in self.list_items:
-                # do not add 'time' to the variable list
+                # do not add 'time' to the variable liist
                 if item == 'time':
                     continue
                 else:
-                    list_item_axes_1 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-                    list_item_axes_1.ids.selected.bind(active=self.on_item_check_changed_axes_1)
-                    self.ids.variable_list_detail_axes_1.add_widget(list_item_axes_1)
+                    results_detail_item_data_1 +=[{
+                        "text": item,
+                        "active": item in self.selected_list_items_axes_1[self.current_configuration],
+                        "owner": self
+                    }]
 
-                    list_item_axes_2 = ResultsVariableListItemWithCheckbox(variable_name=str(item))
-                    list_item_axes_2.ids.selected.bind(active=self.on_item_check_changed_axes_2)
-                    self.ids.variable_list_detail_axes_2.add_widget(list_item_axes_2)
-                                    
-                    if item in self.selected_list_items_axes_1[self.current_configuration]:
-                        list_item_axes_1.ids.selected.active = True
-                    else:
-                        list_item_axes_1.ids.selected.active = False
-                    
-                    if item in self.selected_list_items_axes_2[self.current_configuration]:
-                        list_item_axes_2.ids.selected.active = True
-                    else:
-                        list_item_axes_2.ids.selected.active = False
+                    results_detail_item_data_2 +=[{
+                        "text": item,
+                        "active": item in self.selected_list_items_axes_2[self.current_configuration],
+                        "owner": self
+                    }]
 
+            self.ids.variable_list_detail_axes_1_recycle.data = results_detail_item_data_1
+            self.ids.variable_list_detail_axes_1_recycle.refresh_from_data()
+            self.ids.variable_list_detail_axes_2_recycle.data = results_detail_item_data_2
+            self.ids.variable_list_detail_axes_2_recycle.refresh_from_data()
+            
             # close the drop-down menu
             self.menu.dismiss()
 
@@ -3980,50 +4416,42 @@ class ResultsDetailScreen(SSimBaseScreen):
 
             Logger.debug('This configuration has not been evaluated')
 
-    def on_item_check_changed_axes_1(self, ckb, value):
-        """A callback function for the list items to use when their check 
-        state changes.
-
-        This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_list_items_axes_1` 
-        if value is true and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box (true = checked, false = unchecked).
+    def on_selection_changed_1(self, result_list_item, selected):
+        """Refreshes 'self.selected_list_items_axes_1' with current selection
         """
-        if value:
-            if str(ckb.listItem.text) not in self.selected_list_items_axes_1[str(self.current_configuration)]:
-                self.selected_list_items_axes_1[str(self.current_configuration)].append(str(ckb.listItem.text))
-        else:
-            self.selected_list_items_axes_1[str(self.current_configuration)].remove(str(ckb.listItem.text))
+        # ensure selection is checked in the UI
+        for r in self.ids.variable_list_detail_axes_1_recycle.data:
+            if r["text"] == result_list_item:
+                r["active"] = selected
+        
+        # refresh 'selected_list_items_axes_1' with current selection
+        for r in self.ids.variable_list_detail_axes_1_recycle.data:
+            if r["active"]:
+                if r["text"] not in self.selected_list_items_axes_1[self.current_configuration]:
+                    self.selected_list_items_axes_1[self.current_configuration].append(r["text"])
+            else:
+                if r["text"] in self.selected_list_items_axes_1[self.current_configuration]:
+                    self.selected_list_items_axes_1[self.current_configuration].remove(r["text"])
 
-    # TODO: see if the same function can be resued
-    def on_item_check_changed_axes_2(self, ckb, value):
-        """A callback function for the list items to use when their check 
-        state changes.
-
-        This method looks at the current check state (value) and either adds 
-        the currently selected variable into `self.selected_list_items_axes_2` 
-        if value is true and removes it if value is false.
-
-        Parameters
-        ----------
-        ckb:
-            The check box whose check state has changed.
-        value:
-            The current check state of the check box (true = checked, false = unchecked).
+    def on_selection_changed_2(self, result_list_item, selected):     
+        """Refreshes 'self.selected_list_items_axes_2' with current selection
         """
-        if value:
-            if str(ckb.listItem.text) not in self.selected_list_items_axes_2[str(self.current_configuration)]:
-                self.selected_list_items_axes_2[str(self.current_configuration)].append(str(ckb.listItem.text))
-        else:
-            self.selected_list_items_axes_2[str(self.current_configuration)].remove(str(ckb.listItem.text))
+        # ensure selection is checked in the UI
+        for r in self.ids.variable_list_detail_axes_2_recycle.data:
+            if r["text"] == result_list_item:
+                r["active"] = selected
+        
+        # refresh 'selected_list_items_axes_2' with current selection
+        for r in self.ids.variable_list_detail_axes_2_recycle.data:
+            if r["active"]:
+                if r["text"] not in self.selected_list_items_axes_2[self.current_configuration]:
+                    self.selected_list_items_axes_2[self.current_configuration].append(r["text"])
+            else:
+                if r["text"] in self.selected_list_items_axes_2[self.current_configuration]:
+                    self.selected_list_items_axes_2[self.current_configuration].remove(r["text"])       
 
 
+# NOTE: This class may longer be required
 class ListItemWithCheckbox(TwoLineAvatarIconListItem):
 
     def __init__(self, text, sec_text, tert_text, *args, **kwargs):
@@ -4984,7 +5412,7 @@ def _show_no_grid_popup(dismiss_screen=None, manager=None):
     If the dismiss screen or manager are null, then no screen is set upon
     dismissal.  Whatever screen was visible when this popup was created will
     become visible again.
-    
+
     Parameters
     ----------
     dismiss_screen : str, optional

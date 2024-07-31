@@ -10,6 +10,77 @@
 <MatlabPlotBox>:
     orientation: "vertical"
     pos_hint: {"top":1}
+
+<ConfigurationPanelContent>:
+    orientation: "vertical"
+
+    BoxLayout:
+        orientation: "horizontal"
+        id: filter_options_storage_name
+
+        Label:
+            text: "Filter by Storage Name ..."
+            color: C(hex_black)
+
+        TextFieldListFilter:
+            id: txt_name_filter
+            hint_text: "Storage Device Name"
+            on_filter_applied: self.parent.parent.changed_text_filter(self)
+
+    BoxLayout:
+        orientation: "horizontal"
+        id: filter_options_kW
+
+        Label:
+            text: "Filter by Storage Size ..."
+            color: C(hex_black)
+
+        TextFieldPositiveFloat:
+            id: txt_min_kw_filter
+            hint_text: "Enter minimum kW"
+            size_hint_y: None
+            height: 25
+
+        TextFieldPositiveFloat:
+            id: txt_max_kw_filter
+            hint_text: "Enter maximum kW"
+            size_hint_y: None
+            height: 25
+
+    BoxLayout:
+        orientation: "horizontal"
+        id: filter_options_kWh
+
+        Label:
+            text: "Filter by Storage Capacity ..."
+            color: C(hex_black)
+
+        TextFieldPositiveFloat:
+            id: txt_min_kwh_filter
+            hint_text: "Enter minimum kWh"
+            size_hint_y: None
+            height: 25
+
+        TextFieldPositiveFloat:
+            id: txt_max_kwh_filter
+            hint_text: "Enter maximum kWh"
+            size_hint_y: None
+            height: 25
+
+    BoxLayout:
+        orientation: "horizontal"
+
+        Button:
+            id: okBtn
+            text: 'Ok'
+
+        Button:
+            id: clearBtn
+            text: 'Clear'
+
+        Button:
+            id: cancelBtn
+            text: 'Cancel'
     
 <BusSearchPanelContent>:
     orientation: "vertical"
@@ -502,14 +573,41 @@
 
 
 <PVListitem>:
-
-
 <BusListItem>:
 
     LeftCheckBox:
         id: selected
         on_active: root.mark(self, self.active)
 
+<ResultsListItem>:
+    size_hint: 1.0, 0.5
+    LeftCheckBox:
+        id: selected
+        on_active: root.mark(self, self.active)
+
+<ResultsDetailListItem1>:
+    size_hint: 1.0, 0.5
+
+    LeftCheckBox:
+        id: selected
+        on_active: root.mark(self, self.active)
+
+<BusListItem>:
+    LeftCheckBox:
+        id: selected
+        on_active: root.mark(self, self.active)
+
+<ResultsDetailListItem2>:
+    size_hint: 1.0, 0.5
+    LeftCheckBox:
+        id: selected
+        on_active: root.mark(self, self.active)
+
+<ConfigListItem>:
+    size_hint: 1.0, 0.5
+    LeftCheckBox:
+        id: selected
+        on_active: root.mark(self, self.active)
 
 <DroopTabContent@BoxLayout>
     orientation: "vertical"
@@ -1350,6 +1448,62 @@
         multiselect: False
         touch_multiselect: False
 
+<ResultsListRecycleView>:
+    viewclass: 'ResultsListItem'
+    padding: [0, 0, 10, 0]
+    
+    RecycleBoxLayout:
+        padding: [0, 5, 0, 0]
+        default_size: None, dp(56)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
+<ResultsDetailListRecycleView1>:
+    viewclass: 'ResultsDetailListItem1'
+    padding: [0, 0, 10, 0]
+    
+    RecycleBoxLayout:
+        padding: [0, 5, 0, 0]
+        default_size: None, dp(56)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
+<ResultsDetailListRecycleView2>:
+    viewclass: 'ResultsDetailListItem2'
+    padding: [0, 0, 10, 0]
+    
+    RecycleBoxLayout:
+        padding: [0, 5, 0, 0]
+        default_size: None, dp(56)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
+<ConfigurationRecycleView>:
+    viewclass: 'ConfigListItem'
+    padding: [0, 0, 30, 0]
+
+    RecycleBoxLayout:
+        padding: [5, 25, 5, 5]
+        default_size: None, dp(80)
+        default_size_hint: 1, None
+        size_hint_y: None
+        height: self.minimum_height
+        orientation: 'vertical'
+        multiselect: False
+        touch_multiselect: False
+
 <XYItemTextField>
     multiline: False
 
@@ -1566,35 +1720,30 @@
                 BoxLayout:
                     orientation: "horizontal"
                     size_hint: None, None
-                    size: self.parent.width, 10
-                    padding: 5
-                    spacing: 5
+                    size: self.parent.width, 50
                     
                     Button:
                         id: btnSelectAll
                         text: "Select All"
-                        size_hint: 0.5, None
-                        size: self.parent.width, 10
+                        size_hint: 0.5, 1.0
                         on_release: root.select_all_configurations()
                         disabled: True
 
                     Button:
                         id: btnDeselectAll
                         text: "Deselect All"
-                        size_hint: 0.5, None
-                        size: self.parent.width, 10
+                        size_hint: 0.5, 1.0
                         on_release: root.deselect_all_configurations()
                         disabled: True
+                
+                Button:
+                    id: filter_busses_btn
+                    text: "Filter Configuration"
+                    size_hint: (1.0, 0.05)
+                    on_press: root.open_config_filters()
 
-                MDScrollView:
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
-                    MDList:
-                        id: config_list
+                ConfigurationRecycleView:
+                    id: config_list_recycle
 
             BoxLayout:
                 orientation: "vertical"
@@ -1612,7 +1761,7 @@
                     text: "Resume"
 
                 TextFieldPositiveFloat:
-                    hint_text: "Enter Simulation Time (in hours)"
+                    hint_text: "Enter Simulation Time (in hours, Default 24 hours)"
                     size_hint_y: None
                     height: 25
                     id: simulation_runtime    
@@ -1640,7 +1789,7 @@
 
             BoxLayout:
                 id: detail_plot_canvas
-                size_hint_x: 1.5
+                size_hint_x: 2.0
                 orientation: "vertical"
                 padding: 5
                 spacing: 5
@@ -1651,74 +1800,98 @@
             BoxLayout:
                 id: right_bar
                 orientation: "vertical"
-                Label:
-                    size_hint_y: 0.1
-                    text: "Select Configuration:"
-                    color: 0,0,0,1
 
-                MDRaisedButton:
-                    id: config_list_detail
-                    text: "Select Configuration ... "
-                    size_hint_x: 1.0
-                    on_release: root.drop_config_menu()
+                BoxLayout:
+                    id: drop_down_menus
+                    orientation: "vertical"
+                    size_hint_y: 0.6
+                    Label:
+                        text: "Select Configuration:"
+                        color: 0,0,0,1
+                        size_hint_y: 0.1
 
-                Label:
-                    size_hint_y: 0.1
-                    text: "Select Variable(s) for Plot 1:"
-                    color: 0,0,0,1
+                    MDRaisedButton:
+                        id: config_list_detail
+                        text: "Select Configuration ... "
+                        size_hint_x: 1.0
+                        on_release: root.drop_config_menu()
 
-                ScrollView:
-                    size_hint_y: 1.5
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
-                    MDList:
-                        id: variable_list_detail_axes_1
-                        size_hint_y: 1.5
+                    Label:
+                        text: "Select Variable(s) for Plot 1:"
+                        color: 0,0,0,1
+                        size_hint_y: 0.1
 
-                Label:
-                    size_hint_y: 0.1
-                    text: "Select Variable(s) for Plot 2:"
-                    color: 0,0,0,1
+                    ResultsDetailListRecycleView1:
+                        id: variable_list_detail_axes_1_recycle
 
-                ScrollView:
-                    size_hint_y: 1.5
-                    canvas.before:
-                        Color:
-                            rgba: .5, .5, .5, 1
-                        Line:
-                            width: 2
-                            rectangle: self.x, self.y, self.width, self.height
-                    MDList:
-                        id: variable_list_detail_axes_2
+                    # ScrollView:
+                    #     canvas.before:
+                    #         Color:
+                    #             rgba: .5, .5, .5, 1
+                    #         Line:
+                    #             width: 2
+                    #             rectangle: self.x, self.y, self.width, self.height
+                    #     MDList:
+                    #         id: variable_list_detail_axes_1
 
-                MDTextField:
-                    id: detail_figure_title
-                    hint_text: 'Enter title ...'
+                    Label:
+                        text: "Select Variable(s) for Plot 2:"
+                        color: 0,0,0,1
+                        size_hint_y: 0.1
 
-                MDTextField:
-                    id: detail_figure_ylabel
-                    hint_text: 'Enter Y-axis-1 label ...'
+                    ResultsDetailListRecycleView2:
+                        id: variable_list_detail_axes_2_recycle
 
-                MDTextField:
-                    id: detail_figure_ylabel2
-                    hint_text: 'Enter Y-axis-2 label ...'
-                Button:
-                    size_hint_y: 0.3
-                    text: "Update Figure"
-                    on_release: root.update_figure()
+                    # ScrollView:
+                    #     canvas.before:
+                    #         Color:
+                    #             rgba: .5, .5, .5, 1
+                    #         Line:
+                    #             width: 2
+                    #             rectangle: self.x, self.y, self.width, self.height
+                    #     MDList:
+                    #         id: variable_list_detail_axes_2
+
+                BoxLayout:
+                    orientation: 'vertical'
+                    id: label_inputs
+                    size_hint_y: 0.2
+                    
+                    MDTextField:
+                        id: detail_figure_title
+                        hint_text: 'Enter title ...'
+                        size_hint_y: 0.9
+
+                    MDTextField:
+                        id: detail_figure_ylabel
+                        hint_text: 'Enter Y-axis-1 label ...'
+                        size_hint_y: 0.9
+
+                    MDTextField:
+                        id: detail_figure_ylabel2
+                        hint_text: 'Enter Y-axis-2 label ...'
+                        size_hint_y: 0.9
                 
-                Button:
-                    size_hint_y: 0.3
-                    text: "Clear Figure"
-                    on_release: root.clear_figure()
-                Button:
-                    size_hint_y: 0.3
-                    text: "Save Figure"
-                    on_release: root.save_figure_options()
+                BoxLayout:
+                    orientation: 'vertical'
+                    id: plot_buttons
+                    size_hint_y: 0.1
+                
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        
+                        Button:
+                            text: "Update Figure"
+                            on_release: root.update_figure()
+                        
+                        Button:
+                            text: "Clear Figure"
+                            on_release: root.clear_figure()
+                    BoxLayout:
+                        orientation: 'horizontal'
+                        Button:
+                            text: "Save Figure"
+                            on_release: root.save_figure_options()
 
         Button:
             text: "back"
@@ -1737,23 +1910,28 @@
 
             BoxLayout:
                 id: summary_canvas
-                size_hint_x: 1.5
+                size_hint_x: 2.0
                 orientation: "vertical"
                 padding: 5
                 spacing: 5
 
             BoxLayout:
                 orientation: "vertical"
-
+                id: controls
+                
                 BoxLayout:
                     orientation: "vertical"
                     padding: 5
+                    size_hint_y: 0.6
 
                     BoxLayout:
                         orientation: "horizontal"
 
                         BoxLayout:
                             orientation: "vertical"
+                            padding: 5
+                            spacing: 5
+
                             Label:
                                 size_hint_y: 0.1
                                 text: "Select Configuration:"
@@ -1768,33 +1946,29 @@
                                 text: "Select Metric(s) to Plot:"
                                 color: 0,0,0,1
 
-                            ScrollView:
-                                size_hint_y: 0.8
-                                canvas.before:
-                                    Color:
-                                        rgba: .5, .5, .5, 1
-                                    Line:
-                                        width: 2
-                                        rectangle: self.x, self.y, self.width, self.height
-                                MDList:
-                                    id: metrics_list
+                            ResultsListRecycleView:
+                                id: metrics_list_recycle
                             
                             BoxLayout:
                                 id: voltage_controls
                                 orientation: "horizontal"
-                                size_hint_y: None
-                                height: 30
+                                size_hint: 1.0, 0.1
+                                height: 10
+                                padding: 5
+                                spacing: 5
 
                                 MDLabel:
                                     id: show_voltage_overlay
-                                    size_hint_x: None
-                                    width: 135
+                                    padding: 5, 5
+                                    spacing: 5
+                                    size_hint_x: 0.7
                                     text: "Show Bus Voltage"
 
                                 CheckBox:
                                     id: show_bus_voltages
-                                    size_hint_x: None
-                                    width: 30
+                                    padding: 5
+                                    spacing: 5
+                                    size_hint_x: 0.3
                                     active: True
                                     on_active: root.changed_show_voltage(self.active)
 
@@ -1802,6 +1976,7 @@
                     orientation: "vertical"
                     padding: 5
                     spacing: 5
+                    size_hint_y: 0.3
                     MDTextField:
                         id: detail_figure_title
                         hint_text: 'Enter custom title ...'
