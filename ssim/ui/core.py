@@ -543,15 +543,15 @@ class Project:
 
     def clear_metrics(self):
         """Removes all metrics from all managers and removes all managers."""
-        self._metricMgrs.clear();
+        self._metricMgrs.clear()
 
     def clear_options(self):
         """Removes all storage options from this project."""
-        self.storage_devices.clear();
+        self.storage_devices.clear()
 
     def clear_pv(self):
-        """Removes all storage options from this project."""
-        self.pvsystems.clear();
+        """Removes all PV options from this project."""
+        self.pvsystems.clear()
 
     def get_manager(self, category: str) -> MetricManager:
         """Retrieves the metric manager identified by the supplied category.
