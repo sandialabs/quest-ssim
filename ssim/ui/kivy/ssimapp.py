@@ -2690,14 +2690,6 @@ class MetricListItem(TwoLineAvatarIconListItem):
     pass
 
 
-class RightCheckbox(IRightBodyTouch, MDCheckbox):
-    pass
-
-
-class LeftCheckbox(ILeftBodyTouch, MDCheckbox):
-    pass
-
-
 class MetricConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
     _selBusses = []
     _currentMetricCategory = "None"
