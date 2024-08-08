@@ -891,6 +891,106 @@ class StorageControl:
                     'control curve.  They must be unique')
 
 
+class PVOptions:
+    """Set of configuration options available for a specific PV system.
+
+    Parameters
+    ----------
+    name : str
+        Name of the system.
+    num_phases : int
+        Number of phases this system is connected to.
+    pmpp : iterable of float
+        Options for the maximum power that this system can generate. [kW]
+    busses : iterable of str
+        Busses where this device may be connected.
+    irradiance : str
+        Path to a file containing the irradiance profile that should
+        be used by OpenDSS.
+    dcac_ratio : float, default 1.0
+        Ratio of the maximum DC power of the array to the maximum AC power
+        of the inverter.
+    control : PVControl, optional
+        Control settings for the PVSystems. Defaults to uncontrolled.
+    required : bool, default True
+        If True the device will be included in every configuration.
+    """
+
+    def __init__(self, name, num_phases, pmpp, busses, irradiance,
+                 dcac_ratio=1.0, control=None, required=True):
+        self.name = name
+        self.phases = num_phases
+        self.pmpp = set(pmpp)
+        self.busses = set(busses)
+        self.irradiance = irradiance
+        self.dcac_ratio = dcac_ratio
+        self.control = control
+        self.required = required
+
+    def write_toml(self):
+        """Return a TOML string representing this object."""
+        buslis = list("'" + bus + "'" for bus in self.busses)
+        return "\n".join(
+            ["",
+             f'[pv-options."{self.name}"]',
+             f"phases = {self.phases}",
+             f"pmpp = {buslist}",
+             f"irradiance = '{self.irradiance}'",
+             f"dcac_ratio = {self.dcac_ratio}",
+             # TODO f"control = ???"
+             f"required = {str(self.required).lower()}",
+             ""]
+        )
+
+    def read_toml(self, name: str, toml_data: dict):
+        """Set the attributes of this instance using `toml_data`"""
+        self.name = name
+        self.phases = toml_data["phases"]
+        self.pmpp = set(toml_data["pmpp"])
+        self.busses = set(toml_data["busses"])
+        self.dcac_ratio = toml_data["dcac_ratio"]
+        self.irradiance = toml_data["irradiance"]
+        self.required = toml_data["required"]
+        # TODO self.control
+
+    def add_bus(self, bus: str):
+        """Add `bus` to the set of busses where the PV system may be placed."""
+        self.busses.add(bus)
+
+    def add_pmpp(self, pmpp: float):
+        """Add `pmpp` to the set of maximum powers the PV system can output."""
+        # XXX The corresponding method on StorageOptions returns True if the
+        #     value was added and False if it was not (because it already
+        #     existed in the set). I'm not sure why it behaves like this so I'm
+        #     not going to do the same here. If I need that behavior once the
+        #     UI components are implemented it will be easy to add at that
+        #     time.
+        self.pmpp.add(pmpp)
+
+    @property
+    def num_configurations(self):
+        cfgs = len(self.busses) * len(self.pmpp)
+        if self.required:
+            return cfgs
+        return cfgs + 1
+
+    def configurations(self):
+        """Rerturn a generator that yields all possible configurations."""
+        for bus in self._busses:
+            for pmpp in self.pmpp:
+                yield (
+                    grid.PVSpecification(
+                        self.name,
+                        bus,
+                        pmpp,
+                        kva_rated=pmpp / self.dcac_ratio,
+                        phases=None,
+                        irradiance_profile=self.irradiance,
+                    ),
+                    None,  # TODO inverter controls
+                )
+
+
 class StorageOptions:
     """Set of configuration options available for a specific device.
 
