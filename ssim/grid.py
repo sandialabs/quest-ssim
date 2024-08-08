@@ -268,8 +268,9 @@ class PVSpecification:
         if self.inverter_efficiency is not None:
             pv["inverter_efficiency"] = str(self.inverter_efficiency)
         if self.pt_curve is not None:
-            pv["inverter_efficiency"] = _curve_to_dict(self.pt_curve)
+            pv["pt_curve"] = _curve_to_dict(self.pt_curve)
         return pv
+
 
 @dataclass
 class EMSSpecification:
