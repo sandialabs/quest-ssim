@@ -5,6 +5,7 @@ import os
 from pickle import NONE
 import re
 from contextlib import ExitStack
+from copy import deepcopy
 from math import cos, hypot
 from threading import Thread
 from typing import List
@@ -1299,7 +1300,8 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
 
     _bus_filters = BusFilters()
 
-    def __init__(self, der_screen, ess: StorageOptions, *args, **kwargs):
+    def __init__(self, der_screen, ess: StorageOptions, *args,
+                 editing=None, **kwargs):
         super().__init__(der_screen.project, *args, **kwargs)
         self._der_screen = der_screen
         self.ids.power_input.bind(
@@ -1313,6 +1315,7 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         )
         self.options = ess
         self.initialize_widgets()
+        self._editing = editing
                 
     def initialize_widgets(self):
         if self.options is None: return
@@ -1533,14 +1536,14 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         if self.show_error(self.options.validate_busses()): return
         if self.show_error(self.options.validate_controls()): return
 
-        # self._der_screen.add_ess(self.options)
+        self._der_screen.add_ess(self.options)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
     def cancel(self):
-        # if self._editing is not None:
-        # Restore the original device
-        #    self._der_screen.add_ess(self._editing)
+        if self._editing is not None:
+            # Restore the original device
+            self._der_screen.add_ess(self._editing)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)
 
@@ -2561,8 +2564,6 @@ class DERConfigurationScreen(SSimBaseScreen):
             i += 1
         ess = StorageOptions(name, 3, [], [], [])
 
-        self.add_ess(ess)
-
         self.manager.add_widget(
             StorageConfigurationScreen(
                 self, ess, name="configure-storage")
@@ -2593,10 +2594,16 @@ class DERConfigurationScreen(SSimBaseScreen):
     def edit_storage(self, ess_list_item):
         ess = ess_list_item.ess
         # Remove from the list so it can be re-added after editing
-        # self.project.remove_storage_option(ess)
-        # self.ids.ess_list.remove_widget(ess_list_item)
+        self.project.remove_storage_option(ess)
+        self.ids.ess_list.remove_widget(ess_list_item)
         self.manager.add_widget(
-            StorageConfigurationScreen(self, ess, name="configure-storage"))
+            StorageConfigurationScreen(
+                self,
+                deepcopy(ess),
+                name="configure-storage",
+                editing=ess
+            )
+        )
         self.manager.current = "configure-storage"
 
 
