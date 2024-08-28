@@ -532,6 +532,17 @@
                     MDList:
                         id: pv_list
 
+                Button:
+                    id: new_pv
+                    size_hint: (1.0, 0.1)
+                    text: "New PV System"
+                    on_press: root.new_pv_system()
+
+                Button:
+                    id: delete_pv
+                    size_hint: (1.0, 0.1)
+                    text: "Delete PV System"
+
         BoxLayout:
             orientation: "horizontal"
             size_hint_y: None
@@ -556,6 +567,15 @@
         icon: "pencil"
 
 
+<PVListitem>:
+    LeftCheckBox:
+        id: selected
+
+    IconRightWidget:
+        id: edit
+        icon: "pencil"
+
+
 <ResultsVariableListItemWithCheckbox>:
     id: results_variable_list
 
@@ -571,8 +591,6 @@
         id: metrics_selected
         listItem: root
 
-
-<PVListitem>:
 
 <ResultsListItem>:
     size_hint: 1.0, 0.5
@@ -1115,25 +1133,87 @@
                             id: duration_list
 
             BoxLayout:
+                id: right_box
+                orientation: "vertical"
+                padding: 5
+                spacing: 10
+
+                FilterableBusList:
+                    id: select_busses
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: 25
+                    orientation: "horizontal"
+                    padding: [0, 0, 20, 0]
+
+                    MDLabel:
+                        id: required_label
+                        text: "Required?"
+
+                    MDSwitch:
+                        id: required
+                        active: False
+                        size_hint: [0.08, 1.0]
+
+                Button:
+                    text: "Edit Control Parameters"
+                    size_hint_y: None
+                    height: 30
+                    on_press: root.edit_control_params()
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: "horizontal"
+
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
+
+<PVConfigurationScreen>:
+    id: "configure-pv"
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: 5
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+
+                TextFieldOpenDSSName:
+                    id: device_name
+                    hint_text: "Device Name"
+                    helper_text_mode: "on_error"
+                    helper_text: "invalid name"
+
+                TextFieldPositiveFloat:
+                    id: pmpp_input
+                    hint_text: "PV System Max AC Power (kW)"
+
+                MDScrollView:
+                    EditableSetList:
+                        id: pmpp_list
+
+            BoxLayout:
                 id: bus_list_box
                 orientation: "vertical"
                 padding: 5
                 spacing: 10
 
-                MDLabel:
-                    text: "Select possible busses"
-                    size_hint: (1.0, 0.05)
-                    underline: True
+                FilterableBusList:
+                    id: select_busses
 
-                Button:
-                    id: filter_busses_btn
-                    text: "Filter Busses"
-                    size_hint: (1.0, 0.05)
-                    on_press: root.open_bus_filters()
-
-                BusRecycleView:
-                    id: bus_list
-                    
                 BoxLayout:
                     size_hint_y: None
                     height: 25
@@ -1429,7 +1509,29 @@
         touch_multiselect: False
 
 
-<BusRecycleView>:
+<FilterableBusList@BoxLayout>:
+    id: bus_list_box
+    orientation: "vertical"
+    padding: 5
+    spacing: 10
+
+    MDLabel:
+        text: "Select possible busses"
+        size_hint: (1.0, 0.05)
+        underline: True
+
+    Button:
+        id: filter_busses_btn
+        text: "Filter Busses"
+        size_hint: (1.0, 0.05)
+        on_press: root.open_bus_filters()
+
+    BusRecycleView:
+        id: bus_list
+        project: root.project
+
+
+<BusRecycleView@RecycleView>:
     viewclass: 'BusListItem'
     padding: [0, 0, 10, 0]
     

@@ -1,6 +1,6 @@
 """Core classes and functions for the user interface."""
 from __future__ import annotations
-from copy import copy, deepcopy
+
 import functools
 import hashlib
 import itertools
@@ -9,18 +9,19 @@ import logging
 import os
 import shutil
 import subprocess
-from os import path, makedirs
-from pathlib import Path, PurePosixPath
 import tempfile
+from copy import copy, deepcopy
+from os import makedirs, path
+from pathlib import Path, PurePosixPath
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import pkg_resources
 import tomli
+
 from ssim import dssutil, grid
 from ssim.metrics import MetricManager, MetricTimeAccumulator
 from ssim.opendss import DSSModel
-
 
 # To Do
 #
@@ -360,6 +361,14 @@ class Project:
         return self.storage_devices
 
     @property
+    def pv_names(self):
+        return set(system.name for system in self.pvsystems)
+
+    @property
+    def pv_options(self):
+        return self.pvsystems
+
+    @property
     def pv_assets(self):
         return [] if self._grid_model is None else self._grid_model.pvsystems
 
@@ -581,6 +590,12 @@ class Project:
 
     def add_storage_option(self, storage_options):
         self.storage_devices.append(storage_options)
+
+    def add_pv_option(self, pv: PVOptions):
+        self.pvsystems.append(pv)
+
+    def remove_pv_option(self, pv: PVOptions):
+        self.pvsystems.remove(pv)
 
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
@@ -934,7 +949,7 @@ class PVOptions:
             ["",
              f'[pv-options."{self.name}"]',
              f"phases = {self.phases}",
-             f"pmpp = {buslist}",
+             f"pmpp = {self.busses}",
              f"irradiance = '{self.irradiance}'",
              f"dcac_ratio = {self.dcac_ratio}",
              # TODO f"control = ???"

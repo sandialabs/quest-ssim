@@ -67,6 +67,7 @@ from ssim.ui import (
     Project,
     StorageControl,
     StorageOptions,
+    PVOptions,
     ProjectResults,
     is_valid_opendss_name
 )
@@ -1271,9 +1272,102 @@ class TextFieldOpenDSSName(MDTextField):
             self.error = False
 
 
-class BusRecycleView(RecycleView):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+class FilterableBusList(BoxLayout):
+
+    _bus_filters = BusFilters()
+    project = ObjectProperty(None)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reload_bus_list()
+        self._selected = set()
+        # XXX The naming of this event overlaps with events in BusListItem.
+        #     I would like to use "on_selection_changed" but that clashes with
+        #     the API method on CheckedListItemOwner.
+        self.register_event_type("on_selected_changed")
+
+    def on_project(self, instance, proj):
+        self.reload_bus_list()
+
+    def on_selected_changed(self, buslist, selected):
+        pass
+
+    @property
+    def data(self):
+        return self.ids.bus_list.data
+
+    @data.setter
+    def data(self, value):
+        self.ids.bus_list.data = value
+
+    def reload_bus_list(self):
+        if self.project is None:
+            return
+        self.data = [
+            {"text": bus,
+             "secondary_text": (
+                 f"{self.project.phases(bus)}, "
+                 f"{DSSModel.nominal_voltage(bus)} kV"),
+             "active": bus in self._selected,
+             "owner": self}
+            for bus in filter(self._check_bus_filters, self.project.bus_names)
+        ]
+        button_label = " ".join(
+            filter(lambda x: x,
+                   ["Filter Busses", self._bus_filters.summary()])
+        )
+        self.ids.filter_busses_btn.text = button_label
+
+    def _check_bus_filters(self, bus):
+        return self._bus_filters.test_bus(bus, self.project, self._selected)
+
+    def open_bus_filters(self):
+        content = BusSearchPanelContent()
+        content.load_voltage_checks(
+            self.project.grid_model.all_base_voltages()
+        )
+        content.apply_filters(self._bus_filters)
+        popup = Popup(
+            title='Filter Busses',
+            content=content,
+            auto_dismiss=False,
+            size_hint=(0.7, 0.7),
+            background_color=(224,224,224),
+            title_color=(0,0,0)
+        )
+
+        def apply(*args):
+            self._bus_filters = content.extract_filters()
+            self.reload_bus_list()
+            popup.dismiss()
+
+        def clear(*args):
+            self._bus_filters = BusFilters()
+            self.reload_bus_list()
+            popup.dismiss()
+
+        content.ids.okBtn.bind(on_press=apply)
+        content.ids.clearBtn.bind(on_press=clear)
+        content.ids.cancelBtn.bind(on_press=popup.dismiss)
+        popup.open()
+
+    def on_selection_changed(self, bus, selected):
+        Logger.debug(f"selection_changed - {bus}:{selected}")
+        if selected:
+            self._selected.add(bus)
+        else:
+            self._selected.discard(bus)
+        self.dispatch("on_selected_changed", self, self._selected)
+
+    @property
+    def selected_busses(self):
+        return self._selected
+
+    @selected_busses.setter
+    def selected_busses(self, new):
+        self._selected = new
+        self.dispatch("on_selected_changed", self, self._selected)
+        self.reload_bus_list()
 
 
 class ResultsListRecycleView(RecycleView):
@@ -1326,91 +1420,16 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         for duration in self.options.duration:
             self.ids.duration_list.add_item(duration)
 
+        self.ids.select_busses.project = self._der_screen.project
+        self.ids.select_busses.selected_busses = self.options.busses
+
         self.ids.device_name.text = self.options.name
         
-        self.reload_bus_list()
-
         self.ids.required.active = self.options.required
 
         Clock.schedule_once(
             lambda dt: refocus_text_field(self.ids.device_name), 0.05
             )
-
-    def on_selection_changed(self, bus, selected):
-        if self.options is None: return
-        for b in self.ids.bus_list.data:
-            if b["text"] == bus:
-                b["active"] = selected
-        if selected:
-            self.options.add_bus(bus)
-        else:
-            self.options.remove_bus(bus)
-
-    def apply_bus_filters(self):
-        self.reload_bus_list()
-        
-    def open_bus_filters(self):
-    
-        content = BusSearchPanelContent()
-        
-        content.load_voltage_checks(
-            self.project.grid_model.all_base_voltages()
-            )
-
-        content.apply_filters(self._bus_filters)
-
-        popup = Popup(
-            title='Filter Busses', content=content, auto_dismiss=False,
-            size_hint=(0.7, 0.7), background_color=(224,224,224),
-            title_color=(0,0,0)
-        )
-
-        def apply(*args):
-            self._bus_filters = content.extract_filters()
-            self.apply_bus_filters()
-            popup.dismiss()
-        
-        def clear(*args):
-            self._bus_filters = BusFilters()
-            self.apply_bus_filters()
-            popup.dismiss()            
-
-        content.ids.okBtn.bind(on_press=apply)
-        content.ids.clearBtn.bind(on_press=clear)
-        content.ids.cancelBtn.bind(on_press=popup.dismiss)
-        popup.open()
-
-    def on_bus_filter_applied(self, instance, value):
-        self.reload_bus_list()
-
-    def check_bus_filters(self, bus) -> bool:
-        return self._bus_filters.test_bus(
-            bus, self.project, self.options.busses
-            )
-
-    def check_need_bus_filtering(self) -> bool:
-        return self._bus_filters is not None and \
-            not self._bus_filters.is_empty()
-
-    def reload_bus_list(self):
-        need_filter = self.check_need_bus_filtering()        
-
-        bus_data = []
-        for bus in self.project.bus_names:
-            if not need_filter or self.check_bus_filters(bus):
-                bus_data += [{
-                    "text":bus,
-                    "secondary_text":str(self.project.phases(bus)) +
-                        ", " + str(DSSModel.nominal_voltage(bus)) + " kV",
-                    "active":bus in self.options.busses,
-                    "owner":self
-                    }]
-        
-        self.ids.bus_list.data = bus_data
-
-        filtertxt = self._bus_filters.summary()        
-        self.ids.filter_busses_btn.text = "Filter Busses"
-        if filtertxt: self.ids.filter_busses_btn.text += " " + filtertxt
 
     def _check_name(self, textfield):
         if not textfield.text_valid():
@@ -1451,10 +1470,7 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
 
     @property
     def _selected_busses(self):
-        return set(self.ids.bus_list.data[i]["text"]
-            for i in range(len(self.ids.bus_list.data))
-            if self.ids.bus_list.data[i]["active"]
-        )
+        return self.ids.select_busses.selected_busses
 
     def edit_control_params(self):
         self._record_option_data()
@@ -2521,16 +2537,82 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""
 
-    def __init__(self, *args, **kwargs):
-        self.pvsystem = None
-        super().__init__(*args, **kwargs)
+    _bus_filters = BusFilters()
+
+    def __init__(self, der_screen, pvsystem, *args,
+                 editing=None, **kwargs):
+        super().__init__(der_screen.project, *args, **kwargs)
+        self._pvsystem = pvsystem
+        self._der_screen = der_screen
+        self.ids.pmpp_input.bind(on_text_validate=self._add_pmpp)
+        self.ids.device_name.bind(on_text_validate=self._check_name)
+        self._initialize_widgets()
+        self._editing = editing
+
+    def _initialize_widgets(self):
+        if self._pvsystem is None:
+            return
+        for pmpp in self._pvsystem.pmpp:
+            self.ids.pmpp_list.add_item(pmpp)
+        self.ids.select_busses.selected_busses = self._pvsystem.busses
+        self.ids.select_busses.project = self._der_screen.project
+        self.ids.device_name.text = self._pvsystem.name
+        self.ids.required.active = self._pvsystem.required
+        Clock.schedule_once(
+            lambda _: refocus_text_field(self.ids.device_name),
+            0.05
+        )
+
+    def _check_name(self, textfield):
+        if not textfield.text_valid():
+            textfield.helper_text = "Invalid name"
+            textfield.error = True
+            return False
+        same_name = (pv.name.lower() == textfield.text.lower()
+                     for pv in self.project.pv_options
+                     if pv is not self._pvsystem)
+        if any(same_name):
+            textfield.helper_text = "Name already exists"
+            textfield.error = True
+            return False
+        textfield.error = False
+        return True
+
+    def _add_pmpp(self, textfield):
+        if textfield.text_valid():
+            value = float(textfield.text)
+            self.ids.pmpp_list.add_item(value)
+            textfield.text = ""
+            Clock.schedule_once(lambda dt: refocus_text_field(textfield), 0.05)
+        else:
+            textfield.set_error_message()
+
+    @property
+    def _pmpp(self):
+        return set(self.ids.pmpp_list.options)
+
+    @property
+    def _selected_busses(self):
+        return self.ids.select_busses.selected_busses
+
+    def _record_options(self):
+        self._pvsystem.pmpp = self._pmpp
+        self._pvsystem.busses = self._selected_busses
+        self._pvsystem.required = self.ids.required.active
+        self._pvsystem.name = self.ids.device_name.text
 
     def save(self):
-        # TODO add the new storage device to the project
+        self._record_options()
+        # TODO Error checking!!
+        self._der_screen.add_pv(self._pvsystem)
         self.manager.current = "der-config"
+        self.manager.remove_widget(self)
 
     def cancel(self):
+        if self._editing:
+            self._der_screen.add_pv(self._editing)
         self.manager.current = "der-config"
+        self.manager.remove_widget(self)
 
 
 class DERConfigurationScreen(SSimBaseScreen):
@@ -2549,10 +2631,10 @@ class DERConfigurationScreen(SSimBaseScreen):
             self.ids.ess_list.add_widget(
                 StorageListItem(so, self)
             )
-
+        self.ids.pv_list.clear_widgets()
         for pv in self.project.pvsystems:
             self.ids.pv_list.add_widget(
-                PVListItem(pv)
+                PVListItem(pv, self)
             )
 
     def new_storage(self):
@@ -2570,6 +2652,24 @@ class DERConfigurationScreen(SSimBaseScreen):
         )
 
         self.manager.current = "configure-storage"
+
+    def new_pv_system(self):
+        name = "NewPV"
+        existing_names = {n.lower() for n in self.project.pv_names}
+        i = 1
+        while name.lower() in existing_names:
+            name = "NewPV" + str(i)
+            i += 1
+        pv = PVOptions(name, 3, [], [], [])
+        self.manager.add_widget(
+            PVConfigurationScreen(
+                self, pv, name="configure-pv")
+        )
+        self.manager.current = "configure-pv"
+
+    def add_pv(self, pv):
+        self.project.add_pv_option(pv)
+        self.ids.pv_list.add_widget(PVListItem(pv, self))
 
     def add_ess(self, ess):
         self.project.add_storage_option(ess)
@@ -2606,6 +2706,20 @@ class DERConfigurationScreen(SSimBaseScreen):
         )
         self.manager.current = "configure-storage"
 
+    def edit_pvsystem(self, pv_list_item):
+        pv = pv_list_item.pv
+        self.project.remove_pv_option(pv)
+        self.ids.pv_list.remove_widget(pv_list_item)
+        self.manager.add_widget(
+            PVConfigurationScreen(
+                self,
+                deepcopy(pv),
+                name="configure-pv",
+                editing=pv
+            )
+        )
+        self.manager.current = "configure-pv"
+
 
 class StorageListItem(TwoLineAvatarIconListItem):
     def __init__(self, ess, der_screen, *args, **kwargs):
@@ -2631,8 +2745,16 @@ class PVListItem(TwoLineAvatarIconListItem):
         super().__init__(*args, **kwargs)
         self.pv = pv
         self.text = pv.name
-        self.secondary_text = str(pv.bus)
+        self.secondary_text = str(pv.pmpp)
+        self.ids.edit.bind(on_release=self.edit)
         self._der_screen = der_screen
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
+    def edit(self, icon_widget):
+        self._der_screen.edit_pvsystem(self)
 
 
 class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
