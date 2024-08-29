@@ -1,11 +1,6 @@
 {
+  "broker": true,
   "federates": [
-    {
-      "directory": ".",
-      "exec": "helics_broker -f 8",
-      "host": "localhost",
-      "name": "broker"
-    },
     {
       "directory": ".",
       "exec": "storage-federate S814 --hours 24 grid_config1.json ../../ssim/federates/storage.json",
@@ -44,7 +39,7 @@
     },
     {
       "directory": ".",
-      "exec": "logger-federate --hours 24 --show-plots grid_config1.json ../../ssim/federates/logger.json",
+      "exec": "logger-federate --hours 24 grid_config1.json ../../ssim/federates/logger.json",
       "host": "localhost",
       "name": "logger"
     },
