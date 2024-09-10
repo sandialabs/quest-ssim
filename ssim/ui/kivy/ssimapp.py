@@ -2546,6 +2546,7 @@ class PVConfigurationScreen(SSimBaseScreen):
         self._der_screen = der_screen
         self.ids.pmpp_input.bind(on_text_validate=self._add_pmpp)
         self.ids.device_name.bind(on_text_validate=self._check_name)
+        self.ids.select_irradiance.bind(on_release=self._select_irradiance)
         self._initialize_widgets()
         self._editing = editing
 
@@ -2626,6 +2627,21 @@ class PVConfigurationScreen(SSimBaseScreen):
         self._pvsystem.busses = self._selected_busses
         self._pvsystem.required = self.ids.required.active
         self._pvsystem.name = self.ids.device_name.text
+
+    def _dismiss(self):
+        self._popup.dismiss()
+
+    def _selected(self, path, selection):
+        if len(selection) != 1:
+            Logger.debug("Invalid selection made for irradiance data")
+            return
+        self._pvsystem.irradiance = os.path.join(path, selection[0])
+        self._popup.dismiss()
+
+    def _select_irradiance(self, *args, **kwargs):
+        content = SelectFileDialog(cancel=self._dismiss, load=self._selected)
+        self._popup = Popup(content=content)
+        self._popup.open()
 
     def save(self):
         self._record_options()
@@ -4615,6 +4631,11 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
     @property
     def selected(self):
         return self.ids.selected.active
+
+
+class SelectFileDialog(FloatLayout):
+    load = ObjectProperty(None)
+    cancel = ObjectProperty(None)
 
 
 class SelectGridDialog(FloatLayout):

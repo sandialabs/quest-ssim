@@ -265,6 +265,7 @@ class PVSpecification:
             "pmpp": self.pmpp,
             "kva_rated": self.kva_rated,
             "phases": self.phases,
+            "irradiance_profile": self.irradiance_profile,
             **self.params
         }
         if self.inverter_efficiency is not None:

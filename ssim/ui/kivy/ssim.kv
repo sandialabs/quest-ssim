@@ -1205,6 +1205,12 @@
                     EditableSetList:
                         id: pmpp_list
 
+                Button:
+                    id: select_irradiance
+                    size_hint_y: None
+                    height: 30
+                    text: "Select file containing irradiance profile"
+
             BoxLayout:
                 id: bus_list_box
                 orientation: "vertical"
@@ -2121,6 +2127,30 @@
         text_color: 1, 0, 0, 1
         on_release:
             root.delete_item(the_list_item)
+
+
+<SelectFileDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+
+        FileChooserListView:
+            id: filechooser
+            path: "."
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Ok"
+                on_release: root.load(filechooser.path, filechooser.selection)
+
 
 <SelectGridDialog>:
     BoxLayout:
