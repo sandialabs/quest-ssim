@@ -1025,7 +1025,7 @@ class PVOptions:
 
     def configurations(self):
         """Rerturn a generator that yields all possible configurations."""
-        for bus in self._busses:
+        for bus in self.busses:
             for pmpp in self.pmpp:
                 yield (
                     grid.PVSpecification(
@@ -1038,6 +1038,8 @@ class PVOptions:
                     ),
                     None,  # TODO inverter controls
                 )
+        if not self.required:
+            yield None, None
 
 
 class StorageOptions:
