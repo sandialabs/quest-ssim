@@ -420,6 +420,9 @@ class Project:
         for so in self.storage_devices:
             ret += so.write_toml()
 
+        for pv in self.pvsystems:
+            ret += pv.write_toml()
+
         for mgrKey in self._metricMgrs:
             mgr = self._metricMgrs[mgrKey]
             ret += mgr.write_toml(mgrKey)
@@ -445,6 +448,12 @@ class Project:
             so = StorageOptions(sokey, [], [], [])
             so.read_toml(sokey, sodict[sokey])
             self.add_storage_option(so)
+
+        pvdict = tomlData.get("pv-options", {})
+        for pvname, pvoptions in pvdict.items():
+            pv = PVOptions(pvname, [], [])
+            pv.read_toml(pvname, pvoptions)
+            self.add_pv_option(pv)
 
         if "metrics" in tomlData:
             self.__read_metric_map(tomlData["metrics"])
@@ -953,10 +962,10 @@ class PVOptions:
         return "\n".join(
             ["",
              f'[pv-options."{self.name}"]',
-             f"pmpp = [{self.pmpp}]",
+             f"pmpp = [{', '.join(map(str, self.pmpp))}]",
              f"dcac_ratio = {self.dcac_ratio}",
              # TODO f"control = ???"
-             f"busses = [{self.busses}]",
+             f"busses = [{', '.join(buslist)}]",
              f"required = {str(self.required).lower()}"]
             + ([f"irradiance = '{self.irradiance}'"]
                if self.irradiance is not None else [])
