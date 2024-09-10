@@ -599,26 +599,34 @@ class Project:
 
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
-        for storage_configuration in self._storage_configurations():
-            storage_devices, inv_controls = _safe_unzip(storage_configuration)
-            inv_controls = list(
-                filter(lambda ic: ic is not None, inv_controls)
-            )
-            yield Configuration(
-                self._grid_model_path,
-                self._metricMgrs,
-                self.pvsystems,
-                storage_devices,
-                inv_controls,
-                reliability=self.reliability_params,
-                sim_duration=self.sim_duration
-            )
+        for pv_configuration in self._pv_configurations():
+            for storage_configuration in self._storage_configurations():
+                storage_devices, ess_inv_controls = _safe_unzip(storage_configuration)
+                pv_systems, pv_inv_controls = _safe_unzip(pv_configuration)
+                inv_controls = list(
+                    filter(lambda ic: ic is not None,
+                           ess_inv_controls + pv_inv_controls)
+                )
+                yield Configuration(
+                    self._grid_model_path,
+                    self._metricMgrs,
+                    pv_systems,
+                    storage_devices,
+                    inv_controls,
+                    reliability=self.reliability_params,
+                    sim_duration=self.sim_duration
+                )
 
     def _storage_configurations(self):
         print(f"Project._storage_configurations() - device list: {self.storage_devices}")
         return itertools.product(
             *(storage_options.configurations()
               for storage_options in self.storage_devices)
+        )
+
+    def _pv_configurations(self):
+        return itertools.product(
+            *(pv_options.configurations() for pv_options in self.pvsystems)
         )
 
     def num_configurations(self):
