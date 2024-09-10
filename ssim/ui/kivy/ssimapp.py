@@ -2595,6 +2595,32 @@ class PVConfigurationScreen(SSimBaseScreen):
     def _selected_busses(self):
         return self.ids.select_busses.selected_busses
 
+    def _show_errors(self, errors):
+        if len(errors) == 0:
+            return True
+        content = MessagePopupContent()
+        popup = Popup(
+            title="Invalid PV System Input",
+            content=content,
+            auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+        )
+        content.ids.msg_label.text = "\n".join(errors)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return False
+
+    def _validate(self):
+        errors = [
+            self._pvsystem.validate_name(),
+            self._pvsystem.validate_pmpp(),
+            self._pvsystem.validate_dcac_ratio(),
+            self._pvsystem.validate_busses(),
+            self._pvsystem.validate_controls()
+        ]
+        errors = [error for error in errors if error]
+        return self._show_errors(errors)
+
     def _record_options(self):
         self._pvsystem.pmpp = self._pmpp
         self._pvsystem.busses = self._selected_busses
@@ -2603,7 +2629,8 @@ class PVConfigurationScreen(SSimBaseScreen):
 
     def save(self):
         self._record_options()
-        # TODO Error checking!!
+        if not self._validate():
+            return
         self._der_screen.add_pv(self._pvsystem)
         self.manager.current = "der-config"
         self.manager.remove_widget(self)

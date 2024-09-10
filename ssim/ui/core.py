@@ -976,6 +976,32 @@ class PVOptions:
         self.required = toml_data["required"]
         # TODO self.control
 
+    def validate_name(self):
+        if is_valid_opendss_name(self.name):
+            return None
+        return "name invalid"
+
+    def validate_pmpp(self):
+        if all(pmpp > 0.0 for pmpp in self.pmpp):
+            return None
+        return "pmpp must be greater than 0"
+
+    def validate_dcac_ratio(self):
+        # 2 is sort of arbitrary, and technically we don't actually need an
+        # upper bound, but I also don't trust OpenDSS to handle values >= 2.
+        if 0 < self.dcac_ratio < 2:
+            return None
+        return "DC/AC ratio must be between 0 and 2 (exclusive)"
+
+    def validate_busses(self):
+        if len(self.busses) > 0:
+            return None
+        return "No busses selected"
+
+    def validate_controls(self):
+        # TODO (wfv)
+        pass
+
     def add_bus(self, bus: str):
         """Add `bus` to the set of busses where the PV system may be placed."""
         self.busses.add(bus)
