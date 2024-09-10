@@ -2671,7 +2671,7 @@ class DERConfigurationScreen(SSimBaseScreen):
         while name.lower() in existing_names:
             name = "NewBESS" + str(i)
             i += 1
-        ess = StorageOptions(name, 3, [], [], [])
+        ess = StorageOptions(name, [], [], [])
 
         self.manager.add_widget(
             StorageConfigurationScreen(
@@ -2687,7 +2687,7 @@ class DERConfigurationScreen(SSimBaseScreen):
         while name.lower() in existing_names:
             name = "NewPV" + str(i)
             i += 1
-        pv = PVOptions(name, 3, [], [], [])
+        pv = PVOptions(name, [], [])
         self.manager.add_widget(
             PVConfigurationScreen(
                 self, pv, name="configure-pv")

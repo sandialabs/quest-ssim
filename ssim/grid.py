@@ -75,8 +75,9 @@ class StorageSpecification:
     #: Additional parameters to be passed to the controller constructor.
     controller_params: dict = field(default_factory=dict)
 
-    #: Number of phases to which the device is connected.
-    phases: int = 3
+    #: Number of phases to which the device is connected. If None, then the
+    #: device is connected to all phases present at `bus`.
+    phases: Optional[int] = None
 
     #: State of charge (between 0 and 1).
     soc: float = field(default=1.0)
@@ -216,8 +217,9 @@ class PVSpecification:
     #: List of irradiance values for PV system in :math:`kW/m^2`
     irradiance_profile: Optional[PathLike] = None
 
-    #: Number of phases the inverter is connected to.
-    phases: int = 3
+    #: Number of phases the inverter is connected to. If None, then the device
+    #: is connected to all phases present at `bus`.
+    phases: Optional[int] = None
 
     #: Additional parameters
     params: dict = field(default_factory=dict)

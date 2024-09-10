@@ -442,7 +442,7 @@ class Project:
 
         sodict = tomlData["storage-options"]
         for sokey in sodict:
-            so = StorageOptions(sokey, 3, [], [], [])
+            so = StorageOptions(sokey, [], [], [])
             so.read_toml(sokey, sodict[sokey])
             self.add_storage_option(so)
 
@@ -921,13 +921,11 @@ class PVOptions:
     ----------
     name : str
         Name of the system.
-    num_phases : int
-        Number of phases this system is connected to.
     pmpp : iterable of float
         Options for the maximum power that this system can generate. [kW]
     busses : iterable of str
         Busses where this device may be connected.
-    irradiance : str
+    irradiance : str, optional
         Path to a file containing the irradiance profile that should
         be used by OpenDSS.
     dcac_ratio : float, default 1.0
@@ -939,10 +937,9 @@ class PVOptions:
         If True the device will be included in every configuration.
     """
 
-    def __init__(self, name, num_phases, pmpp, busses, irradiance,
+    def __init__(self, name, pmpp, busses, irradiance=None,
                  dcac_ratio=1.0, control=None, required=True):
         self.name = name
-        self.phases = num_phases
         self.pmpp = set(pmpp)
         self.busses = set(busses)
         self.irradiance = irradiance
@@ -952,23 +949,23 @@ class PVOptions:
 
     def write_toml(self):
         """Return a TOML string representing this object."""
-        buslis = list("'" + bus + "'" for bus in self.busses)
+        buslist = list("'" + bus + "'" for bus in self.busses)
         return "\n".join(
             ["",
              f'[pv-options."{self.name}"]',
-             f"phases = {self.phases}",
-             f"pmpp = {self.busses}",
-             f"irradiance = '{self.irradiance}'",
+             f"pmpp = [{self.pmpp}]",
              f"dcac_ratio = {self.dcac_ratio}",
              # TODO f"control = ???"
-             f"required = {str(self.required).lower()}",
-             ""]
+             f"busses = [{self.busses}]",
+             f"required = {str(self.required).lower()}"]
+            + ([f"irradiance = '{self.irradiance}'"]
+               if self.irradiance is not None else [])
+            + [""]
         )
 
     def read_toml(self, name: str, toml_data: dict):
         """Set the attributes of this instance using `toml_data`"""
         self.name = name
-        self.phases = toml_data["phases"]
         self.pmpp = set(toml_data["pmpp"])
         self.busses = set(toml_data["busses"])
         self.dcac_ratio = toml_data["dcac_ratio"]
@@ -1049,8 +1046,6 @@ class StorageOptions:
     ----------
     name : str
         Name of the device.
-    num_phases: int
-        Number of phases this device must be connected to.
     power : iterable of float
         Options for maximum power capacity of the device. [kW]
     duration : iterable of float
@@ -1076,7 +1071,7 @@ class StorageOptions:
         evaluated.
     """
 
-    def __init__(self, name, num_phases, power, duration, busses,
+    def __init__(self, name, power, duration, busses,
                  min_soc=0.2,
                  max_soc=0.8,
                  initial_soc=0.5,
@@ -1084,7 +1079,6 @@ class StorageOptions:
                  control=None,
                  required=True):
         self.name = name
-        self.phases = num_phases
         self.power = set(power)
         self.duration = set(duration)
         self.busses = set(busses)
@@ -1098,7 +1092,6 @@ class StorageOptions:
     def __eq__(self, other):
 
         return self.name == other.name and \
-            self.phases == other.phases and \
             self.min_soc == other.min_soc and \
             self.max_soc == other.max_soc and \
             self.initial_soc == other.initial_soc and \
@@ -1125,7 +1118,6 @@ class StorageOptions:
            m.update(repr(hash(self.control)).encode())
 
         m.update(repr(self.name).encode())
-        m.update(repr(self.phases).encode())
         m.update(repr(self.min_soc).encode())
         m.update(repr(self.max_soc).encode())
         m.update(repr(self.initial_soc).encode())
@@ -1147,7 +1139,6 @@ class StorageOptions:
         """
         tag = f"storage-options.\"{self.name}\""
         ret = f"\n\n[{tag}]\n"
-        ret += f"phases = {str(self.phases)}\n"
         ret += f"required = {str(self.required).lower()}\n"
         ret += f"min_soc = {str(self.min_soc)}\n"
         ret += f"max_soc = {str(self.max_soc)}\n"
@@ -1171,7 +1162,6 @@ class StorageOptions:
             A TOML formatted dictionary from which to read the properties of this class
             instance.
         """
-        self.phases = tomlData["phases"]
         self.required = tomlData["required"]
         self.min_soc = tomlData["min_soc"]
         self.max_soc = tomlData["max_soc"]

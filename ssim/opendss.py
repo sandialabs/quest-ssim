@@ -1007,7 +1007,7 @@ class DSSModel:
         for monitor_name in dssdirect.Monitors.AllNames():
             yield Monitor(monitor_name)
 
-    def add_storage(self, name: str, bus: str, phases: int,
+    def add_storage(self, name: str, bus: str, phases: Optional[int],
                     device_parameters: Dict[str, Any],
                     state: StorageState = StorageState.IDLE) -> Storage:
         """Add a storage device to OpenDSS.
@@ -1018,18 +1018,21 @@ class DSSModel:
             Name of the storage device.
         bus : str
             Name of the bus where the device is connected.
-        phases : int
-            Number of connected phases.
+        phases : int or None
+            Number of connected phases. If None the device is connected to all
+            phases present at `bus`
         device_parameters : dict
             Dictionary of additional OpenDSS storage device parameters.
         state : StorageState
             Initial operating state of the device.
+
         """
+        phases = phases or len(self.available_phases(bus))
         device = Storage(name, bus, device_parameters, phases, state)
         self._storage[name] = device
         return device
 
-    def add_pvsystem(self, name: str, bus: str, phases: int,
+    def add_pvsystem(self, name: str, bus: str, phases: Optional[int],
                      kva_rating: float, pmpp_kw: float,
                      system_parameters: Optional[dict] = None) -> PVSystem:
         """Add a PV System to OpenDSS.
@@ -1040,8 +1043,9 @@ class DSSModel:
             Name of the system.
         bus : str
             Name of the bus where the system is connected.
-        phases : int
-            Number of phases to connect
+        phases : int or None
+            Number of connected phases. If None the system is connected to all
+            phases present at `bus`
         kva_rating : float
             Rated kVA of the PV system [kVA].
         pmpp_kw : float
@@ -1050,6 +1054,7 @@ class DSSModel:
             Additional parameters. Keys must be valid OpenDSS PVSystem object
             parameters.
         """
+        phases = phases or len(self.available_phases(bus))
         system = PVSystem(name, bus, phases, pmpp_kw, kva_rating,
                           system_parameters)
         self._pvsystems[name] = system
