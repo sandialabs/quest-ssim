@@ -1,6 +1,7 @@
 """Core classes and functions for the user interface."""
 from __future__ import annotations
 
+import csv
 import functools
 import hashlib
 import itertools
@@ -58,6 +59,14 @@ def __eq_maybe_none(v1, v2) -> bool:
         return False  # we already know v1 is not None.
 
     return v1 == v2
+
+
+def _is_float(s):
+    try:
+        _ = float(s)
+        return True
+    except ValueError:
+        return False
 
 
 _DEFAULT_RELIABILITY = {
@@ -1003,6 +1012,27 @@ class PVOptions:
         if len(self.busses) > 0:
             return None
         return "No busses selected"
+
+    def validate_irradiance(self):
+        if self.irradiance is not None:
+            return self._validate_irradiance_data()
+        return "You must select an irraiadnce profile"
+
+    def _validate_irradiance_data(self):
+        try:
+            with open(self.irradiance, "r") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) == 0 or len(row) > 2:
+                        return (
+                            "Invalid irradiance data. "
+                            "There must be 1 to 2 entries per row"
+                        )
+                    if not all(_is_float(x) for x in row):
+                        return "Invalid irradiance data"
+        except OSError:
+            return "Irradiance file could not be read"
+        return None
 
     def validate_controls(self):
         # TODO (wfv)

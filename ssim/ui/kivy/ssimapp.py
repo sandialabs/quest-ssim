@@ -2619,7 +2619,8 @@ class PVConfigurationScreen(SSimBaseScreen):
             self._pvsystem.validate_pmpp(),
             self._pvsystem.validate_dcac_ratio(),
             self._pvsystem.validate_busses(),
-            self._pvsystem.validate_controls()
+            self._pvsystem.validate_controls(),
+            self._pvsystem.validate_irradiance()
         ]
         errors = [error for error in errors if error]
         return self._show_errors(errors)
