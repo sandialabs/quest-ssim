@@ -2559,6 +2559,8 @@ class PVConfigurationScreen(SSimBaseScreen):
         self.ids.select_busses.project = self._der_screen.project
         self.ids.device_name.text = self._pvsystem.name
         self.ids.required.active = self._pvsystem.required
+        if self._pvsystem.irradiance is not None:
+            self.ids.irradiance_path.text = self._pvsystem.irradiance
         Clock.schedule_once(
             lambda _: refocus_text_field(self.ids.device_name),
             0.05
@@ -2636,6 +2638,7 @@ class PVConfigurationScreen(SSimBaseScreen):
             Logger.debug("Invalid selection made for irradiance data")
             return
         self._pvsystem.irradiance = os.path.join(path, selection[0])
+        self.ids.irradiance_path.text = self._pvsystem.irradiance
         self._popup.dismiss()
 
     def _select_irradiance(self, *args, **kwargs):
