@@ -4,6 +4,7 @@ import math
 import os
 from pickle import NONE
 import re
+from collections import defaultdict
 from contextlib import ExitStack
 from copy import deepcopy
 from math import cos, hypot
@@ -4866,6 +4867,10 @@ class SSimScreen(SSimBaseScreen):
     def changed_show_storage_options(self, active_state):
         if len(self.project.storage_options) > 0:
             self.refresh_grid_plot()
+
+    def changed_show_pv_options(self, actove_state):
+        if len(self.project.pvsystems) > 0:
+            self.refresh_grid_plot()
         
     def getImage(self, path):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
@@ -4973,7 +4978,7 @@ class SSimScreen(SSimBaseScreen):
             patches.PathPatch(Path(tverts, codes), facecolor=facecolor,
             edgecolor=c)
             )
-        
+
     def __draw_storage_options(self, ax):
                 
         gm = self.project.grid_model
@@ -5043,6 +5048,39 @@ class SSimScreen(SSimBaseScreen):
             bx, by = [seg_busses[pv.bus][0], seg_busses[pv.bus][1]]            
             self.__make_pv_patch(bx, by, w, h, color, ax)
 
+    def __draw_pv_options(self, ax):
+        gm = self.project.grid_model
+
+        # Without getting the limits here, things don't draw right.  IDK why.
+        ylim = ax.get_ylim()
+
+        w = 12
+        h = 6
+        o = 2
+        yo = 4
+
+        pv_colors = {}
+        pv_busses = defaultdict(list)
+        self.cindex = 0
+
+        seg_busses = self.__get_line_segment_busses(gm)
+
+        for pv in self.project.pvsystems:
+            pv_colors[pv] = self.colors[self.cindex]
+            self.cindex = (self.cindex + 1) % len(self.colors)
+            for b in pv.busses:
+                if b not in seg_busses: continue
+                pv_busses[b].append(pv)
+
+        # we know where to draw each pv system and what color to make them.
+        for b, pvs in pv_busses.items():
+            bx, by = [seg_busses[b][0], seg_busses[b][1]]
+
+            for i, pv in enumerate(pvs):
+                self.__make_pv_patch(
+                    bx, by, w, h, pv_colors[pv], ax, i * o, yo + i * o
+                )
+
     def __make_plot_legend(self, ax):
 
         if len(self.project.storage_options) == 0:
@@ -5059,7 +5097,14 @@ class SSimScreen(SSimBaseScreen):
             self.cindex = (self.cindex + 1) % len(self.colors)
             names += [so.name + f" ({len(so.busses)})"]
             custom_lines += [Line2D([0], [0], color=c, lw=4)]
-            
+
+        self.cindex = 0
+        for pv in self.project.pvsystems:
+            c = self.colors[self.cindex]
+            self.cindex = (self.cindex + 1) % len(self.colors)
+            names.append(f"{pv.name} ({len(pv.busses)})")
+            custom_lines.append(Line2D([0], [0], color=c, lw=4))
+
         ax.legend(custom_lines, names)
 
     def __get_line_segments(self, gm):
@@ -5147,11 +5192,14 @@ class SSimScreen(SSimBaseScreen):
         
         if self.ids.show_storage_options.active:
             self.__draw_storage_options(ax)
-            self.__make_plot_legend(ax)
                    
-        #if self.ids.show_pv_assets.active:
-        self.__draw_fixed_pv_assets(ax)
+        if self.ids.show_pv_options.active:
+            self.__draw_pv_options(ax)
             
+        if (self.ids.show_storage_options.active
+                or self.ids.show_pv_options.active):
+            self.__make_plot_legend(ax)
+
         fig.tight_layout()
 
         self.curr_x_min, self.curr_x_max = (min(x), max(x))

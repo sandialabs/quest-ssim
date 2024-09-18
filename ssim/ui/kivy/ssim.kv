@@ -468,7 +468,7 @@
                         active: True
                         on_active: root.changed_show_bus_labels(self.active)
                         
-                    MDLabel
+                    MDLabel:
                         id: show_storage_option
                         size_hint_x: None
                         width: 170
@@ -480,6 +480,19 @@
                         width: 30
                         active: True
                         on_active: root.changed_show_storage_options(self.active)
+
+                    MDLabel:
+                        id: show_pv_option
+                        size_hint_x: None
+                        width: 170
+                        text: "Show PV Options"
+
+                    CheckBox:
+                        id: show_pv_options
+                        size_hint_x: None
+                        width: 30
+                        active: True
+                        on_active: root.changed_show_pv_options(self.active)
 
 
 <DERConfigurationScreen>:
