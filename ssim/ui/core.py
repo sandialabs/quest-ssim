@@ -976,6 +976,20 @@ class PVOptions:
             self.required == other.required
         )
 
+    def __hash__(self):
+        m = hashlib.sha256()
+        m.update(repr(self.name).encode())
+        m.update(repr(sorted(self.pmpp)).encode())
+        m.update(repr(sorted(self.busses)).encode())
+        if self.irradiance is not None:
+            m.update(self.irradiance.encode())
+        m.update(repr(self.dcac_ratio).encode())
+        if self.control is not None:
+            m.update(repr(hash(self.control)).encode())
+        m.update(repr(self.required).encode())
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
+
     def write_toml(self):
         """Return a TOML string representing this object."""
         buslist = list("'" + bus + "'" for bus in self.busses)
