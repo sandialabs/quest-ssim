@@ -965,6 +965,17 @@ class PVOptions:
         self.control = control
         self.required = required
 
+    def __eq__(self, other):
+        return all(
+            self.name == other.name,
+            self.pmpp == other.pmpp,
+            self.busses == other.busses,
+            self.irradiance == other.irradiance,
+            self.dcac_ratio == other.dcac_ratio,
+            self.control == other.control,
+            self.required == other.required
+        )
+
     def write_toml(self):
         """Return a TOML string representing this object."""
         buslist = list("'" + bus + "'" for bus in self.busses)
