@@ -4874,19 +4874,15 @@ class SSimScreen(SSimBaseScreen):
         
     def getImage(self, path):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
-    
-    def __make_pv_patch(
-        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5., facecolor = None
-        ):
-        
-        xpix, ypix = ax.transData.transform((x, y)).T
 
+    @staticmethod
+    def _pv_path_vertices(xpix, ypix, w, h, xoffset = 0., yoffset = 5.):
         llx = xpix + xoffset - w/2.
         lly = ypix + yoffset
 
         panellow = 0.35 * h
         tiltoffset = 1./8. * w
-        
+
         # Start with main rectangle.
         codes = [Path.MOVETO] + [Path.LINETO]*4
         vertices = [
@@ -4894,7 +4890,7 @@ class SSimScreen(SSimBaseScreen):
             [llx+w, lly+h       ], [llx+tiltoffset,   lly+h       ],
             [llx,   lly+panellow]
             ]
-       
+
         poleleft = llx + 0.35*w
         poleright = poleleft + .15*w
         poleheight = panellow
@@ -4912,13 +4908,27 @@ class SSimScreen(SSimBaseScreen):
         # Finish with a drawing of vertical and horizontal lines on the box
         codes += ([Path.MOVETO] + [Path.LINETO]) * 5
         vertices += [
-            [llx +   spacing, lly + panellow], [llx+ tiltoffset +   spacing, lly+h],
-            [llx + 2*spacing, lly + panellow], [llx+ tiltoffset + 2*spacing, lly+h],
-            [llx + 3*spacing, lly + panellow], [llx+ tiltoffset + 3*spacing, lly+h],
-            [llx + 4*spacing, lly + panellow], [llx+ tiltoffset + 4*spacing, lly+h],
+            [llx +   spacing, lly + panellow],
+            [llx+ tiltoffset +   spacing, lly+h],
+            [llx + 2*spacing, lly + panellow],
+            [llx+ tiltoffset + 2*spacing, lly+h],
+            [llx + 3*spacing, lly + panellow],
+            [llx+ tiltoffset + 3*spacing, lly+h],
+            [llx + 4*spacing, lly + panellow],
+            [llx+ tiltoffset + 4*spacing, lly+h],
             [llx + tiltoffset/2., lly + panellow + halfpanhght],
             [llx + w - tiltoffset/2., lly + panellow + halfpanhght]
-            ]
+        ]
+        return vertices, codes
+
+    def __make_pv_patch(
+        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5., facecolor = None
+        ):
+
+        xpix, ypix = ax.transData.transform((x, y)).T
+
+        vertices, codes = self._pv_path_vertices(
+            xpix, ypix, w, h, xoffset, yoffset)
 
         if facecolor is None:
             facecolor = ax.get_facecolor()
@@ -4932,13 +4942,9 @@ class SSimScreen(SSimBaseScreen):
             edgecolor=c)
             )
         
-    def __make_battery_patch(
-        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5.,
-        facecolor = None, incl_plus_minus = True
-        ):
-        
-        xpix, ypix = ax.transData.transform((x, y)).T
-
+    @staticmethod
+    def _battery_path_vertices(xpix, ypix, w, h, xoffset, yoffset,
+                               incl_plus_minus=True):
         llx = xpix + xoffset - w/2.
         lly = ypix + yoffset
         
@@ -4967,6 +4973,18 @@ class SSimScreen(SSimBaseScreen):
                 [llx+5.*w/8.,lly+h/2.], [llx+7.*w/8., lly+   h/2.],
                 ]
 
+        return vertices, codes
+
+    def __make_battery_patch(
+        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5.,
+        facecolor = None, incl_plus_minus = True
+        ):
+
+        xpix, ypix = ax.transData.transform((x, y)).T
+
+        vertices, codes = self._battery_path_vertices(
+            xpix, ypix, w, h, xoffset, yoffset, incl_plus_minus)
+
         if facecolor is None:
             facecolor = ax.get_facecolor()
 
@@ -4979,12 +4997,11 @@ class SSimScreen(SSimBaseScreen):
             edgecolor=c)
             )
 
-    def __draw_storage_options(self, ax):
-                
-        gm = self.project.grid_model
-        
-        # make a mapping of all busses to receive batteries to the storage
-        # options that include them.  Also map colors to storage options.
+    def _draw_der(self, ax, storage=True, pv=True):
+        der_options = itertools.chain(
+            self.project.storage_options if storage else [],
+            self.project.pvsystems if pv else []
+        )
 
         # Without getting the limits here, things don't draw right.  IDK why.
         ylim = ax.get_ylim()
@@ -4994,33 +5011,36 @@ class SSimScreen(SSimBaseScreen):
         o = 2
         yo = 4
 
-        so_colors = {}
-        bat_busses = {}
-        self.cindex = 0
-                
-        seg_busses = self.__get_line_segment_busses(gm)
-        
-        for so in self.project.storage_options:
-            so_colors[so] = self.colors[self.cindex]
-            self.cindex = (self.cindex + 1) % len(self.colors)
-            for b in so.busses:
-                if b not in seg_busses: continue
-                if b not in bat_busses:
-                    bat_busses[b] = [so]
-                else:
-                    bat_busses[b] += [so]
+        der_colors = {}
+        der_busses = defaultdict(list)
+        seg_busses = self.__get_line_segment_busses(self.project.grid_model)
+        cindex = 0
 
-        # we know where to draw each battery and what color to make them.
-        for b, sos in bat_busses.items():
-            bx, by = [seg_busses[b][0], seg_busses[b][1]]
-            
-            # for i in range(len(sos)): self.__make_pv_patch(
-            #     bx, by, w, 8, so_colors[sos[i]], ax, i * o, yo + i * o                
-            #     )
-                
-            for i in range(len(sos)): self.__make_battery_patch(
-                bx, by, w, h, so_colors[sos[i]], ax, i * o, yo + i * o                
-                )
+        for der in der_options:
+            der_colors[der] = self.colors[cindex]
+            cindex = (cindex + 1) % len(self.colors)
+            for bus in der.busses:
+                if bus not in seg_busses:
+                    continue
+                der_busses[bus].append(der)
+
+        for bus, ders in der_busses.items():
+            bx, by = seg_busses[bus]
+            for i, der in enumerate(ders):
+                if isinstance(der, StorageOptions):
+                    draw_func = self.__make_battery_patch
+                elif isinstance(der, PVOptions):
+                    draw_func = self.__make_pv_patch
+                else:
+                    Logger.warning(
+                        f"Unexpected DER type '{type(der)}' "
+                        "encountered whild drawing map"
+                    )
+                    continue
+                draw_func(bx, by, w, h, der_colors[der], ax, i * o, yo + i * o)
+
+        if len(der_busses.keys()) > 0:
+            self.__make_plot_legend(ax, der_colors)
                 
     def __draw_fixed_pv_assets(self, ax):
                 
@@ -5048,62 +5068,42 @@ class SSimScreen(SSimBaseScreen):
             bx, by = [seg_busses[pv.bus][0], seg_busses[pv.bus][1]]            
             self.__make_pv_patch(bx, by, w, h, color, ax)
 
-    def __draw_pv_options(self, ax):
-        gm = self.project.grid_model
-
-        # Without getting the limits here, things don't draw right.  IDK why.
-        ylim = ax.get_ylim()
-
-        w = 12
-        h = 6
-        o = 2
-        yo = 4
-
-        pv_colors = {}
-        pv_busses = defaultdict(list)
-        self.cindex = 0
-
-        seg_busses = self.__get_line_segment_busses(gm)
-
-        for pv in self.project.pvsystems:
-            pv_colors[pv] = self.colors[self.cindex]
-            self.cindex = (self.cindex + 1) % len(self.colors)
-            for b in pv.busses:
-                if b not in seg_busses: continue
-                pv_busses[b].append(pv)
-
-        # we know where to draw each pv system and what color to make them.
-        for b, pvs in pv_busses.items():
-            bx, by = [seg_busses[b][0], seg_busses[b][1]]
-
-            for i, pv in enumerate(pvs):
-                self.__make_pv_patch(
-                    bx, by, w, h, pv_colors[pv], ax, i * o, yo + i * o
-                )
-
-    def __make_plot_legend(self, ax):
-
-        if len(self.project.storage_options) == 0:
-            return    
-
-        # The legend will show the storage options defined and have an
-        # indicator of their color.
-        self.cindex = 0
+    def __make_plot_legend(self, ax, der_colors):
         custom_lines = []
         names = []
                         
-        for so in self.project.storage_options:
-            c = self.colors[self.cindex]
-            self.cindex = (self.cindex + 1) % len(self.colors)
-            names += [so.name + f" ({len(so.busses)})"]
-            custom_lines += [Line2D([0], [0], color=c, lw=4)]
-
-        self.cindex = 0
-        for pv in self.project.pvsystems:
-            c = self.colors[self.cindex]
-            self.cindex = (self.cindex + 1) % len(self.colors)
-            names.append(f"{pv.name} ({len(pv.busses)})")
-            custom_lines.append(Line2D([0], [0], color=c, lw=4))
+        for der, color in der_colors.items():
+            names.append(f"{der.name} ({len(der.busses)})")
+            if isinstance(der, PVOptions):
+                vertices, codes = self._pv_path_vertices(0, 0, 10, 6, 0, -2.5)
+                path = Path(vertices, codes)
+                custom_lines.append(
+                    Line2D(
+                        [0], [0],
+                        marker=path,
+                        color="w",
+                        lw=0,
+                        markersize=20,
+                        markerfacecolor="w",
+                        markeredgecolor=color
+                    )
+                )
+            elif isinstance(der, StorageOptions):
+                vertices, codes = self._battery_path_vertices(0, 0, 12, 6, 0, -2.5, True)
+                path = Path(vertices, codes)
+                custom_lines.append(
+                    Line2D(
+                        [0], [0],
+                        marker=path,
+                        color="w",
+                        lw=0,
+                        markersize=20,
+                        markerfacecolor="w",
+                        markeredgecolor=color
+                    )
+                )
+            else:
+                custom_lines.append(Line2D([0], [0], color=color, lw=4))
 
         ax.legend(custom_lines, names)
 
@@ -5190,15 +5190,11 @@ class SSimScreen(SSimBaseScreen):
         # Without doing the scatter here, things don't draw right.  IDK why.
         ax.scatter(x, y, marker="None")
         
-        if self.ids.show_storage_options.active:
-            self.__draw_storage_options(ax)
-                   
-        if self.ids.show_pv_options.active:
-            self.__draw_pv_options(ax)
-            
-        if (self.ids.show_storage_options.active
-                or self.ids.show_pv_options.active):
-            self.__make_plot_legend(ax)
+        self._draw_der(
+            ax,
+            storage=self.ids.show_storage_options.active,
+            pv=self.ids.show_pv_options.active
+        )
 
         fig.tight_layout()
 
