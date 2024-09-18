@@ -1671,17 +1671,12 @@ class Configuration:
             if ess is None:
                 h.update(b"None")
             else:
-                h.update(
-                    bytes(
-                        str((ess.name,
-                             ess.bus,
-                             ess.phases,
-                             ess.kwh_rated,
-                             ess.kw_rated,
-                             ess.controller)),
-                        "utf-8"
-                    )
-                )
+                h.update(bytes(str(ess.to_dict()), "utf-8"))
+        for pv in self.pvsystems:
+            if pv is None:
+                h.update(b"None")
+            else:
+                h.update(bytes(str(pv.to_dict()), "utf-8"))
         return str(h.hexdigest())
 
     def evaluate(self, basepath="."):
