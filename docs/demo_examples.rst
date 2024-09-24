@@ -7,13 +7,13 @@ This document provides instructions on how to run the example case studies prese
     Electric Grids," in IEEE EESAT 2025. 
 
 This particular document in not a comprehensive documentation of the tool. The documentation of the tool is available under ``docs`` folder in the repository. 
-
-It is assumed the simulator is already installed. For instructions to install the simulator please refer to:
+It is assumed the simulator is already installed. For instructions to install the simulator please refer to ``docs/index.rst``.
 
 Required Files
 --------------
 All the files requried to run the examples cases presented in the paper are available under ``examples`` 
-folder of the repository. Following are the list of requried files:
+folder of the repository. These files are installed automatically when you install the tool.
+Following are the list of requried files:
 
 **Files common to all the cases in the paper:**
 
@@ -27,38 +27,38 @@ folder of the repository. Following are the list of requried files:
 - Configuration 2 simulation files: ``examples/presentation_demo2``
 - Configuration 3 simulation files: ``examples/presentation_demo3``
 
-Each of the sub-folders containts two kinds of configuration files that are needed to run the simulations. The first
-is a `federate_config` file which is a JSON file used directly by HELICS for configuring each federate (see`<https://docs.helics.org/en/helics3/references/configuration_options_reference.html>`. 
-For more information about helics configuration options). The other file is a `grid_config` JSON file specifying 
+Each of the sub-folders contains two kinds of configuration files that are needed to run the simulations. The first
+is a `federate_config` file which is a JSON file used directly by HELICS for configuring each federate 
+(see`<https://docs.helics.org/en/helics3/references/configuration_options_reference.html>`  - for more information about 
+HELICS configuration options). The other file is a `grid_config` JSON file specifying 
 the configuration of the grid that is being simulated. The instructions for configuring the JSON files for Configuration 1
-is described in the following sections followed by instructions to run it from the CLI. The same procedure applies 
-for setting up and running the other configurations as well (with changes in parameters as required). Detailed description of the structure of these files are 
-available in ()
+is described in the following sections followed by instructions on how to run it from the CLI. The same procedure applies 
+for setting up and running the other configurations as well (with changes in parameters as required).
 
 Setting up `grid_config` JSON file:
 -----------------------------------
-The setup of the file ``examples/presentation_demo1/grid_confgi1.json`` is described here.
+The contents of the file ``examples/presentation_demo1/grid_confgi1.json`` is described here.
 The fields relevant to these example cases are:
 
-- ``"dss_file"`` which specifies the path to the OpenDSS model file
+- ``"dss_file"`` which specifies the path to the OpenDSS model
 - ``"storage"`` is a list of storage device specifications
-- ``busses_to_log`` and ``busses_to_measure`` specifies the metrics
+- ``busses_to_log`` and ``busses_to_measure`` configures the metrics
 - ``"pvsystem"`` is a list of PV device specifications
-- ``"invcontrol"`` is lost of inverter contro models
+- ``"invcontrol"`` is list of inverter control modes
 - ``"reliability"`` provides a JSON object specifying the parameters of the reliability model.
 
 ``"dss_file"``:
 ^^^^^^^^^^^^^^^
 This field points to the OpenDSS model of IEEE 34 bus test system. 
-Again this file is available under `examples/ieee34demo/ieee34Mod_temp.dss``. ::
+Again this file is available under ``examples/ieee34demo/ieee34Mod_temp.dss``. ::
 
     "dss_file": "../ieee34demo/ieee34Mod_temp.dss"
 
 ``"busses_to_log"`` and ``"busses_to_measure"``: 
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 These fields are used to configure the metrics. In this example, the metrics are being setup to compare the voltage 
-along the diffrerent busses in the test system. The ``"busses_to_log"`` specifies which busses are to be logged. 
-Similarly, the ``"busses_to_measure"`` describes how the metrics should be setup. ::
+along the diffrerent busses in the test system. The ``"busses_to_log"`` field specifies which busses are to be logged and
+the ``"busses_to_measure"`` field describes how the metrics should be setup. ::
 
 
     "busses_to_log": ["814", "828", "860", "840"]
@@ -73,15 +73,14 @@ Similarly, the ``"busses_to_measure"`` describes how the metrics should be setup
 ``"storage"``:
 ^^^^^^^^^^^^^^^
 This field allows the storage assets to be placed and configured along the test system. In Configuration 1, 
-the storage asset is assumeted to be placed at Bus814 (Note that: in the actual file, there are fields for 
-other storage assests as well but the controller parameters are set to 0.0 essentially disabling them. This 
+the storage asset is assumed to be placed at Bus814 (Note that: in the actual file, there are fields for 
+other storage assets as well but the controller parameters are set to 0.0 essentially disabling them. This 
 is done so that the same file can be repurposed for all the cases with simple modifications to the controller
-parameters.) Various parameters of the storage asses are defined here 
-which are self explanatory based on the field names. Of particular interest is the field ``"controller"``. 
-This allows custom storage controllers to be assigned to the storage asset. In this particular case, a ``"droop"`` 
-controller is used. This controller is already available in the simulator. The necessary parameters for the 
-controller is based as dictionary through the ``"controller_params"`` field. In this case, the active power droop 
-coefficient ``"p_droop"`` and the reactive power droop coefficient ``"q_droop"`` are provided:: 
+parameters.) Various parameters of the storage assets are defined here which is self-explanatory based on the 
+field names. Of particular interest is the field ``"controller"``. This allows custom storage controllers to be 
+assigned to the storage asset. In this particular case, a ``"droop"``controller is used. This controller is already
+available in the simulator. The necessary parameters for the controller is based as dictionary through the ``"controller_params"`` 
+field. In this case, the active power droop coefficient ``"p_droop"`` and the reactive power droop coefficient ``"q_droop"`` are provided:: 
 
     "storage": [
         {
@@ -103,9 +102,9 @@ coefficient ``"p_droop"`` and the reactive power droop coefficient ``"q_droop"``
 
 ``"pvsystem"``:
 ^^^^^^^^^^^^^^^
-This field allows PV systems to be placed and configured along the test system. The snippet below show the 
-configuration for PV802 at bus 802. The other PVs are configured in a similar manner. The ``"irradiance_profile"`` 
-field points to the file where the irradiance_profile is stoted. ::
+This field allows PV assets to be placed and configured along the test system. The snippet below shows the 
+configuration for PV802 at Bus 802. The other PVs are configured in a similar manner. The ``"irradiance_profile"`` 
+field points to the file (``examples/ieee34demo/5MinuteIrradiance.csv``) where the irradiance profile is stored. ::
 
     "pvsystem": [
         {
@@ -126,10 +125,10 @@ field points to the file where the irradiance_profile is stoted. ::
 ^^^^^^^^^^^^^^^^^
 This field sets up the parameters for inverter controls that can be assigned to storage/PV assets in the system. The field 
 ``"der_list`` specifies which PV/storage assets the controller is associated with and ``inv_control_mode`` defines the control 
-mode. In these set of examples, the ``"voltvar"`` controllers are enabled for PV assets at bus 850 and 860 
+mode. In these set of examples, the ``"voltvar"`` controllers are enabled for PV assets at Bus 850 and 860 
 so the field ``"der_list`` is set to ``["PVsystem.PV850", "PVsystem.PV860" ]`` and the field ``inv_control_mode`` 
-is set to  ``"voltvar"``. The field ``"function_curve_1"`` specifices a XY curve that the controller will folow.
-A detailed description of these control modes can be found at (). ::
+is set to  ``"voltvar"``. The field ``"function_curve_1"`` specifices a XY curve that the controller will follow.
+A detailed description of these control modes can be found at ``docs/inverter_controls.rst``. ::
 
     "invcontrol": [
             {
@@ -174,5 +173,15 @@ then configured separately. For example, the federate for stoage at bus 814 is s
     }
 
 Here, within the 'exec' field, the name ``S814`` must match the storage name provided in the grid 
-configuration files. Similary ``-hours 24`` specifices the simulaton time in hours, this is followed by 
-the name of the grod configuration file `` grid_config1.json ``.
+configuration files. Similary ``--hours 24`` specifices the simulaton time in hours, this is followed by 
+the name of the grod configuration file ``grid_config1.json``.
+
+Running the simulation from the CLI
+-----------------------------------
+To run the simulation (for Configuration 1) run the following command: ::
+
+    helics run --path examples/presentation_demo1/federation_config1.json
+
+Once the simulation is completed, a series of plots will be generated. The users can also access CSV files that
+contains the raw data for further processing. These CSV files will automatically be logged with the folder 
+``"examples/presentation_demo1"``.
