@@ -39,7 +39,7 @@
     },
     {
       "directory": ".",
-      "exec": "logger-federate --hours 24 grid_config3.json ../../ssim/federates/logger.json",
+      "exec": "logger-federate --hours 24 --show-plots grid_config3.json ../../ssim/federates/logger.json",
       "host": "localhost",
       "name": "logger"
     },
