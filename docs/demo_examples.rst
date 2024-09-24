@@ -147,4 +147,32 @@ This field sets up the parameters for reliability studies. Default values are us
 relevant to the voltage regulation example being presented in the paper.
 
 Setting up `federate_config` JSON file:
------------------------------------
+---------------------------------------
+The setup of the file ``examples/presentation_demo1/federation_confgi1.json`` is described here. As mentioned 
+earlier, this is a JSON file used directly by HELICS for configuring each federate in the co-simulation. Only 
+a few parameters/fields are relevant to setup and run the examples presented in the paper. The first field is 
+the ``"federates"`` field which sets up all the federates within a HELICS co-simulation. The first value for field 
+is: ::
+
+    {
+      "directory": ".",
+      "exec": "helics_broker -f 8",
+      "host": "localhost",
+      "name": "broker"
+    }
+
+This setup the helics_broker and specifices how many federates are setup. In this case this value is set to 8.
+This includes 4 federates for the storage simulation (one at each critical bus), 1 for the grid simulation, 
+1 for the reliability simulation, 1 for the logger and the final 1 for the metrics federate. Each federate is 
+then configured separately. For example, the federate for stoage at bus 814 is setup as follows: ::
+
+    {
+      "directory": ".",
+      "exec": "storage-federate S814 --hours 24 grid_config1.json ../../ssim/federates/storage.json",
+      "host": "localhost",
+      "name": "s814"
+    }
+
+Here, within the 'exec' field, the name ``S814`` must match the storage name provided in the grid 
+configuration files. Similary ``-hours 24`` specifices the simulaton time in hours, this is followed by 
+the name of the grod configuration file `` grid_config1.json ``.
