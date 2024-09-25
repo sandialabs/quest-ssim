@@ -718,7 +718,7 @@ class SSimApp(MDApp):
         Window.size = (1000, 800)
 
         screen_manager = ScreenManager()
-        screen_manager.add_widget(SSimScreen(self.project, [sys.argv[1]] if len(sys.argv) > 0 else None, name="ssim"))
+        screen_manager.add_widget(SSimScreen(self.project, name="ssim"))
         screen_manager.add_widget(
             DERConfigurationScreen(self.project, name="der-config"))
         screen_manager.add_widget(
@@ -4514,18 +4514,10 @@ class SSimScreen(SSimBaseScreen):
     curr_y_min = 0.0
     curr_y_max = 0.0
         
-    def __init__(self, project, filename, *args, **kwargs):
+    def __init__(self, project, *args, **kwargs):
         super().__init__(project, *args, **kwargs)
         self._popup = None
-        self.init_file = filename
-        if self.init_file:
-            Clock.schedule_once(lambda dt: self.load_input_file(dt), 1000)
                 
-    def load_input_file(self, dt):        
-        if self.init_file:
-            self.load_toml_file(None, self.init_file)
-            self.init_file = None
-
     def on_kv_post(self, base_widget):
         self.refresh_grid_plot()        
 
