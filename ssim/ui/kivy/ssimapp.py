@@ -4513,13 +4513,9 @@ class SSimScreen(SSimBaseScreen):
     curr_x_max = 0.0
     curr_y_min = 0.0
     curr_y_max = 0.0
-        
-    def __init__(self, project, *args, **kwargs):
-        super().__init__(project, *args, **kwargs)
-        self._popup = None
-                
+
     def on_kv_post(self, base_widget):
-        self.refresh_grid_plot()        
+        self.refresh_grid_plot()
 
     def report(self, message):
         Logger.debug("button pressed: %s", message)
