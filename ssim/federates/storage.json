@@ -1,5 +1,5 @@
 {
-  "log_level": "trace",
+  "log_level": "warning",
   "core_type": "zmq",
   "time_delta": 0.1,
   "subscriptions": [],
