@@ -573,11 +573,6 @@
 
 
 <PVListitem>:
-<BusListItem>:
-
-    LeftCheckBox:
-        id: selected
-        on_active: root.mark(self, self.active)
 
 <ResultsListItem>:
     size_hint: 1.0, 0.5
@@ -1416,7 +1411,7 @@
     IconRightWidget:
         icon: root.icon
 
-    LeftCheckbox:
+    LeftCheckBox:
         id: check
         listItem: root
 
