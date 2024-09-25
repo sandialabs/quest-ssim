@@ -1305,13 +1305,13 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         self._der_screen = der_screen
         self.ids.power_input.bind(
             on_text_validate=self._add_device_power
-        )
+            )
         self.ids.duration_input.bind(
             on_text_validate=self._add_device_duration
-        )
+            )
         self.ids.device_name.bind(
             on_text_validate=self._check_name
-        )
+            )
         self.options = ess
         self.initialize_widgets()
                 
@@ -1361,7 +1361,7 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
             title='Filter Busses', content=content, auto_dismiss=False,
             size_hint=(0.7, 0.7), background_color=(224,224,224),
             title_color=(0,0,0)
-        )
+            )
 
         def apply(*args):
             self._bus_filters = content.extract_filters()
@@ -4690,6 +4690,18 @@ class SSimScreen(SSimBaseScreen):
     def bus_coords(self, bus):
         dssdirect.Circuit.SetActiveBus(bus)
         return dssdirect.Bus.X(), dssdirect.Bus.Y()
+    
+    def all_bus_coords(self, gm) -> dict:
+        if len(gm.bus_names) == 0:
+            return None
+            
+        seg_busses = {}
+
+        for bus in gm.bus_names:
+            bc = self.bus_coords(bus)
+            seg_busses[self.get_raw_bus_name(bus)] = bc
+
+        return seg_busses
 
     def line_bus_coords(self, line):
         bus1, bus2 = self.line_busses(line)
@@ -4832,7 +4844,7 @@ class SSimScreen(SSimBaseScreen):
         bat_busses = {}
         self.cindex = 0
                 
-        seg_busses = self.__get_line_segment_busses(gm)
+        seg_busses = self.all_bus_coords(gm)
         
         for so in self.project.storage_options:
             so_colors[so] = self.colors[self.cindex]
@@ -4905,30 +4917,24 @@ class SSimScreen(SSimBaseScreen):
         lines = gm.line_names
         if len(lines) == 0: return None
         
-        return [line for line in gm.line_names
+        return [line for line in lines
             if (0., 0.) not in self.line_bus_coords(line)]
     
     def __get_line_segment_busses(self, gm, seg_lines=None):
         if seg_lines is None:
             seg_lines = self.__get_line_segments(gm)
         
+        if len(seg_lines) == 0:
+            return self.all_bus_coords()
+
         seg_busses = {}
         
-        if len(seg_lines) == 0:
-            busses = gm.bus_names
-            if len(busses) == 0:
-                return None
-            
-            for bus in busses:
-                bc = self.bus_coords(bus)
-                seg_busses[self.get_raw_bus_name(bus)] = bc
-        else:            
-            for line in seg_lines:
-                bus1, bus2 = self.line_busses(line)
-                bc1 = self.bus_coords(bus1)
-                bc2 = self.bus_coords(bus2)
-                seg_busses[self.get_raw_bus_name(bus1)] = bc1
-                seg_busses[self.get_raw_bus_name(bus2)] = bc2
+        for line in seg_lines:
+            bus1, bus2 = self.line_busses(line)
+            bc1 = self.bus_coords(bus1)
+            bc2 = self.bus_coords(bus2)
+            seg_busses[self.get_raw_bus_name(bus1)] = bc1
+            seg_busses[self.get_raw_bus_name(bus2)] = bc2
 
         return seg_busses
     
