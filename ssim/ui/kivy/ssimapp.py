@@ -2349,14 +2349,7 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
             The current parameters of the supplied mode.  The data type will
             depend on which control mode is supplied.
         """
-        defaults = StorageControl.default_params(mode)
-
-        if mode not in self._options.control.params:
-            self._options.control.params[mode] = {}
-
-        if label not in self._options.control.params[mode]:
-            self._options.control.params[mode][label] = defaults[label]
-
+        self._options.control.ensure_param(mode, label)
         return self._options.control.params[mode][label]
 
     def __set_xy_grid_data(self, grid: XYGridView, xdat: list, ydat: list) -> list:

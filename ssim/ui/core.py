@@ -626,7 +626,7 @@ class Project:
                 pv_systems, pv_inv_controls = _safe_unzip(pv_configuration)
                 inv_controls = list(
                     filter(lambda ic: ic is not None,
-                           ess_inv_controls + pv_inv_controls)
+                           itertools.chain(ess_inv_controls, pv_inv_controls))
                 )
                 yield Configuration(
                     self._grid_model_path,
@@ -725,10 +725,23 @@ class InverterControl:
             mode = InverterControl.Mode(mode)
         elif not isinstance(mode, InverterControl.Mode):
             raise ValueError("invalid mode")
-        self.mode = mode
+        self._mode = mode
         self.params = deepcopy(params)
         if self.params is None:
             self.params = deepcopy(InverterControl._DEFAULT_PARAMS[self.mode])
+
+    @property
+    def mode(self):
+        return self._mode
+
+    @mode.setter
+    def mode(self, value):
+        if isinstance(value, InverterControl.Mode):
+            self._mode = value
+        elif isinstance(value, str):
+            self._mode = InverterControl.Mode(value)
+        else:
+            raise ValueError("invalid mode")
 
     def __eq__(self, other):
         if self.mode is not other.mode:
@@ -863,15 +876,17 @@ class InverterControl:
 
     @property
     def active_params(self):
+        if self.mode not in self.params:
+            self.params[self.mode] = {}
         return self.params[self.mode]
 
     def _active_curves(self):
         x_names, y_names = self._curve_names()
-        curves = tuple(zip(self.active_params[x], self.active_params[y])
+        curves = tuple(list(zip(self.active_params[x], self.active_params[y]))
                        for x, y in zip(x_names, y_names))
         if len(curves) == 2:
             return curves[0], curves[1]
-        return None
+        return curves[0], None
 
     @staticmethod
     def _get_default(mode, param):
@@ -948,6 +963,7 @@ class StorageControl:
         if self._invcontrol is None:
             self._invcontrol = InverterControl(value)
             self._invcontrol.params = self._params
+        self._invcontrol.mode = value
         self._mode = "invcontrol"
 
     @property
@@ -955,6 +971,12 @@ class StorageControl:
         if self._mode == "invcontrol":
             return self._invcontrol.params
         return self._params
+
+    @property
+    def active_params(self):
+        if self._mode == "invcontrol":
+            return self._invcontrol.active_params
+        return self._params[self._mode]
 
     @property
     def is_external(self):
@@ -971,7 +993,9 @@ class StorageControl:
             Name of the parameter(s) to ensure is defined. If None, then all
             default parameters for `mode` will be checked.
         """
-        if not self.is_external:
+        if mode not in StorageControl._DEFAULTS:
+            self._invcontrol = self._invcontrol or InverterControl("voltvar")
+            self._invcontrol.params = self._params
             return self._invcontrol.ensure_param(mode, param)
         params = StorageControl._DEFAULTS[mode].keys()
         if isinstance(param, str):
@@ -987,6 +1011,16 @@ class StorageControl:
     @staticmethod
     def _get_default(mode, param):
         return deepcopy(StorageControl._DEFAULTS[mode][param])
+
+    def validate(self) -> Optional[str]:
+        if self._mode == "droop":
+            params = self._params.get("droop", {})
+            required_params = set(StorageControl._DEFAULTS["droop"].keys())
+            if set(params.keys()) != required_params:
+                missing = required_params - set(params.keys())
+                return "Missing parameters: " + ", ".join(missing)
+        if self._invcontrol is not None:
+            return self._invcontrol.validate()
 
     def get_invcontrol(self, storage_name):
         """Return a specification of an InvControl implementing the control.
@@ -1013,6 +1047,45 @@ class StorageControl:
                 "Cannot convert external control to inverter control."
             )
         return self._invcontrol.get_invcontrol("Storage", storage_name)
+
+    def write_toml(self, name: str):
+        """Return a TOML string representing this control parameter instance.
+
+        Parameters
+        ----------
+        name : str
+            The name of the DER to which these control parameters apply.
+
+        Returns
+        -------
+        str :
+            A TOML string with the properties of the instance.
+        """
+        if not self.is_external:
+            return self._invcontrol.write_toml(name)
+        ret = ["", f"[{name}.control-params]", f"mode = '{self.mode}'"]
+        for key in self.params:
+            ret += ["", f'[{name}.control-params."{key}"]']
+            for pkey, pval in self._params.items():
+                ret += [f'"{pkey}" = {pval}']
+        return "\n".join(ret) + "\n"
+
+    def read_toml(self, tomlData):
+        """Initialize this instance from the values in `tomlData`.
+
+        Parameters
+        ----------
+        tomlData : dict
+            A dictionary of values to be assigned for control parameters.
+        """
+        d = deepcopy(tomlData)
+        mode = d.pop("mode")
+        self._params = d
+        if mode == "droop":
+            self.mode = mode
+            self._invcontrol = None
+        else:
+            self.mode = mode
 
 
 class PVOptions:
@@ -1180,7 +1253,7 @@ class PVOptions:
                         phases=None,
                         irradiance_profile=self.irradiance,
                     ),
-                    None,  # TODO inverter controls
+                    None  # TODO inverter controls
                 )
         if not self.required:
             yield None, None
