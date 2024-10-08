@@ -674,35 +674,35 @@ class InverterControl:
         VOLTVAR = "voltvar"
         VOLTWATT = "voltwatt"
         VARWATT = "varwatt"
-        VOLTVAR_VARWATT = "vv_vw"
+        VOLTVAR_VOLTWATT = "vv_vw"
         CONSTPF = "constantpf"
 
     _CURVE_NAME_X = {
         Mode.VOLTVAR: ("volts",),
         Mode.VOLTWATT: ("volts",),
         Mode.VARWATT: ("vars",),
-        Mode.VOLTVAR_VARWATT: ("vv_volts", "vw_volts")
+        Mode.VOLTVAR_VOLTWATT: ("vv_volts", "vw_volts")
     }
 
     _CURVE_NAME_Y = {
         Mode.VOLTVAR: ("vars",),
         Mode.VOLTWATT: ("watts",),
         Mode.VARWATT: ("watts",),
-        Mode.VOLTVAR_VARWATT: ("vv_vars", "vw_watts")
+        Mode.VOLTVAR_VOLTWATT: ("vv_vars", "vw_watts")
     }
 
     _CURVE_DESC = {
         Mode.VOLTVAR: "Volt-Var",
         Mode.VOLTWATT: "Volt-Watt",
         Mode.VARWATT: "Var-Watt",
-        Mode.VOLTVAR_VARWATT: "Volt-Var + Var-Watt"
+        Mode.VOLTVAR_VOLTWATT: "Volt-Var + Var-Watt"
     }
 
     _MODE_PARAMS = {
         Mode.VOLTVAR: {"volts", "vars"},
         Mode.VOLTWATT: {"volts", "watts"},
         Mode.VARWATT: {"vars", "watts"},
-        Mode.VOLTVAR_VARWATT: {"vv_volts", "vv_vars", "vw_volts", "wv_watts"},
+        Mode.VOLTVAR_VOLTWATT: {"vv_volts", "vv_vars", "vw_volts", "wv_watts"},
         Mode.CONSTPF: {"pf_val"}
     }
 
@@ -713,10 +713,10 @@ class InverterControl:
                         "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
         Mode.VARWATT: {"vars": [0.5, 0.95, 1.0, 1.05, 1.5],
                        "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
-        Mode.VOLTVAR_VARWATT: {"vv_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
-                               "vv_vars": [1.0, 1.0, 0.0, -1.0, -1.0],
-                               "vw_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
-                               "vw_watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        Mode.VOLTVAR_VOLTWATT: {"vv_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                                "vv_vars": [1.0, 1.0, 0.0, -1.0, -1.0],
+                                "vw_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                                "vw_watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
         Mode.CONSTPF: {"pf_val": 0.99}
     }
 
