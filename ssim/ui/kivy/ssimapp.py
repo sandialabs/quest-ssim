@@ -72,6 +72,7 @@ from ssim.ui import (
     ProjectResults,
     is_valid_opendss_name
 )
+from ssim.ui.kivy.xygrid import XYGridView
 
 import kivy.garden
 import inspect

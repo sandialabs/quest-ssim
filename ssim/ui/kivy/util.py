@@ -1,8 +1,18 @@
 """Utilities for the ssim UI."""
+import inspect
+import os
+
 import matplotlib.pyplot as plt
-from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
-from kivy.uix.boxlayout import BoxLayout
-from kivymd.uix.label import MDLabel
+
+import ssim.ui
+
+import kivy.garden
+kivy.garden.garden_system_dir = os.path.join(
+    os.path.dirname(inspect.getfile(ssim.ui)), "libs/garden"
+)
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg  # noqa: E402
+from kivy.uix.boxlayout import BoxLayout  # noqa: E402
+from kivymd.uix.label import MDLabel  # noqa: E402
 
 
 class MatlabPlotBox(BoxLayout):

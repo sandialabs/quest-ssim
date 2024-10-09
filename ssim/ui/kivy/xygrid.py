@@ -2,7 +2,8 @@
 import matplotlib.pyplot as plt
 from kivy.clock import Clock
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.recycleview import RecycleDataViewBehavior, RecycleView
+from kivy.uix.recycleview import RecycleView
+from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.textinput import TextInput
 
 from ssim.ui.kivy.util import MatlabPlotBox
