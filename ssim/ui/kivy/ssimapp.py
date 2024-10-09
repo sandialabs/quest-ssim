@@ -73,6 +73,7 @@ from ssim.ui import (
     is_valid_opendss_name
 )
 from ssim.ui.kivy.xygrid import XYGridView
+from ssim.ui.kivy import util
 
 import kivy.garden
 import inspect
@@ -1599,30 +1600,14 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.ids.max_soc.text = str(self._options.max_soc * 100.0)
         self.ids.init_soc.text = str(self._options.initial_soc * 100.0)
 
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.max_soc), 0.05)
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.min_soc), 0.05)
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.init_soc), 0.05)
+        util.focus_defocus(self.ids.max_soc)
+        util.focus_defocus(self.ids.min_soc)
+        util.focus_defocus(self.ids.init_soc)
 
         if self._options is not None:
             self.ids.tabs.control = self._options.control
 
         self.ids.tabs.bind(active_tab=self.set_mode_label_text)
-
-    @staticmethod
-    def __set_focus_clear_sel(widget, value=True):
-        """Sets the focus of the supplied widget to the supplied value and
-        schedules a call to widget.cancel_selection().
-        
-        Parameters
-        ----------
-        widget:
-            The widget whose focus is to be set to the supplied value and on
-            whom selection is to be canceled.
-        value:
-            True if the widget is to receive focus and false otherwise.
-        """
-        widget.focus = value
-        Clock.schedule_once(lambda dt: widget.cancel_selection(), 0.05)
 
     def set_mode_label_text(self, *args):
         """ Adds the current device name to the label that informs a user to
@@ -1647,89 +1632,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         """
         return "" if self._options is None else self._options.name
 
-    def save(self):
-        self.cancel()
-
-    def read_all_data(self):
-        """Reads all entered data out of the controls for all control modes.
-
-        This uses the individual "read...data" methods for each mode.  See them
-        for more information about each.
-        """
-        self._options.min_soc = self.ids.min_soc.fraction()
-        self._options.max_soc = self.ids.max_soc.fraction()
-        self._options.initial_soc = self.ids.init_soc.fraction()
-        self.read_droop_data()
-        self.read_const_pf_data()
-        self.read_voltvar_data()
-        self.read_voltwatt_data()
-        self.read_varwatt_data()
-        self.read_voltvar_and_voltwatt_data()
-
-    def read_droop_data(self):
-        """Reads and stores the entered data out of the controls for droop mode.
-
-        The data is stored in the options control parameters.
-        """
-        droop_map = self._options.control.params["droop"]
-        droop_map["p_droop"] = parse_float(self.ids.droop_tab_content.ids.p_value.text)
-        droop_map["q_droop"] = parse_float(self.ids.droop_tab_content.ids.q_value.text)
-
-    def read_const_pf_data(self):
-        """Reads and stores the entered data out of the controls for constant
-        power factor mode.
-
-        The data is stored in the options control parameters.
-        """
-        constpf_map = self._options.control.params["constantpf"]
-        constpf_map["pf_val"] = parse_float(self.ids.const_pf_tab_content.ids.pf_value.text)
-
-    def read_voltvar_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Var
-        mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.vv_tab_content.ids.grid, "voltvar", "volts", "vars"
-        )
-
-    def read_voltwatt_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Watt
-        mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.vw_tab_content.ids.grid, "voltwatt", "volts", "watts"
-        )
-
-    def read_varwatt_data(self):
-        """Reads and stores the entered data out of the controls for Var-Watt
-        mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.var_watt_tab_content.ids.grid, "varwatt", "vars", "watts"
-        )
-
-    def read_voltvar_and_voltwatt_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Var &
-        Volt-Watt mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vv_grid,
-           "vv_vw", "vv_volts", "vv_vars"
-        )
-
-        self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vw_grid,
-           "vv_vw", "vw_volts", "vw_watts"
-        )
-
     def cancel(self):
         """Returns to the "configure-storage" form.
 
@@ -1738,27 +1640,21 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         This is called when the user presses the "back" button.
         """
-        self.read_all_data()
+        self._close()
+
+    def _close(self):
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
 
-    def _extract_and_store_data_lists(self, xyc: XYGridView, mode: str, l1name: str, l2name: str):
-        """Reads the x and y data from the supplied grid and stores them in the
-        control parameters using the supplied list keys.
-
-        Parameters
-        ----------
-        l1name : str
-            The key by which to store the "x" values read out of the grid into
-            the control parameters
-        l2name : str
-            The key by which to store the "y" values read out of the grid into
-            the control parameters
-        """
-        xl, yl = xyc.extract_data_lists()
-        param_map = self._options.control.params[mode]
-        param_map[l1name] = xl
-        param_map[l2name] = yl
+    def save(self):
+        result = self.ids.tabs.save(self._options.control)
+        if result is not None:
+            # TODO display an error message
+            return
+        self._options.min_soc = self.ids.min_soc.fraction()
+        self._options.max_soc = self.ids.max_soc.fraction()
+        self._options.initial_soc = self.ids.init_soc.fraction()
+        self._close()
 
 
 class PVConfigurationScreen(SSimBaseScreen):
@@ -1873,6 +1769,16 @@ class PVConfigurationScreen(SSimBaseScreen):
         content = SelectFileDialog(cancel=self._dismiss, load=self._selected)
         self._popup = Popup(content=content)
         self._popup.open()
+
+    def edit_control_params(self):
+        # self._record_option_data()
+        self.manager.add_widget(
+            PVControlConfigurationScreen(
+                self, self.project, self._pvsystem,
+                name="configure-pv-controls"
+            )
+        )
+        self.manager.current = "configure-pv-controls"
 
     def save(self):
         self._record_options()

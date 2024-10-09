@@ -6,13 +6,15 @@ import matplotlib.pyplot as plt
 
 import ssim.ui
 
+from kivy.clock import Clock
+from kivy.uix.boxlayout import BoxLayout  # noqa: E402
+from kivymd.uix.label import MDLabel  # noqa: E402
+
 import kivy.garden
 kivy.garden.garden_system_dir = os.path.join(
     os.path.dirname(inspect.getfile(ssim.ui)), "libs/garden"
 )
 from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg  # noqa: E402
-from kivy.uix.boxlayout import BoxLayout  # noqa: E402
-from kivymd.uix.label import MDLabel  # noqa: E402
 
 
 class MatlabPlotBox(BoxLayout):
@@ -36,3 +38,17 @@ class MatlabPlotBox(BoxLayout):
         """
         self.clear_widgets()
         self.add_widget(MDLabel(text=msg))
+
+
+def focus_defocus(widget, dt=0.05):
+    """Focus and defocus a widget after a delay.
+
+    This is used to work around the quirks of the TextField widgets that cause
+    them to display overlapping text when initialized directly instead of by
+    user input.
+
+    """
+    def fd(t):
+        widget.focus = True
+        Clock.schedule_once(lambda _: widget.cancel_selection(), t)
+    Clock.schedule_once(fd, dt)

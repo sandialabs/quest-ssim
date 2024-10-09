@@ -1,6 +1,7 @@
 """Kivy elements for configuring DER controls."""
 from abc import ABC, abstractmethod
-from typing import Union
+from copy import deepcopy
+from typing import Union, Optional
 
 import matplotlib.pyplot as plt
 from kivy.properties import ListProperty, ObjectProperty
@@ -9,6 +10,7 @@ from kivy.uix.boxlayout import BoxLayout
 from kivymd.uix.tab import MDTabs, MDTabsBase
 
 from ssim.ui import StorageControl, InverterControl
+from ssim.ui.kivy.util import focus_defocus
 from ssim.ui.kivy.xygrid import make_xy_grid_data, make_xy_matlab_plot
 
 
@@ -23,13 +25,11 @@ class ControlTab(ABC):
     """
 
     @property
-    @staticmethod
     @abstractmethod
     def control_name() -> str:
         """Return the human readable name of the control mode."""
 
     @property
-    @staticmethod
     @abstractmethod
     def control_id() -> str:
         """Return the internal identifier of the control mode."""
@@ -45,6 +45,14 @@ class ControlTab(ABC):
     @abstractmethod
     def set_data(self, control: Union[StorageControl, InverterControl]):
         """Update the data in the tab without activating it."""
+
+    @abstractmethod
+    def validate(self) -> Optional[str]:
+        """Return a string desctibing the error, otherwise None."""
+
+    @abstractmethod
+    def save(self, control: Union[StorageControl, InverterControl]):
+        """Save the data from the tab into `control`."""
 
 
 class VoltVarTabContent(BoxLayout, MDTabsBase):
@@ -87,6 +95,16 @@ class VoltVarTabContent(BoxLayout, MDTabsBase):
         """Prepare the tab content to be foregrounded."""
         self.set_data(control)
         control.mode = "voltvar"
+
+    def validate(self):
+        # TODO ???
+        pass
+
+    def save(self, control):
+        control.ensure_param("voltvar")
+        volt, var = self.ids.grid.extract_data_lists()
+        control.params["voltvar"]["volts"] = volt
+        control.params["voltvar"]["vars"] = var
 
     def rebuild_plot(self):
         """A function to reset the plot of the volt var data.
@@ -146,6 +164,15 @@ class VoltWattTabContent(BoxLayout, MDTabsBase):
         control.mode = "voltwatt"
         self.set_data(control)
 
+    def validate(self):
+        pass
+
+    def save(self, control):
+        control.ensure_param("voltwatt")
+        volts, watts = self.ids.grid.extract_data_lists()
+        control.params["voltwatt"]["volts"] = volts
+        control.params["voltwatt"]["watts"] = watts
+
     def rebuild_plot(self):
         """A function to reset the plot of the volt watt data.
 
@@ -203,6 +230,16 @@ class VarWattTabContent(BoxLayout, MDTabsBase):
     def activate(self, control):
         control.mode = "varwatt"
         self.set_data(control)
+
+    def validate(self):
+        # TODO ???
+        pass
+
+    def save(self, control):
+        control.ensure_param("varwatt")
+        var, watt = self.ids.grid.extract_data_lists()
+        control.params["varwatt"]["vars"] = var
+        control.params["varwatt"]["watts"] = watt
 
     def rebuild_plot(self):
         """A function to reset the plot of the var watt data.
@@ -282,6 +319,19 @@ class VoltVarVoltWattTabContent(BoxLayout, MDTabsBase):
         control.mode = "vv_vw"
         self.set_data(control)
 
+    def validate(self):
+        # TODO ???
+        pass
+
+    def save(self, control):
+        control.ensure_param("vv_vw")
+        vv_volts, vv_vars = self.ids.vv_grid.extract_data_lists()
+        vw_volts, vw_watts = self.ids.vw_grid.extract_data_lists()
+        control.params["vv_vw"]["vv_volts"] = vv_volts
+        control.params["vv_vw"]["vv_vars"] = vv_vars
+        control.params["vv_vw"]["vw_volts"] = vw_volts
+        control.params["vv_vw"]["vw_watts"] = vw_watts
+
     def rebuild_plot(self):
         """A function to reset the plot of the volt var and volt watt data.
 
@@ -324,11 +374,19 @@ class ConstPFTabContent(BoxLayout, MDTabsBase):
     def set_data(self, control):
         control.ensure_param("constantpf")
         self.ids.pf_value.text = str(control.params["constantpf"]["pf_val"])
-        _focus_defocus(self.ids.pf_value)
+        focus_defocus(self.ids.pf_value)
 
     def activate(self, control):
         control.mode = "constantpf"
         self.set_data(control)
+
+    def validate(self):
+        if not self.ids.pf_value.text_valid():
+            return f"{self.control_name} - invalid 'pf' value"
+
+    def save(self, control):
+        control.ensure_param("constantpf")
+        control.params["constantpf"]["pf_val"] = float(self.ids.pf_value.text)
 
 
 class DroopTabContent(BoxLayout, MDTabsBase):
@@ -346,12 +404,23 @@ class DroopTabContent(BoxLayout, MDTabsBase):
         control.ensure_param("droop")
         self.ids.p_value.text = str(control.params["droop"]["p_droop"])
         self.ids.q_value.text = str(control.params["droop"]["q_droop"])
-        _focus_defocus(self.ids.p_value)
-        _focus_defocus(self.ids.q_value)
+        focus_defocus(self.ids.p_value)
+        focus_defocus(self.ids.q_value)
 
     def activate(self, control):
         control.mode = "droop"
         self.set_data(control)
+
+    def validate(self):
+        if not self.ids.p_value.text_valid:
+            return f"{self.control_name} - Invalid value for paramerer 'p'"
+        if not self.ids.q_value.text_valid:
+            return f"{self.control_name} - Invalid value for paramerer 'q'"
+
+    def save(self, control):
+        control.ensure_param("droop")
+        control.params["droop"]["p_droop"] = float(self.ids.p_value.text)
+        control.params["droop"]["q_droop"] = float(self.ids.q_value.text)
 
 
 class NoControl(BoxLayout, MDTabsBase):
@@ -370,6 +439,12 @@ class NoControl(BoxLayout, MDTabsBase):
 
     def activate(self, control):
         control.mode = None
+
+    def validate(self):
+        pass
+
+    def save(self, control):
+        pass
 
 
 class ControlTabFactory:
@@ -405,16 +480,18 @@ class ControlTabs(MDTabs):
         super().__init__(*args, **kwargs)
 
     def on_control(self, instance, control):
+        ctrl = deepcopy(control)
         for tab in self.get_tab_list():
-            self._tabs[tab.text].set_data(control)
+            self._tabs[tab.text].set_data(ctrl)
+            if self._tabs[tab.text].control_id == control.mode:
+                self.switch_tab(tab)
 
     def on_tab_switch(self, tab, tablabel, tabtext):
-        tab.activate(self.control)
         self.active_tab = tab
 
     def on_enabled_controls(self, instance, value):
         for tab in self.get_tab_list():
-            del self._tabs[tab.text.text]
+            del self._tabs[tab.text]
             self.remove_widget(tab)
         first = True
         for mode in value:
@@ -425,14 +502,11 @@ class ControlTabs(MDTabs):
             self.add_widget(tab)
             self._tabs[tab.tab_label.text] = tab
 
-
-def _focus_defocus(widget, dt=0.05):
-    """Focus and defocus a widget after a delay.
-
-    This is used to work around the quirks of the TextField widgets that cause
-    them to display overlapping text when initialized directly instead of by
-    user input.
-
-    """
-    widget.focus = True
-    Clock.schedule_once(lambda _: widget.cancel_selection(), dt)
+    def save(self, control):
+        for tab in self.get_tab_list():
+            result = self._tabs[tab.text].validate()
+            if result is not None:
+                return result
+        for tab in self.get_tab_list():
+            self._tabs[tab.text].save(control)
+        control.mode = self.active_tab.control_id
