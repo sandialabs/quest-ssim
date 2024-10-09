@@ -702,7 +702,7 @@ class InverterControl:
         Mode.VOLTVAR: {"volts", "vars"},
         Mode.VOLTWATT: {"volts", "watts"},
         Mode.VARWATT: {"vars", "watts"},
-        Mode.VOLTVAR_VOLTWATT: {"vv_volts", "vv_vars", "vw_volts", "wv_watts"},
+        Mode.VOLTVAR_VOLTWATT: {"vv_volts", "vv_vars", "vw_volts", "vw_watts"},
         Mode.CONSTPF: {"pf_val"}
     }
 
