@@ -1,20 +1,63 @@
 """Kivy elements for configuring DER controls."""
-
+from abc import ABC, abstractmethod
 from typing import Union
 
 import matplotlib.pyplot as plt
-from kivy.properties import ListProperty
+from kivy.properties import ListProperty, ObjectProperty
 from kivy.clock import Clock
 from kivy.uix.boxlayout import BoxLayout
-from kivymd.uix.tab import MDTabs
+from kivymd.uix.tab import MDTabs, MDTabsBase
 
 from ssim.ui import StorageControl, InverterControl
 from ssim.ui.kivy.xygrid import make_xy_grid_data, make_xy_matlab_plot
 
 
-class VoltVarTabContent(BoxLayout):
+class ControlTab(ABC):
+    """This defines the interface required for contol configuration tabs.
+
+    Because of how abstract classes work in python and how layouts are
+    implemented in Kivy, we can't actually inherit from this class. However, for
+    the sake of documentation the definition is retained even though it is
+    unused.
+
+    """
+
+    @property
+    @staticmethod
+    @abstractmethod
+    def control_name() -> str:
+        """Return the human readable name of the control mode."""
+
+    @property
+    @staticmethod
+    @abstractmethod
+    def control_id() -> str:
+        """Return the internal identifier of the control mode."""
+
+    @abstractmethod
+    def activate(self, control: Union[StorageControl, InverterControl]):
+        """Activate the control mode represented by this tab in `control`.
+
+        Also update the state of subordinate widgets to reflect parameters
+        already present in `control`.
+        """
+
+    @abstractmethod
+    def set_data(self, control: Union[StorageControl, InverterControl]):
+        """Update the data in the tab without activating it."""
+
+
+class VoltVarTabContent(BoxLayout, MDTabsBase):
     """The class that stores the content for the Volt-Var tab in the storage
      option control tabs."""
+
+    @property
+    def control_name(self):
+        return "Volt-Var"
+
+    @property
+    def control_id(self):
+        return "voltvar"
 
     def on_add_button(self):
         """A callback function for the button that adds a new value to the volt-var grid"""
@@ -33,14 +76,17 @@ class VoltVarTabContent(BoxLayout):
         self.ids.grid.data = make_xy_grid_data(xs, ys)
         Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
-    def activate(self, control):
-        """Prepare the tab content to be foregrounded."""
+    def set_data(self, control):
         control.ensure_param("voltvar")
-        control.mode = "voltvar"
         vvs = control.params["voltvar"]["volts"]
         var = control.params["voltvar"]["vars"]
         self.ids.grid.set_data(vvs, var)
         self.rebuild_plot()
+
+    def activate(self, control):
+        """Prepare the tab content to be foregrounded."""
+        self.set_data(control)
+        control.mode = "voltvar"
 
     def rebuild_plot(self):
         """A function to reset the plot of the volt var data.
@@ -60,9 +106,17 @@ class VoltVarTabContent(BoxLayout):
             )
 
 
-class VoltWattTabContent(BoxLayout):
+class VoltWattTabContent(BoxLayout, MDTabsBase):
     """The class that stores the content for the Volt-Watt tab in the storage
      option control tabs"""
+
+    @property
+    def control_name(self):
+        return "Volt-Watt"
+
+    @property
+    def control_id(self):
+        return "voltwatt"
 
     def on_add_button(self):
         """A callback function for the button that adds a new value to the volt-watt grid"""
@@ -81,13 +135,16 @@ class VoltWattTabContent(BoxLayout):
         self.ids.grid.data = make_xy_grid_data(xs, ys)
         Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
-    def activate(self, control):
+    def set_data(self, control):
         control.ensure_param("voltwatt")
-        control.mode = "voltwatt"
-        vvs = control.params["voltvar"]["volts"]
-        watts = control.params["voltvar"]["watts"]
+        vvs = control.params["voltwatt"]["volts"]
+        watts = control.params["voltwatt"]["watts"]
         self.ids.grid.set_data(vvs, watts)
         self.rebuild_plot()
+
+    def activate(self, control):
+        control.mode = "voltwatt"
+        self.set_data(control)
 
     def rebuild_plot(self):
         """A function to reset the plot of the volt watt data.
@@ -107,9 +164,17 @@ class VoltWattTabContent(BoxLayout):
             )
 
 
-class VarWattTabContent(BoxLayout):
+class VarWattTabContent(BoxLayout, MDTabsBase):
     """The class that stores the content for the Var-Watt tab in the storage
      option control tabs"""
+
+    @property
+    def control_name(self):
+        return "Var-Watt"
+
+    @property
+    def control_id(self):
+        return "varwatt"
 
     def on_add_button(self):
         """A callback function for the button that adds a new value to the var-watt grid"""
@@ -128,13 +193,16 @@ class VarWattTabContent(BoxLayout):
         self.ids.grid.data = make_xy_grid_data(xs, ys)
         Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
-    def activate(self, control):
+    def set_data(self, control):
         control.ensure_param("varwatt")
-        control.mode = "varwatt"
         var = control.params["varwatt"]["vars"]
         watts = control.params["varwatt"]["watts"]
         self.ids.grid.set_data(var, watts)
         self.rebuild_plot()
+
+    def activate(self, control):
+        control.mode = "varwatt"
+        self.set_data(control)
 
     def rebuild_plot(self):
         """A function to reset the plot of the var watt data.
@@ -154,9 +222,17 @@ class VarWattTabContent(BoxLayout):
             )
 
 
-class VoltVarVoltWattTabContent(BoxLayout):
+class VoltVarVoltWattTabContent(BoxLayout, MDTabsBase):
     """The class that stores the content for the Volt-Var & Volt-Watt tab in the storage
      option control tabs"""
+
+    @property
+    def control_name(self):
+        return "Volt-Var & Volt-Watt"
+
+    @property
+    def control_id(self):
+        return "vv_vw"
 
     def on_add_vv_button(self):
         """A callback function for the button that adds a new value to the volt-var grid"""
@@ -192,16 +268,19 @@ class VoltVarVoltWattTabContent(BoxLayout):
         xs, ys = self.ids.vw_grid.extract_data_lists()
         self.ids.vw_grid.data = make_xy_grid_data(xs, ys)
 
-    def activate(self, control):
+    def set_data(self, control):
         control.ensure_param("vv_vw")
-        control.mode = "vv_vw"
-        vv_volts = control["vv_vw"]["vv_volts"]
-        vv_vars = control["vv_vw"]["vv_vars"]
-        vw_volts = control["vv_vw"]["vw_volts"]
-        vw_watts = control["vv_vw"]["vw_watts"]
+        vv_volts = control.params["vv_vw"]["vv_volts"]
+        vv_vars = control.params["vv_vw"]["vv_vars"]
+        vw_volts = control.params["vv_vw"]["vw_volts"]
+        vw_watts = control.params["vv_vw"]["vw_watts"]
         self.ids.vv_grid.set_data(vv_volts, vv_vars)
         self.ids.vw_grid.set_data(vw_volts, vw_watts)
         self.rebuild_plot()
+
+    def activate(self, control):
+        control.mode = "vv_vw"
+        self.set_data(control)
 
     def rebuild_plot(self):
         """A function to reset the plot of the volt var and volt watt data.
@@ -231,29 +310,73 @@ class VoltVarVoltWattTabContent(BoxLayout):
             self.ids.plot_box.reset_plot()
 
 
-class ConstPFTabContent(BoxLayout):
+class ConstPFTabContent(BoxLayout, MDTabsBase):
     # See ssim.kv for definition
 
-    def activate(self, control):
+    @property
+    def control_name(self):
+        return "Constant Power Factor"
+
+    @property
+    def control_id(self):
+        return "constantpf"
+
+    def set_data(self, control):
         control.ensure_param("constantpf")
-        control.mode = "constantpf"
         self.ids.pf_value.text = str(control.params["constantpf"]["pf_val"])
-
-
-class DroopTabContent(BoxLayout):
-    # See ssim.kv for definition
+        _focus_defocus(self.ids.pf_value)
 
     def activate(self, control):
+        control.mode = "constantpf"
+        self.set_data(control)
+
+
+class DroopTabContent(BoxLayout, MDTabsBase):
+    # See ssim.kv for definition
+
+    @property
+    def control_name(self):
+        return "Droop"
+
+    @property
+    def control_id(self):
+        return "droop"
+
+    def set_data(self, control):
         control.ensure_param("droop")
-        control.mode = "droop"
         self.ids.p_value.text = str(control.params["droop"]["p_droop"])
         self.ids.q_value.text = str(control.params["droop"]["q_droop"])
+        _focus_defocus(self.ids.p_value)
+        _focus_defocus(self.ids.q_value)
+
+    def activate(self, control):
+        control.mode = "droop"
+        self.set_data(control)
+
+
+class NoControl(BoxLayout, MDTabsBase):
+    """A tab that represents the abscence of a controller."""
+
+    @property
+    def control_name(self):
+        return "Uncontrolled"
+
+    @property
+    def control_id(self):
+        return None
+
+    def set_data(self, control):
+        pass
+
+    def activate(self, control):
+        control.mode = None
 
 
 class ControlTabFactory:
     """Factory that ceates tab content used to configure DER control modes."""
 
     _MODES = {
+        None: NoControl,
         "droop": DroopTabContent,
         "voltvar": VoltVarTabContent,
         "voltwatt": VoltWattTabContent,
@@ -263,7 +386,7 @@ class ControlTabFactory:
     }
 
     @staticmethod
-    def new(mode, control):
+    def new(mode):
         """Construct a new control mode configuration tab."""
         if mode not in ControlTabFactory._MODES:
             raise ValueError(f"unknown control mode '{mode}'")
@@ -274,16 +397,42 @@ class ControlTabs(MDTabs):
     """Generic UI element for configuring PV and Storage controllers."""
 
     enabled_controls = ListProperty()
+    active_tab = ObjectProperty()  # TODO set the default
+    control = ObjectProperty()
 
-    def __init__(self, control: Union[StorageControl, InverterControl], *args, **kwargs):
+    def __init__(self, *args, **kwargs):
+        self._tabs = {}
         super().__init__(*args, **kwargs)
-        self._control = control
 
-    def on_tab_switch(self, instance, tab, tab_label, tab_text):
-        tab.activate(self._control)
+    def on_control(self, instance, control):
+        for tab in self.get_tab_list():
+            self._tabs[tab.text].set_data(control)
+
+    def on_tab_switch(self, tab, tablabel, tabtext):
+        tab.activate(self.control)
+        self.active_tab = tab
 
     def on_enabled_controls(self, instance, value):
-        for tab in self.ids.tabs.get_tab_list():
-            self.ids.tabs.remove_widget(tab)
+        for tab in self.get_tab_list():
+            del self._tabs[tab.text.text]
+            self.remove_widget(tab)
+        first = True
         for mode in value:
-            self.ids.tabs.add_widget(ControlTabFactory.new(mode, self._control))
+            tab = ControlTabFactory.new(mode)
+            if first:
+                self.active_tab = tab
+                first = False
+            self.add_widget(tab)
+            self._tabs[tab.tab_label.text] = tab
+
+
+def _focus_defocus(widget, dt=0.05):
+    """Focus and defocus a widget after a delay.
+
+    This is used to work around the quirks of the TextField widgets that cause
+    them to display overlapping text when initialized directly instead of by
+    user input.
+
+    """
+    widget.focus = True
+    Clock.schedule_once(lambda _: widget.cancel_selection(), dt)

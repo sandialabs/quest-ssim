@@ -636,9 +636,10 @@
         id: selected
         on_active: root.mark(self, self.active)
 
-<DroopTabContent@BoxLayout>
+<DroopTabContent>
     orientation: "vertical"
     padding: 5
+    title: "Droop"
 
     TextFieldFloat:
         id: p_value
@@ -651,9 +652,10 @@
     BoxLayout:
         size_hint: (1.0, 0.8)
 
-<ConstPFTabContent@BoxLayout>
+<ConstPFTabContent>
     orientation: "vertical"
     padding: 5
+    title: "Constant Power Factor"
 
     TextFieldFloat:
         id: pf_value
@@ -666,6 +668,7 @@
     orientation: "vertical"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Volt-Var"
 
     BoxLayout:
         orientation: "horizontal"
@@ -732,6 +735,7 @@
     orientation: "vertical"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Volt-Watt"
 
     BoxLayout:
         orientation: "horizontal"
@@ -798,6 +802,7 @@
     orientation: "vertical"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Var-Watt"
 
     BoxLayout:
         orientation: "horizontal"
@@ -865,6 +870,7 @@
     orientation: "horizontal"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Volt-Var & Volt-Watt"
 
     BoxLayout:
         orientation: "vertical"
@@ -997,6 +1003,15 @@
         size_hint_x: 0.5
 
 
+<NoControl>:
+    padding: 4
+    title: "Uncontrolled"
+
+    Label:
+        id: ucmodelabel
+        text: "Uncontrolled"
+
+
 <StorageControlConfigurationScreen>:
     name: "configure-storage-controls"
     on_enter: self.set_mode_label_text()
@@ -1028,52 +1043,10 @@
         BoxLayout:
             size_hint: (1.0, 0.2)
 
-            MDTabs:
-                id: control_tabs
+            ControlTabs:
+                id: tabs
                 lock_swiping: True
-                on_tab_switch: root.on_tab_switch(*args)
-
-                StorageControlModelTab:
-                    id: droop_tab
-                    title: "Droop"
-
-                    DroopTabContent:
-                        id: droop_tab_content
-
-                StorageControlModelTab:
-                    id: vv_tab
-                    title: "Volt-Var"
-
-                    VoltVarTabContent:
-                        id: vv_tab_content
-
-                StorageControlModelTab:
-                    id: vw_tab
-                    title: "Volt-Watt"
-
-                    VoltWattTabContent:
-                        id: vw_tab_content
-
-                StorageControlModelTab:
-                    id: var_watt_tab
-                    title: "Var-Watt"
-
-                    VarWattTabContent:
-                        id: var_watt_tab_content
-
-                StorageControlModelTab:
-                    id: vv_vw_tab
-                    title: "Volt-Var & Volt-Watt"
-
-                    VoltVarVoltWattTabContent:
-                        id: vv_vw_tab_content
-
-                StorageControlModelTab:
-                    id: const_pf_tab
-                    title: "Constant Power Factor"
-
-                    ConstPFTabContent:
-                        id: const_pf_tab_content
+                enabled_controls: ["droop", "voltvar", "voltwatt", "varwatt", "vv_vw", "constantpf"]
 
         BoxLayout:
             size_hint_y: None
