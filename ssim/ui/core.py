@@ -1180,7 +1180,9 @@ class PVOptions:
         self.dcac_ratio = toml_data["dcac_ratio"]
         self.irradiance = toml_data["irradiance"]
         self.required = toml_data["required"]
-        # TODO self.control
+        if "control-params" in toml_data:
+            self.control = InverterControl("uncontrolled")
+            self.control.read_toml(toml_data["control-params"])
 
     def validate_name(self):
         if is_valid_opendss_name(self.name):
