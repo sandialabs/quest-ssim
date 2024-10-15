@@ -1067,9 +1067,9 @@ class StorageControl:
         if not self.is_external:
             return self._invcontrol.write_toml(name)
         ret = ["", f"[{name}.control-params]", f"mode = '{self.mode}'"]
-        for key in self.params:
+        for key, params in self.params.items():
             ret += ["", f'[{name}.control-params."{key}"]']
-            for pkey, pval in self._params.items():
+            for pkey, pval in params.items():
                 ret += [f'"{pkey}" = {pval}']
         return "\n".join(ret) + "\n"
 
