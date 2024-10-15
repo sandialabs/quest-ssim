@@ -67,6 +67,7 @@ from ssim.ui import (
     Configuration,
     Project,
     StorageControl,
+    InverterControl,
     StorageOptions,
     PVOptions,
     ProjectResults,
@@ -1576,16 +1577,37 @@ class PVControlConfigurationScreen(SSimBaseScreen):
         super().__init__(project, *args, **kwargs)
         self._pvscreen = pvscreen
         self._pvoptions = pvoptions
-        self._load_control_data()
-        self._set_mode()
+        self._control = self._pvoptions.control or InverterControl("voltvar")
+        self.ids.tabs.bind(active_tab=self._set_mode_label)
+        if self._pvoptions is not None:
+            self.ids.tabs.control = self._control
+        self._set_mode_label()
 
-    def _load_control_data(self):
-        # TODO
-        pass
+    def save(self):
+        self._pvoptions.control = self._control
+        self.ids.tabs.save(self._pvoptions.control)
+        self._close()
 
-    def _set_mode(self):
-        # TODO
-        pass
+    def cancel(self):
+        self._close()
+
+    @property
+    def device_name(self):
+        if self._pvoptions is None:
+            return ""
+        return self._pvoptions.name
+
+    def _close(self):
+        self.manager.current = "configure-pv"
+        self.manager.remove_widget(self)
+
+    def _set_mode_label(self, *args):
+        Logger.debug(f"-> PV...Screen._set_mode_label() {self.ids.tabs.active_tab}")
+        txt = f"Select a control mode for this PV system: [b]{self.device_name}[/b]"
+        if self.ids.tabs.active_tab is not None:
+            pName = self.ids.tabs.active_tab.control_name
+            txt += f", currently [b]{pName}[/b]"
+        self.ids.mode_label.text = txt
 
 
 class StorageControlConfigurationScreen(SSimBaseScreen):

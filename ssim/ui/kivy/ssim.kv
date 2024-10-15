@@ -1163,6 +1163,45 @@
                 on_press: root.save()
 
 
+<PVControlConfigurationScreen>:
+    name: "configure-pv-controls"
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: 5
+
+        # TODO may want to expose the OpenDSS "%cutin" & "%cutout" parameters here
+
+        Label:
+            id: mode_label
+            markup: True
+            text: "Select a control mode for this PV system:"
+            color: C(hex_black)
+            size_hint_y: None
+            height: 25
+
+        BoxLayout:
+            size_hint: (1.0, 0.2)
+
+            ControlTabs:
+                id: tabs
+                lock_swiping: True
+                enabled_controls: ["voltvar", "voltwatt", "varwatt", "vv_vw", "constantpf"]
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: "horizontal"
+
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
+
 <PVConfigurationScreen>:
     id: "configure-pv"
 

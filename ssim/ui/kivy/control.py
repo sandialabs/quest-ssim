@@ -4,6 +4,7 @@ from copy import deepcopy
 from typing import Union, Optional
 
 import matplotlib.pyplot as plt
+from kivy.logger import Logger
 from kivy.properties import ListProperty, ObjectProperty
 from kivy.clock import Clock
 from kivy.uix.boxlayout import BoxLayout
@@ -85,11 +86,16 @@ class VoltVarTabContent(BoxLayout, MDTabsBase):
         Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
 
     def set_data(self, control):
+        Logger.debug("-> VoltVarTabContent.set_data()")
         control.ensure_param("voltvar")
         vvs = control.params["voltvar"]["volts"]
         var = control.params["voltvar"]["vars"]
+        Logger.debug(f"   volts = {vvs}")
+        Logger.debug(f"   vars  = {var}")
         self.ids.grid.set_data(vvs, var)
+        Logger.debug("Updated grid")
         self.rebuild_plot()
+        Logger.debug("<- VoltVarTabContent.set_data()")
 
     def activate(self, control):
         """Prepare the tab content to be foregrounded."""
@@ -112,8 +118,10 @@ class VoltVarTabContent(BoxLayout, MDTabsBase):
         This method extracts the volt var data out of the UI grid and then, if
         the data exists, plots it in the associated plot.
         """
+        Logger.debug("-> VoltVarTabContent.rebuild_plot()")
         xs, ys = self.ids.grid.extract_data_lists()
-
+        Logger.debug(f"   xs = {xs}")
+        Logger.debug(f"   ys = {ys}")
         if len(xs) == 0:
             self.ids.plot_box.display_plot_error("No Data")
 
@@ -122,6 +130,7 @@ class VoltVarTabContent(BoxLayout, MDTabsBase):
                 self.ids.plot_box, xs, ys, 'Voltage (p.u.)',
                 'Reactive Power (p.u.)', 'Volt-Var Control Parameters'
             )
+        Logger.debug("<- VoltVarTabContent.rebuild_plot()")
 
 
 class VoltWattTabContent(BoxLayout, MDTabsBase):
@@ -472,26 +481,30 @@ class ControlTabs(MDTabs):
     """Generic UI element for configuring PV and Storage controllers."""
 
     enabled_controls = ListProperty()
-    active_tab = ObjectProperty()  # TODO set the default
+    active_tab = ObjectProperty()
     control = ObjectProperty()
 
     def __init__(self, *args, **kwargs):
         self._tabs = {}
+        self._ctrl = None
         super().__init__(*args, **kwargs)
 
     def on_control(self, instance, control):
         ctrl = deepcopy(control)
+        self._ctrl = ctrl
         for tab in self.get_tab_list():
-            self._tabs[tab.text].set_data(ctrl)
-            if self._tabs[tab.text].control_id == control.mode:
+            self._tabs[tab.tab.control_id].set_data(ctrl)
+            if tab.tab.control_id == control.mode:
+                Logger.debug(f"on_control() -> switching to tab {control.mode}")
                 self.switch_tab(tab)
 
     def on_tab_switch(self, tab, tablabel, tabtext):
+        tab.set_data(self._ctrl)
         self.active_tab = tab
 
     def on_enabled_controls(self, instance, value):
         for tab in self.get_tab_list():
-            del self._tabs[tab.text]
+            del self._tabs[tab.tab.control_id]
             self.remove_widget(tab)
         first = True
         for mode in value:
@@ -500,13 +513,13 @@ class ControlTabs(MDTabs):
                 self.active_tab = tab
                 first = False
             self.add_widget(tab)
-            self._tabs[tab.tab_label.text] = tab
+            self._tabs[tab.control_id] = tab
 
     def save(self, control):
         for tab in self.get_tab_list():
-            result = self._tabs[tab.text].validate()
+            result = self._tabs[tab.tab.control_id].validate()
             if result is not None:
                 return result
         for tab in self.get_tab_list():
-            self._tabs[tab.text].save(control)
+            self._tabs[tab.tab.control_id].save(control)
         control.mode = self.active_tab.control_id

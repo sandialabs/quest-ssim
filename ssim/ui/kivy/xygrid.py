@@ -1,6 +1,7 @@
 """XY-Grid widgets and supporting functions."""
 import matplotlib.pyplot as plt
 from kivy.clock import Clock
+from kivy.logger import Logger
 from kivy.uix.boxlayout import BoxLayout
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
@@ -40,8 +41,14 @@ class XYGridView(RecycleView):
 
     def set_data(self, xdat, ydat):
         """Set the data in the grid."""
+        Logger.debug("-> XYGridView.set_data()")
         xs, ys = try_co_sort(xdat, ydat)
+        Logger.debug(f"   xs = {xs}")
+        Logger.debug(f"   ys = {ys}")
         self.data = make_xy_grid_data(xs, ys)
+        Clock.schedule_once(lambda dt: self.__raise_value_changed(), 0.05)
+        Logger.debug(f"   self.data = {self.data}")
+        Logger.debug("<- XYGridView.set_data()")
 
     def __raise_deleted_item(self):
         """Dispatches the on_item_deleted method to anything bound to it."""
