@@ -747,6 +747,8 @@ class InverterControl:
             raise ValueError("invalid mode")
 
     def __eq__(self, other):
+        if not isinstance(other, InverterControl):
+            return False
         if self.mode is not other.mode:
             return False
         smp = self.mode in self.params
@@ -936,6 +938,8 @@ class StorageControl:
             self._mode = "invcontrol"
 
     def __eq__(self, other):
+        if not isinstance(other, StorageControl):
+            return False
         if self._invcontrol != other._invcontrol:
             return False
         if self._mode != other._mode:
