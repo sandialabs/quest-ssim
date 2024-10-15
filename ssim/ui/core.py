@@ -936,6 +936,7 @@ class StorageControl:
             self._invcontrol = InverterControl(mode)
             self._invcontrol.params = self._params
             self._mode = "invcontrol"
+        self.ensure_param(mode)
 
     def __eq__(self, other):
         if not isinstance(other, StorageControl):
