@@ -1165,7 +1165,12 @@ class PVOptions:
             + ([f"irradiance = '{self.irradiance}'"]
                if self.irradiance is not None else [])
             + [""]
-        )
+        ) + self._control_toml()
+
+    def _control_toml(self):
+        if self.control is None:
+            return ""
+        return self.control.write_toml(f'pv-options."{self.name}"') + "\n"
 
     def read_toml(self, name: str, toml_data: dict):
         """Set the attributes of this instance using `toml_data`"""
