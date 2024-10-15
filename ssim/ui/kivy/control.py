@@ -441,7 +441,7 @@ class NoControl(BoxLayout, MDTabsBase):
 
     @property
     def control_id(self):
-        return None
+        return "uncontrolled"
 
     def set_data(self, control):
         pass
@@ -460,7 +460,7 @@ class ControlTabFactory:
     """Factory that ceates tab content used to configure DER control modes."""
 
     _MODES = {
-        None: NoControl,
+        "uncontrolled": NoControl,
         "droop": DroopTabContent,
         "voltvar": VoltVarTabContent,
         "voltwatt": VoltWattTabContent,

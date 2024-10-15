@@ -676,6 +676,7 @@ class InverterControl:
         VARWATT = "varwatt"
         VOLTVAR_VOLTWATT = "vv_vw"
         CONSTPF = "constantpf"
+        UNCONTROLLED = "uncontrolled"
 
     _CURVE_NAME_X = {
         Mode.VOLTVAR: ("volts",),
@@ -703,7 +704,8 @@ class InverterControl:
         Mode.VOLTWATT: {"volts", "watts"},
         Mode.VARWATT: {"vars", "watts"},
         Mode.VOLTVAR_VOLTWATT: {"vv_volts", "vv_vars", "vw_volts", "vw_watts"},
-        Mode.CONSTPF: {"pf_val"}
+        Mode.CONSTPF: {"pf_val"},
+        Mode.UNCONTROLLED: set()
     }
 
     _DEFAULT_PARAMS = {
@@ -717,7 +719,8 @@ class InverterControl:
                                 "vv_vars": [1.0, 1.0, 0.0, -1.0, -1.0],
                                 "vw_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
                                 "vw_watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
-        Mode.CONSTPF: {"pf_val": 0.99}
+        Mode.CONSTPF: {"pf_val": 0.99},
+        Mode.UNCONTROLLED: {}
     }
 
     def __init__(self, mode, params=None):
@@ -1244,7 +1247,7 @@ class PVOptions:
     def configurations(self):
         """Rerturn a generator that yields all possible configurations."""
         inv_control = None
-        if self.control is not None:
+        if self.control is not None and self.control.mode != "uncontrolled":
             inv_control = self.control.get_invcontrol("PVSystem", self.name)
         for bus in self.busses:
             for pmpp in self.pmpp:

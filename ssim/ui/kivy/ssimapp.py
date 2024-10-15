@@ -1577,7 +1577,7 @@ class PVControlConfigurationScreen(SSimBaseScreen):
         super().__init__(project, *args, **kwargs)
         self._pvscreen = pvscreen
         self._pvoptions = pvoptions
-        self._control = self._pvoptions.control or InverterControl("voltvar")
+        self._control = self._pvoptions.control or InverterControl("uncontrolled")
         self.ids.tabs.bind(active_tab=self._set_mode_label)
         if self._pvoptions is not None:
             self.ids.tabs.control = self._control
