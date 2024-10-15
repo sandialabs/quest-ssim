@@ -1125,7 +1125,9 @@ class PVOptions:
         self.required = required
 
     def __eq__(self, other):
-        return all(
+        if not isinstance(other, PVOptions):
+            return False
+        return all([
             self.name == other.name,
             self.pmpp == other.pmpp,
             self.busses == other.busses,
@@ -1133,7 +1135,7 @@ class PVOptions:
             self.dcac_ratio == other.dcac_ratio,
             self.control == other.control,
             self.required == other.required
-        )
+        ])
 
     def __hash__(self):
         m = hashlib.sha256()
