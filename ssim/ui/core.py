@@ -1216,7 +1216,8 @@ class PVOptions:
         return None
 
     def validate_controls(self):
-        # TODO (wfv)
+        # TODO (wfv) make sure that the voltwatt curves are greater then 0 if
+        #      enabled.
         pass
 
     def add_bus(self, bus: str):
@@ -1242,6 +1243,9 @@ class PVOptions:
 
     def configurations(self):
         """Rerturn a generator that yields all possible configurations."""
+        inv_control = None
+        if self.control is not None:
+            inv_control = self.control.get_invcontrol("PVSystem", self.name)
         for bus in self.busses:
             for pmpp in self.pmpp:
                 yield (
@@ -1253,7 +1257,7 @@ class PVOptions:
                         phases=None,
                         irradiance_profile=self.irradiance,
                     ),
-                    None  # TODO inverter controls
+                    inv_control
                 )
         if not self.required:
             yield None, None
