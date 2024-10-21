@@ -13,8 +13,7 @@
     <LaunchProvider>Standard Python launcher</LaunchProvider>
     <InterpreterId>CondaEnv|CondaEnv|ssim_environment</InterpreterId>
     <TestFramework>Pytest</TestFramework>
-    <CommandLineArguments>
-    </CommandLineArguments>
+    <CommandLineArguments>"C:\Users\jpeddy\Documents\dev\storage-sim\quick_start_example.toml"</CommandLineArguments>
     <EnableNativeCodeDebugging>False</EnableNativeCodeDebugging>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />

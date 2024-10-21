@@ -714,6 +714,16 @@ class SSimApp(MDApp):
         self.project = Project("unnamed")
         super().__init__(*args, **kwargs)
         
+    def on_start(self):
+        Clock.schedule_once(lambda dt: self.load_initial_file(dt), 3)
+
+    def load_initial_file(self, dt):
+        if len(sys.argv) < 2: return
+        
+        screen = self.root.current_screen
+        if hasattr(screen, 'load_toml_file'):
+            screen.load_toml_file('', [sys.argv[1]])
+
     def build(self):
         Window.size = (1000, 800)
 
@@ -4513,6 +4523,10 @@ class SSimScreen(SSimBaseScreen):
     curr_x_max = 0.0
     curr_y_min = 0.0
     curr_y_max = 0.0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._popup = None
 
     def on_kv_post(self, base_widget):
         self.refresh_grid_plot()
