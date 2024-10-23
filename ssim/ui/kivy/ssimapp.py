@@ -1,83 +1,82 @@
 """Storage Sizing and Placement Kivy application"""
+import inspect
 import itertools
+import logging
 import math
 import os
-import sys
-from pickle import NONE
 import re
+from collections import defaultdict
 from contextlib import ExitStack
 from copy import deepcopy
 from math import cos, hypot
 from threading import Thread
 from typing import List
-from ssim.opendss import DSSModel
 
-import kivy
-import matplotlib as mpl
-from matplotlib.path import Path
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-import matplotlib.patches as patches
-import matplotlib.colors as mplcolors
-
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import dss.plot
+import kivy
+import kivy.garden
+import matplotlib as mpl
+import matplotlib.colors as mplcolors
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import opendssdirect as dssdirect
 import pandas as pd
-import logging
-from importlib_resources import files, as_file
+from importlib_resources import as_file, files
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
-from kivy.logger import Logger, LOG_LEVELS
+from kivy.core.window import Window
+from kivy.logger import LOG_LEVELS, Logger
 from kivy.metrics import dp
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.popup import Popup
 from kivy.uix.button import Button
+from kivy.uix.checkbox import CheckBox
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.textinput import TextInput
-from kivy.core.window import Window
 from kivymd.app import MDApp
 from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
-from kivy.uix.label import Label
-from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivymd.uix.list import (
-    TwoLineAvatarIconListItem,
-    OneLineIconListItem,
-    TwoLineIconListItem,
-    ThreeLineIconListItem,
     ILeftBodyTouch,
+    MDList,
+    OneLineIconListItem,
     OneLineRightIconListItem,
-    MDList
+    ThreeLineIconListItem,
+    TwoLineAvatarIconListItem,
+    TwoLineIconListItem
 )
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.selectioncontrol import MDCheckbox
-from kivy.uix.checkbox import CheckBox
 from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.textfield import MDTextField
 from matplotlib.collections import LineCollection
-from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
+from matplotlib.lines import Line2D
+from matplotlib.offsetbox import OffsetImage
+from matplotlib.path import Path
+
 import ssim.ui
+from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
+from ssim.opendss import DSSModel
 from ssim.ui import (
     Configuration,
+    InverterControl,
     Project,
-    StorageControl,
+    PVOptions,
     StorageOptions,
-    ProjectResults,
     is_valid_opendss_name
 )
+from ssim.ui.kivy import util
 
-import kivy.garden
-import inspect
 kivy.garden.garden_system_dir = os.path.join(
     os.path.dirname(inspect.getfile(ssim.ui)), "libs/garden"
 )
-from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg, NavigationToolbar2Kivy
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 
 _FONT_FILES = {
     "exo_regular": "Exo2-Regular.ttf",
@@ -713,7 +712,7 @@ class SSimApp(MDApp):
     def __init__(self, *args, **kwargs):
         self.project = Project("unnamed")
         super().__init__(*args, **kwargs)
-        
+
     def build(self):
         Window.size = (1000, 800)
 
@@ -734,7 +733,7 @@ class SSimApp(MDApp):
         screen_manager.add_widget(
             ResultsDetailScreen(self.project, name="results-detail"))
         screen_manager.current = "ssim"
-                    
+
         return screen_manager
 
 
@@ -1147,7 +1146,7 @@ class TextFieldPositiveFloat(MDTextField):
             self.helper_text = "Input value and press enter"
 
 
-class StorageControlModelTab(FloatLayout, MDTabsBase):
+class ControlModelTab(FloatLayout, MDTabsBase):
     pass
 
 
@@ -1272,9 +1271,102 @@ class TextFieldOpenDSSName(MDTextField):
             self.error = False
 
 
-class BusRecycleView(RecycleView):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+class FilterableBusList(BoxLayout):
+
+    _bus_filters = BusFilters()
+    project = ObjectProperty(None)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reload_bus_list()
+        self._selected = set()
+        # XXX The naming of this event overlaps with events in BusListItem.
+        #     I would like to use "on_selection_changed" but that clashes with
+        #     the API method on CheckedListItemOwner.
+        self.register_event_type("on_selected_changed")
+
+    def on_project(self, instance, proj):
+        self.reload_bus_list()
+
+    def on_selected_changed(self, buslist, selected):
+        pass
+
+    @property
+    def data(self):
+        return self.ids.bus_list.data
+
+    @data.setter
+    def data(self, value):
+        self.ids.bus_list.data = value
+
+    def reload_bus_list(self):
+        if self.project is None:
+            return
+        self.data = [
+            {"text": bus,
+             "secondary_text": (
+                 f"{self.project.phases(bus)}, "
+                 f"{DSSModel.nominal_voltage(bus)} kV"),
+             "active": bus in self._selected,
+             "owner": self}
+            for bus in filter(self._check_bus_filters, self.project.bus_names)
+        ]
+        button_label = " ".join(
+            filter(lambda x: x,
+                   ["Filter Busses", self._bus_filters.summary()])
+        )
+        self.ids.filter_busses_btn.text = button_label
+
+    def _check_bus_filters(self, bus):
+        return self._bus_filters.test_bus(bus, self.project, self._selected)
+
+    def open_bus_filters(self):
+        content = BusSearchPanelContent()
+        content.load_voltage_checks(
+            self.project.grid_model.all_base_voltages()
+        )
+        content.apply_filters(self._bus_filters)
+        popup = Popup(
+            title='Filter Busses',
+            content=content,
+            auto_dismiss=False,
+            size_hint=(0.7, 0.7),
+            background_color=(224,224,224),
+            title_color=(0,0,0)
+        )
+
+        def apply(*args):
+            self._bus_filters = content.extract_filters()
+            self.reload_bus_list()
+            popup.dismiss()
+
+        def clear(*args):
+            self._bus_filters = BusFilters()
+            self.reload_bus_list()
+            popup.dismiss()
+
+        content.ids.okBtn.bind(on_press=apply)
+        content.ids.clearBtn.bind(on_press=clear)
+        content.ids.cancelBtn.bind(on_press=popup.dismiss)
+        popup.open()
+
+    def on_selection_changed(self, bus, selected):
+        Logger.debug(f"selection_changed - {bus}:{selected}")
+        if selected:
+            self._selected.add(bus)
+        else:
+            self._selected.discard(bus)
+        self.dispatch("on_selected_changed", self, self._selected)
+
+    @property
+    def selected_busses(self):
+        return self._selected
+
+    @selected_busses.setter
+    def selected_busses(self, new):
+        self._selected = new
+        self.dispatch("on_selected_changed", self, self._selected)
+        self.reload_bus_list()
 
 
 class ResultsListRecycleView(RecycleView):
@@ -1307,13 +1399,13 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         self._der_screen = der_screen
         self.ids.power_input.bind(
             on_text_validate=self._add_device_power
-            )
+        )
         self.ids.duration_input.bind(
             on_text_validate=self._add_device_duration
-            )
+        )
         self.ids.device_name.bind(
             on_text_validate=self._check_name
-            )
+        )
         self.options = ess
         self.initialize_widgets()
         self._editing = editing
@@ -1327,10 +1419,11 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         for duration in self.options.duration:
             self.ids.duration_list.add_item(duration)
 
+        self.ids.select_busses.project = self._der_screen.project
+        self.ids.select_busses.selected_busses = self.options.busses
+
         self.ids.device_name.text = self.options.name
         
-        self.reload_bus_list()
-
         self.ids.required.active = self.options.required
 
         Clock.schedule_once(
@@ -1338,7 +1431,8 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
             )
 
     def on_selection_changed(self, bus, selected):
-        if self.options is None: return
+        if self.options is None:
+            return
         for b in self.ids.bus_list.data:
             if b["text"] == bus:
                 b["active"] = selected
@@ -1349,32 +1443,32 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
 
     def apply_bus_filters(self):
         self.reload_bus_list()
-        
+
     def open_bus_filters(self):
-    
         content = BusSearchPanelContent()
-        
-        content.load_voltage_checks(
-            self.project.grid_model.all_base_voltages()
-            )
+
+        content.load_voltage_checks(self.project.grid_model.all_base_voltages())
 
         content.apply_filters(self._bus_filters)
 
         popup = Popup(
-            title='Filter Busses', content=content, auto_dismiss=False,
-            size_hint=(0.7, 0.7), background_color=(224,224,224),
-            title_color=(0,0,0)
-            )
+            title="Filter Busses",
+            content=content,
+            auto_dismiss=False,
+            size_hint=(0.7, 0.7),
+            background_color=(224, 224, 224),
+            title_color=(0, 0, 0),
+        )
 
         def apply(*args):
             self._bus_filters = content.extract_filters()
             self.apply_bus_filters()
             popup.dismiss()
-        
+
         def clear(*args):
             self._bus_filters = BusFilters()
             self.apply_bus_filters()
-            popup.dismiss()            
+            popup.dismiss()
 
         content.ids.okBtn.bind(on_press=apply)
         content.ids.clearBtn.bind(on_press=clear)
@@ -1385,33 +1479,34 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         self.reload_bus_list()
 
     def check_bus_filters(self, bus) -> bool:
-        return self._bus_filters.test_bus(
-            bus, self.project, self.options.busses
-            )
+        return self._bus_filters.test_bus(bus, self.project, self.options.busses)
 
     def check_need_bus_filtering(self) -> bool:
-        return self._bus_filters is not None and \
-            not self._bus_filters.is_empty()
+        return self._bus_filters is not None and not self._bus_filters.is_empty()
 
     def reload_bus_list(self):
-        need_filter = self.check_need_bus_filtering()        
+        need_filter = self.check_need_bus_filtering()
 
         bus_data = []
         for bus in self.project.bus_names:
             if not need_filter or self.check_bus_filters(bus):
-                bus_data += [{
-                    "text":bus,
-                    "secondary_text":str(self.project.phases(bus)) +
-                        ", " + str(DSSModel.nominal_voltage(bus)) + " kV",
-                    "active":bus in self.options.busses,
-                    "owner":self
-                    }]
-        
+                phases = str(self.project.phases(bus))
+                kv = str(DSSModel.nominal_voltage(bus))
+                bus_data += [
+                    {
+                        "text": bus,
+                        "secondary_text": phases + ", " + kv + " kV",
+                        "active": bus in self.options.busses,
+                        "owner": self,
+                    }
+                ]
+
         self.ids.bus_list.data = bus_data
 
-        filtertxt = self._bus_filters.summary()        
+        filtertxt = self._bus_filters.summary()
         self.ids.filter_busses_btn.text = "Filter Busses"
-        if filtertxt: self.ids.filter_busses_btn.text += " " + filtertxt
+        if filtertxt:
+            self.ids.filter_busses_btn.text += " " + filtertxt
 
     def _check_name(self, textfield):
         if not textfield.text_valid():
@@ -1452,10 +1547,7 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
 
     @property
     def _selected_busses(self):
-        return set(self.ids.bus_list.data[i]["text"]
-            for i in range(len(self.ids.bus_list.data))
-            if self.ids.bus_list.data[i]["active"]
-        )
+        return self.ids.select_busses.selected_busses
 
     def edit_control_params(self):
         self._record_option_data()
@@ -1552,434 +1644,43 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         return super().on_enter(*args)
 
 
-class XYGridView(RecycleView):
+class PVControlConfigurationScreen(SSimBaseScreen):
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.register_event_type("on_item_deleted")
-        self.register_event_type("on_value_changed")
+    def __init__(self, pvscreen, project, pvoptions, *args, **kwargs):
+        super().__init__(project, *args, **kwargs)
+        self._pvscreen = pvscreen
+        self._pvoptions = pvoptions
+        self._control = self._pvoptions.control or InverterControl("uncontrolled")
+        self.ids.tabs.bind(active_tab=self._set_mode_label)
+        if self._pvoptions is not None:
+            self.ids.tabs.control = self._control
+        self._set_mode_label()
 
-    def delete_item(self, index: int):
-        self.data.pop(index)
-        Clock.schedule_once(lambda dt: self.__raise_deleted_item(), 0.05)
+    def save(self):
+        self._pvoptions.control = self._control
+        self.ids.tabs.save(self._pvoptions.control)
+        self._close()
 
-    def x_value_changed(self, index: int, value):
-        self.__on_value_changed(index, "x", value)
-
-    def y_value_changed(self, index: int, value):
-        self.__on_value_changed(index, "y", value)
-
-    def __on_value_changed(self, index: int, key: str, value):
-        self.data[index][key] = parse_float_or_str(value)
-        Clock.schedule_once(lambda dt: self.__raise_value_changed(), 0.05)
-
-    def __raise_value_changed(self):
-        self.dispatch("on_value_changed")
-
-    def on_value_changed(self):
-        pass
-
-    def on_item_deleted(self):
-        pass
-
-    def __raise_deleted_item(self):
-        """Dispatches the on_item_deleted method to anything bound to it.
-        """
-        self.dispatch("on_item_deleted")
-
-    def extract_data_lists(self, sorted: bool = True) -> (list, list):
-        """Reads all values out of the "x" and "y" columns of this control and
-           as returns them pair of lists that may be sorted if requested.
-
-        Parameters
-        ----------
-        sorted : bool
-            True if this method should try and c0-sort the extracted x and y
-             lists beforereturning them and false otherwise.
-
-        Returns
-        -------
-        tuple:
-            A pair of lists containing the x and y values in this grid.  The
-            lists will be co-sorted using the x list as an index if requested
-            and they can be sorted.
-        """
-        xvs = self.extract_x_vals()
-        yvs = self.extract_y_vals()
-        if not sorted: return (xvs, yvs)
-        return try_co_sort(xvs, yvs)
-
-    def extract_x_vals(self) -> list:
-        """Reads all values out of the "x" column of this control and returns them as a list.
-
-        Returns
-        -------
-        list:
-            A list containing all values in the "x" column of this control.  The
-            values in the list will be of type float if they can be cast as
-            such.  Otherwise, raw text representations will be put in the list
-            in locations where the cast fails.
-        """
-        return [child.x_value for child in self.children[0].children]
-
-    def extract_y_vals(self) -> list:
-        """Reads all values out of the "y" column of this control and returns them as a list.
-
-        Returns
-        -------
-        list:
-            A list containing all values in the "y" column of this control. 
-            The values in the list will be of type float if they can be cast as
-            such.  Otherwise, raw text representations will be put in the list
-            in locations where the cast fails.
-        """
-        return [child.y_value for child in self.children[0].children]
-
-
-class XYGridViewItem(RecycleDataViewBehavior, BoxLayout):
-    index: int = -1
-
-    last_text: str = ""
-
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
+    def cancel(self):
+        self._close()
 
     @property
-    def x_value(self):
-        """Returns the current contents of the x value field of this row.
-
-        Returns
-        -------
-        float or str:
-            If the current content of the x value field of this row can be cast
-            to a float, then the float is returned.  Otherwise, the raw string
-            contents of the field are returned.
-        """
-        return parse_float_or_str(self.ids.x_field.text)
-
-    @property
-    def y_value(self):
-        """Returns the current contents of the y value field of this row.
-
-        Returns
-        -------
-        float or str:
-            If the current content of the y value field of this row can be cast
-            to a float, then the float is returned.  Otherwise, the raw string
-            contents of the field are returned.
-        """
-        return parse_float_or_str(self.ids.y_field.text)
-
-    def refresh_view_attrs(self, rv, index, data):
-        """A method of the RecycleView called automatically to refresh the content of the view.
-
-        Parameters
-        ----------
-        rv : RecycleView
-            The RecycleView that owns this row and wants it refreshed (not used
-            in this function).
-        index: int
-            The index of this row.
-        data: dict
-            The dictionary of data that constitutes this row.  Should have keys
-            for 'x' and 'y'.
-        """
-        self.index = index
-        self.ids.x_field.text = str(data['x'])
-        self.ids.y_field.text = str(data['y'])
-
-    def on_delete_button(self):
-        """A callback function for the button that deletes the data item
-        represented by this row from the data list"""
-        self.parent.parent.delete_item(self.index)
-
-    def on_x_value_changed(self, instance, text):
-        """A callback method used when the value in the x field of an XY grid changes.
-
-        This method notifies the grandparent, which is an XYGridView, of the
-        change.
-
-        Parameters
-        ----------
-        instance
-            The x text field whose value has changed.
-        text
-            The new x value as a string.
-        """
-        if self.parent:
-            self.parent.parent.x_value_changed(self.index, self.x_value)
-
-    def on_x_focus_changed(self, instance, value):
-        """A callback method used when the focus on the x field of an XY grid
-            changes.
-
-        This method checks to see if this is a focus event or an unfocus event.
-        If focus, it stores the current value in the field for comparison later.
-        If unfocus and the value has not changed, nothing is done.  If the value
-        has changed, then the self.on_x_value_changed method is invoked.
-
-        Parameters
-        ----------
-        instance
-            The x text field whose value has changed.
-        value
-            True if this is a focus event and false if it is unfocus.
-        """
-        if value:
-            self.last_text = instance.text
-        elif value != instance.text:
-            self.on_x_value_changed(instance, instance.text)
-
-    def on_y_value_changed(self, instance, text):
-        """A callback method used when the value in the y field of an XY grid is validated.
-
-        This method notifies the grandparent, which is an XYGridView, of the change.
-
-        Parameters
-        ----------
-        instance
-            The y text field whose value has changed.
-        text
-            The new y value as a string.
-        """
-        if self.parent:
-            self.parent.parent.y_value_changed(self.index, self.y_value)
-
-    def on_y_focus_changed(self, instance, value):
-        """A callback method used when the focus on the y field of an XY grid
-            changes.
-
-        This method checks to see if this is a focus event or an unfocus event.
-        If focus, it stores the current value in the field for comparison later.
-        If unfocus and the value has not changed, nothing is done.  If the value
-        has changed, then the self.on_y_value_changed method is invoked.
-
-        Parameters
-        ----------
-        instance
-            The y text field whose value has changed.
-        value
-            True if this is a focus event and false if it is unfocus.
-        """
-        if value:
-            self.last_text = instance.text
-        elif value != instance.text:
-            self.on_y_value_changed(instance, instance.text)
-
-
-class XYItemTextField(TextInput):
-    """A class to serve as a text field used in an XY grid.
-
-    This class can be either an x or a y value field and enforces the
-    requirement that the contents be a floating point number by indicating
-    if it is not.
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.def_back_color = self.background_color
-        self.bind(text=self.set_error_message)
-        self.hint_text = "Enter a number."
-
-    def set_error_message(self, instance, text):
-        """A function to set this text field to an error state.
-
-        This method checks to see if the contents of this text field are
-        a floating point number and does nothing if so.  If not, then this
-        sets the background color to "red".
-
-        Parameters
-        ----------
-        instance:
-            The text field that initiated this call.
-        text:
-            The current text content of the text field as of this call.
-        """
-        v = parse_float(text) is not None
-        self.background_color = "red" if not v else self.def_back_color
-
-
-class VoltVarTabContent(BoxLayout):
-    """The class that stores the content for the Volt-Var tab in the storage
-     option control tabs."""
-
-    def on_add_button(self):
-        """A callback function for the button that adds a new value to the volt-var grid"""
-        self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def on_sort_button(self):
-        """A callback function for the button that sorts the volt-var grid by voltage"""
-        xs, ys = self.ids.grid.extract_data_lists()
-        self.ids.grid.data = make_xy_grid_data(xs, ys)
-
-    def on_reset_button(self):
-        """A callback function for the button that resets the volt-var grid data to defaults"""
-        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
-        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
-        self.ids.grid.data = make_xy_grid_data(xs, ys)
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def rebuild_plot(self):
-        """A function to reset the plot of the volt var data.
-
-        This method extracts the volt var data out of the UI grid and then, if
-        the data exists, plots it in the associated plot.
-        """
-        xs, ys = self.ids.grid.extract_data_lists()
-
-        if len(xs) == 0:
-            self.ids.plot_box.display_plot_error("No Data")
-
-        else:
-            _make_xy_matlab_plot(
-                self.ids.plot_box, xs, ys, 'Voltage (p.u.)',
-                'Reactive Power (p.u.)', 'Volt-Var Control Parameters'
-                )
-
-
-class VoltWattTabContent(BoxLayout):
-    """The class that stores the content for the Volt-Watt tab in the storage
-     option control tabs"""
-
-    def on_add_button(self):
-        """A callback function for the button that adds a new value to the volt-watt grid"""
-        self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def on_sort_button(self):
-        """A callback function for the button that sorts the volt-watt grid by voltage"""
-        xs, ys = self.ids.grid.extract_data_lists()
-        self.ids.grid.data = make_xy_grid_data(xs, ys)
-
-    def on_reset_button(self):
-        """A callback function for the button that resets the volt-var grid data to defaults"""
-        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
-        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
-        self.ids.grid.data = make_xy_grid_data(xs, ys)
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def rebuild_plot(self):
-        """A function to reset the plot of the volt watt data.
-
-        This method extracts the volt watt data out of the UI grid and then, if
-        the data exists, plots it in the associated plot.
-        """
-        xs, ys = self.ids.grid.extract_data_lists()
-
-        if len(xs) == 0:
-            self.ids.plot_box.display_plot_error("No Data")
-
-        else:
-            _make_xy_matlab_plot(
-                self.ids.plot_box, xs, ys, 'Voltage (p.u.)',
-                'Watts (p.u.)', 'Volt-Watt Control Parameters'
-            )
-
-
-class VarWattTabContent(BoxLayout):
-    """The class that stores the content for the Var-Watt tab in the storage
-     option control tabs"""
-
-    def on_add_button(self):
-        """A callback function for the button that adds a new value to the var-watt grid"""
-        self.ids.grid.data.append({'x': 1.0, 'y': 1.0})
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def on_sort_button(self):
-        """A callback function for the button that sorts the var-watt grid by reactive power"""
-        xs, ys = self.ids.grid.extract_data_lists()
-        self.ids.grid.data = make_xy_grid_data(xs, ys)
-
-    def on_reset_button(self):
-        """A callback function for the button that resets the volt-var grid data to defaults"""
-        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
-        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
-        self.ids.grid.data = make_xy_grid_data(xs, ys)
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def rebuild_plot(self):
-        """A function to reset the plot of the var watt data.
-
-        This method extracts the var watt data out of the UI grid and then, if
-        the data exists, plots it in the associated plot.
-        """
-        xs, ys = self.ids.grid.extract_data_lists()
-
-        if len(xs) == 0:
-            self.ids.plot_box.display_plot_error("No Data")
-
-        else:
-            _make_xy_matlab_plot(
-                self.ids.plot_box, xs, ys, 'Reactive Power (p.u.)',
-                'Watts (p.u.)', 'Var-Watt Control Parameters'
-            )
-
-
-class VoltVarVoltWattTabContent(BoxLayout):
-    """The class that stores the content for the Volt-Var & Volt-Watt tab in the storage
-     option control tabs"""
-
-    def on_add_vv_button(self):
-        """A callback function for the button that adds a new value to the volt-var grid"""
-        self.ids.vv_grid.data.append({'x': 1.0, 'y': 1.0})
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def on_add_vw_button(self):
-        """A callback function for the button that adds a new value to the volt-watt grid"""
-        self.ids.vw_grid.data.append({'x': 1.0, 'y': 1.0})
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def on_reset_vv_button(self):
-        """A callback function for the button that resets the volt-var grid data to defaults"""
-        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
-        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
-        self.ids.vv_grid.data = make_xy_grid_data(xs, ys)
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def on_reset_vw_button(self):
-        """A callback function for the button that resets the volt-var grid data to defaults"""
-        xs = [0.5, 0.95, 1.0, 1.05, 1.5]
-        ys = [1.0, 1.0, 0.0, -1.0, -1.0]
-        self.ids.vw_grid.data = make_xy_grid_data(xs, ys)
-        Clock.schedule_once(lambda dt: self.rebuild_plot(), 0.05)
-
-    def on_sort_vv_button(self):
-        """A callback function for the button that sorts the volt-var grid by voltage"""
-        xs, ys = self.ids.vv_grid.extract_data_lists()
-        self.ids.vv_grid.data = make_xy_grid_data(xs, ys)
-
-    def on_sort_vw_button(self):
-        """A callback function for the button that sorts the volt-watt grid by voltage"""
-        xs, ys = self.ids.vw_grid.extract_data_lists()
-        self.ids.vw_grid.data = make_xy_grid_data(xs, ys)
-
-    def rebuild_plot(self):
-        """A function to reset the plot of the volt var and volt watt data.
-
-        This method extracts the volt var and volt watt data out of the UI grids and then, if
-        the data exists, plots them in the associated plot, 1 on each of two y axes.
-        """
-        vxs, vys = self.ids.vv_grid.extract_data_lists()
-        wxs, wys = self.ids.vw_grid.extract_data_lists()
-
-        if len(vxs) == 0 and len(wxs) == 0:
-            self.ids.plot_box.display_plot_error("No Data")
-
-        else:
-            fig, ax1 = plt.subplots(1, 1, layout="constrained")
-            l1, = ax1.plot(vxs, vys, marker='o')
-            ax1.set_xlabel('Voltage (p.u.)')
-            ax1.set_ylabel('Reactive Power (p.u.)')
-
-            ax2 = ax1.twinx()
-            l2, = ax2.plot(wxs, wys, color="red", marker='o')
-            ax2.set_ylabel('Watts (p.u.)', color="red")
-            ax2.tick_params(axis='y', labelcolor="red")
-
-            ax1.legend([l1, l2], ["Volt-Var", "Volt-Watt"])
-            plt.title('Volt-Var & Volt-Watt Control Parameters')
-            self.ids.plot_box.reset_plot()
+    def device_name(self):
+        if self._pvoptions is None:
+            return ""
+        return self._pvoptions.name
+
+    def _close(self):
+        self.manager.current = "configure-pv"
+        self.manager.remove_widget(self)
+
+    def _set_mode_label(self, *args):
+        Logger.debug(f"-> PV...Screen._set_mode_label() {self.ids.tabs.active_tab}")
+        txt = f"Select a control mode for this PV system: [b]{self.device_name}[/b]"
+        if self.ids.tabs.active_tab is not None:
+            pName = self.ids.tabs.active_tab.control_name
+            txt += f", currently [b]{pName}[/b]"
+        self.ids.mode_label.text = txt
 
 
 class StorageControlConfigurationScreen(SSimBaseScreen):
@@ -1994,65 +1695,22 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         self.ids.max_soc.text = str(self._options.max_soc * 100.0)
         self.ids.init_soc.text = str(self._options.initial_soc * 100.0)
 
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.max_soc), 0.05)
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.min_soc), 0.05)
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(self.ids.init_soc), 0.05)
-
-        self.load_all_control_data()
-
-        self._mode_dict = {
-            "droop": "Droop", "voltvar": "Volt-Var", "voltwatt": "Volt-Watt",
-            "varwatt": "Var-Watt", "vv_vw": "Volt-Var & Volt-Watt",
-            "constantpf": "Constant Power Factor"
-        }
-        
-        self._set_mode_dict = {
-            "droop": self.set_droop_mode, "voltvar": self.set_volt_var_mode,
-            "voltwatt": self.set_volt_watt_mode, "varwatt": self.set_var_watt_mode,
-            "vv_vw": self.set_volt_var_and_volt_watt_mode,
-            "constantpf": self.set_const_power_factor_mode
-        }
+        util.focus_defocus(self.ids.max_soc)
+        util.focus_defocus(self.ids.min_soc)
+        util.focus_defocus(self.ids.init_soc)
 
         if self._options is not None:
-            self.dispatch_set_mode(self._options.control.mode)
+            self.ids.tabs.control = self._options.control
 
-    def load_all_control_data(self):
-        """Verifies the existence of all control mode parameters and then sets
-        the contents of the controls used to display and modify them.
+        self.ids.tabs.bind(active_tab=self.set_mode_label_text)
 
-        This uses the individual "set...data" methods for each control mode. 
-        See those methods for more details of each.
-        """
-        self.set_droop_data()
-        self.set_volt_var_data()
-        self.set_volt_watt_data()
-        self.set_var_watt_data()
-        self.set_volt_var_and_volt_watt_data()
-        self.set_const_power_factor_data()
-
-    @staticmethod
-    def __set_focus_clear_sel(widget, value=True):
-        """Sets the focus of the supplied widget to the supplied value and
-        schedules a call to widget.cancel_selection().
-        
-        Parameters
-        ----------
-        widget:
-            The widget whose focus is to be set to the supplied value and on
-            whom selection is to be canceled.
-        value:
-            True if the widget is to receive focus and false otherwise.
-        """
-        widget.focus = value
-        Clock.schedule_once(lambda dt: widget.cancel_selection(), 0.05)
-
-    def set_mode_label_text(self):
+    def set_mode_label_text(self, *args):
         """ Adds the current device name to the label that informs a user to
         select a current control model.
         """
         txt = f"Select a control mode for this storage asset: [b]{self.device_name}[/b]"
-        if self._options.control.mode:
-            pName = self._mode_dict[self._options.control.mode]
+        if self.ids.tabs.active_tab is not None:
+            pName = self.ids.tabs.active_tab.control_name
             txt += f", currently [b]{pName}[/b]"
         self.ids.mode_label.text = txt
 
@@ -2069,425 +1727,6 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
         """
         return "" if self._options is None else self._options.name
 
-    def on_tab_switch(self, instance_tabs, instance_tab, instance_tab_label, tab_text):
-        """A callback function used by the control mode tab to notify of tab
-        changes
-
-        This extracts and stores any data that was input on the previous tab
-        and then ensures that the new tab is in the correct state.
-
-        Parameters
-        ----------
-        instance_tabs:
-            The tab control that issued this call.
-        instance_tab:
-            The newly selected tab in the calling tab control.
-        instance_tab_label:
-            The label object of the newly selected tab.
-        tab_text:
-            The text or name icon of the newly selected tab.
-        """
-        self.read_all_data()
-        self.dispatch_set_mode(self.__find_inv_mode__(tab_text))
-        self.set_mode_label_text()
-
-    def __find_inv_mode__(self, txt: str) -> str:
-        for k,v in self._mode_dict.items():
-            if v == txt: return k
-        return None
-
-    def set_droop_mode(self):
-        """Changes the current contorl mode for the current storage option to
-        droop.
-
-        This ensures control parameters for the droop mode, registers the
-        fields for data extraction, and sets focus on the two fields to put
-        them into editing mode.
-        """
-        self.set_mode("droop", self.ids.droop_tab)
-        self.set_droop_data()
-
-    def set_droop_data(self):
-        """Verifies the existence of droop parameters and then sets the
-        contents of the controls used to display and modify them.
-        """
-        pval, qval = self.verify_droop_params()
-        pfield = self.ids.droop_tab_content.ids.p_value
-        qfield = self.ids.droop_tab_content.ids.q_value
-
-        pfield.text = str(pval)
-        qfield.text = str(qval)
-
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pfield), 0.05)
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(qfield), 0.05)
-
-    def verify_droop_params(self) -> (float, float):
-        """ Checks to see if there is a recorded set of droop parameters in the
-        current control parameters list and installs them as default values if
-        they are missing.
-
-        Returns
-        -------
-        tuple:
-            The result of verifying the P and Q droop parameters.
-        """
-        return (
-            self.__verify_control_param("droop", "p_droop"),
-            self.__verify_control_param("droop", "q_droop")
-        )
-
-    def set_volt_var_mode(self):
-        """Changes the current contorl mode for the current storage option to
-        volt-var.
-
-        This ensures control parameters for the volt-var mode and loads the
-        volt-var data into the xy grid.
-        """
-        self.set_mode("voltvar", self.ids.vv_tab)
-        self.set_volt_var_data()
-
-    def set_volt_var_data(self):
-        """Verifies the existence of Volt-Var parameters and then sets the
-        contents of the controls used to display and modify them.
-        """
-        vvs, var = self.verify_volt_var_params()
-        self.__set_xy_grid_data(self.ids.vv_tab_content.ids.grid, vvs, var)
-        self.ids.vv_tab_content.rebuild_plot()
-
-    def verify_volt_var_params(self) -> (list, list):
-        """ Checks to see if there is a recorded set of Volt-Var parameters in
-        the current control parameters list and installs them as default values
-        if they are missing.
-
-        Default volts are [0.5, 0.95, 1.0, 1.05, 1.5] and default VARs are
-        [1.0, 1.0, 0.0, -1.0, -1.0].
-
-        Returns
-        -------
-        tuple:
-            The result of verifying the volt and var lists in the control
-            parameters. The first member of the tuple will be the volts list
-            and the second is the list of var values.
-        """
-        return (
-            self.__verify_control_param("voltvar", "volts"),
-            self.__verify_control_param("voltvar", "vars")
-        )
-
-    def set_volt_watt_mode(self):
-        """Changes the current contorl mode for the current storage option to
-        volt-watt.
-
-        This ensures control parameters for the volt-var mode and loads the
-        volt-watt data into the xy grid.
-        """
-        self.set_mode("voltwatt", self.ids.vw_tab)
-        self.set_volt_watt_data()
-
-    def set_volt_watt_data(self):
-        """Verifies the existence of Volt-Watt parameters and then sets the
-        contents of the controls used to display and modify them.
-        """
-        vvs, wvs = self.verify_volt_watt_params()
-        self.__set_xy_grid_data(self.ids.vw_tab_content.ids.grid, vvs, wvs)
-        self.ids.vw_tab_content.rebuild_plot()
-
-    def verify_volt_watt_params(self) -> (list, list):
-        """ Checks to see if there is a recorded set of Volt-Watt parameters in
-        the current control parameters list and installs them as default values
-        if they are missing.
-
-        Returns
-        -------
-        tuple:
-            The result of verifying the volt and watt lists in the control
-            parameters. The first member of the tuple will be the volts list
-            and the second is the list of watt values.
-        """
-        return (
-            self.__verify_control_param("voltwatt", "volts"),
-            self.__verify_control_param("voltwatt", "watts")
-        )
-
-    def set_var_watt_mode(self):
-        """Changes the current contorl mode for the current storage option to
-        var-watt.
-
-        This ensures control parameters for the volt-var mode and loads the
-        var-watt data into the xy grid.
-        """
-        self.set_mode("varwatt", self.ids.var_watt_tab)
-        self.set_var_watt_data()
-
-    def set_var_watt_data(self):
-        """Verifies the existence of Var-Watt parameters and then sets the
-        contents of the controls used to display and modify them.
-        """
-        vvs, wvs = self.verify_var_watt_params()
-        self.__set_xy_grid_data(self.ids.var_watt_tab_content.ids.grid, vvs, wvs)
-        self.ids.var_watt_tab_content.rebuild_plot()
-
-    def verify_var_watt_params(self) -> (list, list):
-        """ Checks to see if there is a recorded set of Var-Watt parameters in
-        the current control parameters list and installs them as default values
-        if they are missing.
-
-        Returns
-        -------
-        tuple:
-            The result of verifying the VAR and Watt lists in the control
-            parameters. The first member of the tuple will be the VARs list
-            and the second is the list of Watt values.
-        """
-        return (
-            self.__verify_control_param("varwatt", "vars"),
-            self.__verify_control_param("varwatt", "watts")
-        )
-
-    def set_volt_var_and_volt_watt_mode(self):
-        """Changes the current contorl mode for the current storage option to
-        volt-var & var-watt.
-
-        This ensures control parameters for the volt-var mode and loads the
-        volt-var & var-watt data into the xy grid.
-        """
-        self.set_mode("vv_vw", self.ids.vv_vw_tab)
-        self.set_volt_var_and_volt_watt_data()
-
-    def set_volt_var_and_volt_watt_data(self):
-        """Verifies the existence of Volt-Var & Volt-Watt parameters and then
-        sets the contents of the controls used to display and modify them.
-        """
-        vvvs, vars, vwvs, watts = self.verify_volt_var_and_volt_watt_params()
-        self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vv_grid, vvvs, vars)
-        self.__set_xy_grid_data(self.ids.vv_vw_tab_content.ids.vw_grid, vwvs, watts)
-        self.ids.vv_vw_tab_content.rebuild_plot()
-
-    def verify_volt_var_and_volt_watt_params(self) -> (list, list, list, list):
-        """ Checks to see if there is a recorded set of Volt-Var and Volt_Watt
-        parameters in the current control parameters list and installs them as
-        default values if they are missing.
-
-        Returns
-        -------
-        tuple:
-            The result of verifying the Volt-Var and Volt-Watt lists in the
-            control parameters. The first member of the tuple will be the
-            Volt-Var Volts.  The second is the list of Volt-Var Var values. 
-            The third is the list of Volt-Watt Volt values and finally, the
-            fourth is the list of Watt Values of the Volt-Watt mode.
-        """
-        return (
-            self.__verify_control_param("vv_vw", "vv_volts"),
-            self.__verify_control_param("vv_vw", "vv_vars"),
-            self.__verify_control_param("vv_vw", "vw_volts"),
-            self.__verify_control_param("vv_vw", "vw_watts")
-        )
-
-    def set_const_power_factor_mode(self):
-        """Changes the current contorl mode for the current storage option to
-        const PF.
-
-        This ensures control parameters for the const PF mode, registers the
-        fields for data extraction, and sets focus on the two fields to put
-        them into editing mode.
-        """
-        self.set_mode("constantpf", self.ids.const_pf_tab)
-        self.set_const_power_factor_data()
-
-    def set_const_power_factor_data(self):
-        """Verifies the existence of the Constant Power Factor parameters and
-        then sets the contents of the controls used to display and modify them.
-        """
-        cpf = self.verify_const_pf_params()
-        pffield = self.ids.const_pf_tab_content.ids.pf_value
-        pffield.text = str(cpf)
-        Clock.schedule_once(lambda dt: self.__set_focus_clear_sel(pffield), 0.05)
-
-    def verify_const_pf_params(self) -> float:
-        """ Checks to see if there is a recorded constant power factor
-        parameter in the current control parameters list and installs it as the
-        default value if it is missing.
-
-        Returns
-        -------
-        float:
-            The result of verifying the constant PF value parameter.
-        """
-        return self.__verify_control_param("constantpf", "pf_val")
-
-    def __verify_control_param(self, mode: str, label: str):
-        """Verifies that there is a data value in the control parameters for
-        the current storage element and puts the default value in if not.
-
-        Parameters
-        ----------
-        mode : str
-            The control mode for which to store the default value for label
-        label : str
-            The key to check for in the current storage control parameters.
-
-        Return
-        ------
-        parameters:
-            The current parameters of the supplied mode.  The data type will
-            depend on which control mode is supplied.
-        """
-        defaults = StorageControl.default_params(mode)
-
-        if mode not in self._options.control.params:
-            self._options.control.params[mode] = {}
-
-        if label not in self._options.control.params[mode]:
-            self._options.control.params[mode][label] = defaults[label]
-
-        return self._options.control.params[mode][label]
-
-    def __set_xy_grid_data(self, grid: XYGridView, xdat: list, ydat: list) -> list:
-        """Converts the supplied lists into a dictionary appropriately keyed to
-        be assigned as the data for the supplied grid and assignes it.
-
-        This performs a try-co-sort of the lists prior to assignment to the
-        grid data.
-
-        Parameters
-        ----------
-        grid : XYGridView
-            The grid to assign data to.
-        xdat : list
-            The list of x values to assign to the x column of the grid.
-        ydat : list
-            The list of y values to assign to the y column of the grid.
-
-        Return
-        ------
-        list:
-            The list of dictionaries that was craeted from the xdat and ydat.
-            See the make_xy_grid_data function documentation for more details
-            on the format of the returned list.
-        """
-        xs, ys = try_co_sort(xdat, ydat)
-        grid.data = make_xy_grid_data(xs, ys)
-        return grid.data
-
-    def dispatch_set_mode(self, mode):
-        if mode in self._set_mode_dict:
-            self._set_mode_dict[mode]()
-        else:
-            self.set_droop_mode()
-
-    def set_mode(self, name: str, tab) -> bool:
-        """Changes the current contorl mode for the current storage option to
-        the supplied one and sets the current tab.
-
-        If the current control mode is the supplied one, then the only thing
-        this does is set the supplied tab if it is not correct.
-
-        Parameters
-        ----------
-        name : str
-            The name of the control mode to make current.
-        tab
-            The tab page to make visible.
-
-        Returns
-        -------
-        bool:
-            True if this method goes so far as to actually change the mode
-            and False if the the mode is already the requested one. 
-            Regardless, this method will set the current tab if needed.
-        """
-        if self.ids.control_tabs.get_current_tab() is not tab:
-            self.ids.control_tabs.switch_tab(tab.tab_label_text)
-
-        if self._options.control.mode == name: return False
-        self._options.control.mode = name
-        # self._options.control.params.clear()
-        return True
-
-    def save(self):
-        self.cancel()
-
-    def read_all_data(self):
-        """Reads all entered data out of the controls for all control modes.
-
-        This uses the individual "read...data" methods for each mode.  See them
-        for more information about each.
-        """
-        self._options.min_soc = self.ids.min_soc.fraction()
-        self._options.max_soc = self.ids.max_soc.fraction()
-        self._options.initial_soc = self.ids.init_soc.fraction()
-        self.read_droop_data()
-        self.read_const_pf_data()
-        self.read_voltvar_data()
-        self.read_voltwatt_data()
-        self.read_varwatt_data()
-        self.read_voltvar_and_voltwatt_data()
-
-    def read_droop_data(self):
-        """Reads and stores the entered data out of the controls for droop mode.
-
-        The data is stored in the options control parameters.
-        """
-        droop_map = self._options.control.params["droop"]
-        droop_map["p_droop"] = parse_float(self.ids.droop_tab_content.ids.p_value.text)
-        droop_map["q_droop"] = parse_float(self.ids.droop_tab_content.ids.q_value.text)
-
-    def read_const_pf_data(self):
-        """Reads and stores the entered data out of the controls for constant
-        power factor mode.
-
-        The data is stored in the options control parameters.
-        """
-        constpf_map = self._options.control.params["constantpf"]
-        constpf_map["pf_val"] = parse_float(self.ids.const_pf_tab_content.ids.pf_value.text)
-
-    def read_voltvar_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Var
-        mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.vv_tab_content.ids.grid, "voltvar", "volts", "vars"
-        )
-
-    def read_voltwatt_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Watt
-        mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.vw_tab_content.ids.grid, "voltwatt", "volts", "watts"
-        )
-
-    def read_varwatt_data(self):
-        """Reads and stores the entered data out of the controls for Var-Watt
-        mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.var_watt_tab_content.ids.grid, "varwatt", "vars", "watts"
-        )
-
-    def read_voltvar_and_voltwatt_data(self):
-        """Reads and stores the entered data out of the controls for Volt-Var &
-        Volt-Watt mode.
-
-        The data is stored in the options control parameters.
-        """
-        self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vv_grid,
-           "vv_vw", "vv_volts", "vv_vars"
-        )
-
-        self._extract_and_store_data_lists(
-            self.ids.vv_vw_tab_content.ids.vw_grid,
-           "vv_vw", "vw_volts", "vw_watts"
-        )
-
     def cancel(self):
         """Returns to the "configure-storage" form.
 
@@ -2496,42 +1735,159 @@ class StorageControlConfigurationScreen(SSimBaseScreen):
 
         This is called when the user presses the "back" button.
         """
-        self.read_all_data()
+        self._close()
+
+    def _close(self):
         self.manager.current = "configure-storage"
         self.manager.remove_widget(self)
 
-    def _extract_and_store_data_lists(self, xyc: XYGridView, mode: str, l1name: str, l2name: str):
-        """Reads the x and y data from the supplied grid and stores them in the
-        control parameters using the supplied list keys.
-
-        Parameters
-        ----------
-        l1name : str
-            The key by which to store the "x" values read out of the grid into
-            the control parameters
-        l2name : str
-            The key by which to store the "y" values read out of the grid into
-            the control parameters
-        """
-        xl, yl = xyc.extract_data_lists()
-        param_map = self._options.control.params[mode]
-        param_map[l1name] = xl
-        param_map[l2name] = yl
+    def save(self):
+        result = self.ids.tabs.save(self._options.control)
+        if result is not None:
+            # TODO display an error message
+            return
+        self._options.min_soc = self.ids.min_soc.fraction()
+        self._options.max_soc = self.ids.max_soc.fraction()
+        self._options.initial_soc = self.ids.init_soc.fraction()
+        self._close()
 
 
 class PVConfigurationScreen(SSimBaseScreen):
     """Configure a single PV system."""
 
-    def __init__(self, *args, **kwargs):
-        self.pvsystem = None
-        super().__init__(*args, **kwargs)
+    _bus_filters = BusFilters()
+
+    def __init__(self, der_screen, pvsystem, *args,
+                 editing=None, **kwargs):
+        super().__init__(der_screen.project, *args, **kwargs)
+        self._pvsystem = pvsystem
+        self._der_screen = der_screen
+        self.ids.pmpp_input.bind(on_text_validate=self._add_pmpp)
+        self.ids.device_name.bind(on_text_validate=self._check_name)
+        self.ids.select_irradiance.bind(on_release=self._select_irradiance)
+        self._initialize_widgets()
+        self._editing = editing
+
+    def _initialize_widgets(self):
+        if self._pvsystem is None:
+            return
+        for pmpp in self._pvsystem.pmpp:
+            self.ids.pmpp_list.add_item(pmpp)
+        self.ids.select_busses.selected_busses = self._pvsystem.busses
+        self.ids.select_busses.project = self._der_screen.project
+        self.ids.device_name.text = self._pvsystem.name
+        self.ids.required.active = self._pvsystem.required
+        if self._pvsystem.irradiance is not None:
+            self.ids.irradiance_path.text = self._pvsystem.irradiance
+        Clock.schedule_once(
+            lambda _: refocus_text_field(self.ids.device_name),
+            0.05
+        )
+
+    def _check_name(self, textfield):
+        if not textfield.text_valid():
+            textfield.helper_text = "Invalid name"
+            textfield.error = True
+            return False
+        same_name = (pv.name.lower() == textfield.text.lower()
+                     for pv in self.project.pv_options
+                     if pv is not self._pvsystem)
+        if any(same_name):
+            textfield.helper_text = "Name already exists"
+            textfield.error = True
+            return False
+        textfield.error = False
+        return True
+
+    def _add_pmpp(self, textfield):
+        if textfield.text_valid():
+            value = float(textfield.text)
+            self.ids.pmpp_list.add_item(value)
+            textfield.text = ""
+            Clock.schedule_once(lambda dt: refocus_text_field(textfield), 0.05)
+        else:
+            textfield.set_error_message()
+
+    @property
+    def _pmpp(self):
+        return set(self.ids.pmpp_list.options)
+
+    @property
+    def _selected_busses(self):
+        return self.ids.select_busses.selected_busses
+
+    def _show_errors(self, errors):
+        if len(errors) == 0:
+            return True
+        content = MessagePopupContent()
+        popup = Popup(
+            title="Invalid PV System Input",
+            content=content,
+            auto_dismiss=False,
+            size_hint=(0.4, 0.4)
+        )
+        content.ids.msg_label.text = "\n".join(errors)
+        content.ids.dismissBtn.bind(on_press=popup.dismiss)
+        popup.open()
+        return False
+
+    def _validate(self):
+        errors = [
+            self._pvsystem.validate_name(),
+            self._pvsystem.validate_pmpp(),
+            self._pvsystem.validate_dcac_ratio(),
+            self._pvsystem.validate_busses(),
+            self._pvsystem.validate_controls(),
+            self._pvsystem.validate_irradiance()
+        ]
+        errors = [error for error in errors if error]
+        return self._show_errors(errors)
+
+    def _record_options(self):
+        self._pvsystem.pmpp = self._pmpp
+        self._pvsystem.busses = self._selected_busses
+        self._pvsystem.required = self.ids.required.active
+        self._pvsystem.name = self.ids.device_name.text
+
+    def _dismiss(self):
+        self._popup.dismiss()
+
+    def _selected(self, path, selection):
+        if len(selection) != 1:
+            Logger.debug("Invalid selection made for irradiance data")
+            return
+        self._pvsystem.irradiance = os.path.join(path, selection[0])
+        self.ids.irradiance_path.text = self._pvsystem.irradiance
+        self._popup.dismiss()
+
+    def _select_irradiance(self, *args, **kwargs):
+        content = SelectFileDialog(cancel=self._dismiss, load=self._selected)
+        self._popup = Popup(content=content)
+        self._popup.open()
+
+    def edit_control_params(self):
+        # self._record_option_data()
+        self.manager.add_widget(
+            PVControlConfigurationScreen(
+                self, self.project, self._pvsystem,
+                name="configure-pv-controls"
+            )
+        )
+        self.manager.current = "configure-pv-controls"
 
     def save(self):
-        # TODO add the new storage device to the project
+        self._record_options()
+        if not self._validate():
+            return
+        self._der_screen.add_pv(self._pvsystem)
         self.manager.current = "der-config"
+        self.manager.remove_widget(self)
 
     def cancel(self):
+        if self._editing:
+            self._der_screen.add_pv(self._editing)
         self.manager.current = "der-config"
+        self.manager.remove_widget(self)
 
 
 class DERConfigurationScreen(SSimBaseScreen):
@@ -2543,6 +1899,9 @@ class DERConfigurationScreen(SSimBaseScreen):
         self.ids.delete_storage.bind(
             on_release=self.delete_ess
         )
+        self.ids.delete_pv.bind(
+            on_release=self.delete_pv
+        )
 
     def load_project_data(self):
         self.ids.ess_list.clear_widgets()
@@ -2550,10 +1909,10 @@ class DERConfigurationScreen(SSimBaseScreen):
             self.ids.ess_list.add_widget(
                 StorageListItem(so, self)
             )
-
+        self.ids.pv_list.clear_widgets()
         for pv in self.project.pvsystems:
             self.ids.pv_list.add_widget(
-                PVListItem(pv)
+                PVListItem(pv, self)
             )
 
     def new_storage(self):
@@ -2563,7 +1922,7 @@ class DERConfigurationScreen(SSimBaseScreen):
         while name.lower() in existing_names:
             name = "NewBESS" + str(i)
             i += 1
-        ess = StorageOptions(name, 3, [], [], [])
+        ess = StorageOptions(name, [], [], [])
 
         self.manager.add_widget(
             StorageConfigurationScreen(
@@ -2572,11 +1931,38 @@ class DERConfigurationScreen(SSimBaseScreen):
 
         self.manager.current = "configure-storage"
 
+    def new_pv_system(self):
+        name = "NewPV"
+        existing_names = {n.lower() for n in self.project.pv_names}
+        i = 1
+        while name.lower() in existing_names:
+            name = "NewPV" + str(i)
+            i += 1
+        pv = PVOptions(name, [], [])
+        self.manager.add_widget(
+            PVConfigurationScreen(
+                self, pv, name="configure-pv")
+        )
+        self.manager.current = "configure-pv"
+
+    def add_pv(self, pv):
+        self.project.add_pv_option(pv)
+        self.ids.pv_list.add_widget(PVListItem(pv, self))
+
     def add_ess(self, ess):
         self.project.add_storage_option(ess)
         self.ids.ess_list.add_widget(
             StorageListItem(ess, self)
         )
+
+    def delete_pv(self, button):
+        to_remove = []
+        for pv_list_item in self.ids.pv_list.children:
+            if pv_list_item.selected:
+                to_remove.append(pv_list_item)
+                self.project.remove_pv_option(pv_list_item.pv)
+        for widget in to_remove:
+            self.ids.pv_list.remove_widget(widget)
 
     def delete_ess(self, button):
         to_remove = []
@@ -2607,6 +1993,20 @@ class DERConfigurationScreen(SSimBaseScreen):
         )
         self.manager.current = "configure-storage"
 
+    def edit_pvsystem(self, pv_list_item):
+        pv = pv_list_item.pv
+        self.project.remove_pv_option(pv)
+        self.ids.pv_list.remove_widget(pv_list_item)
+        self.manager.add_widget(
+            PVConfigurationScreen(
+                self,
+                deepcopy(pv),
+                name="configure-pv",
+                editing=pv
+            )
+        )
+        self.manager.current = "configure-pv"
+
 
 class StorageListItem(TwoLineAvatarIconListItem):
     def __init__(self, ess, der_screen, *args, **kwargs):
@@ -2632,8 +2032,16 @@ class PVListItem(TwoLineAvatarIconListItem):
         super().__init__(*args, **kwargs)
         self.pv = pv
         self.text = pv.name
-        self.secondary_text = str(pv.bus)
+        self.secondary_text = str(pv.pmpp)
+        self.ids.edit.bind(on_release=self.edit)
         self._der_screen = der_screen
+
+    @property
+    def selected(self):
+        return self.ids.selected.active
+
+    def edit(self, icon_widget):
+        self._der_screen.edit_pvsystem(self)
 
 
 class ResultsVariableListItemWithCheckbox(TwoLineAvatarIconListItem):
@@ -4469,6 +3877,11 @@ class ListItemWithCheckbox(TwoLineAvatarIconListItem):
         return self.ids.selected.active
 
 
+class SelectFileDialog(FloatLayout):
+    load = ObjectProperty(None)
+    cancel = ObjectProperty(None)
+
+
 class SelectGridDialog(FloatLayout):
     load = ObjectProperty(None)
     cancel = ObjectProperty(None)
@@ -4677,11 +4090,11 @@ class SSimScreen(SSimBaseScreen):
     def bus_coords(self, bus):
         dssdirect.Circuit.SetActiveBus(bus)
         return dssdirect.Bus.X(), dssdirect.Bus.Y()
-    
+
     def all_bus_coords(self, gm) -> dict:
         if len(gm.bus_names) == 0:
             return None
-            
+
         seg_busses = {}
 
         for bus in gm.bus_names:
@@ -4704,22 +4117,22 @@ class SSimScreen(SSimBaseScreen):
     def changed_show_storage_options(self, active_state):
         if len(self.project.storage_options) > 0:
             self.refresh_grid_plot()
+
+    def changed_show_pv_options(self, actove_state):
+        if len(self.project.pvsystems) > 0:
+            self.refresh_grid_plot()
         
     def getImage(self, path):
         return OffsetImage(plt.imread(path, format="png"), zoom=.1)
-    
-    def __make_pv_patch(
-        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5., facecolor = None
-        ):
-        
-        xpix, ypix = ax.transData.transform((x, y)).T
 
+    @staticmethod
+    def _pv_path_vertices(xpix, ypix, w, h, xoffset = 0., yoffset = 5.):
         llx = xpix + xoffset - w/2.
         lly = ypix + yoffset
 
         panellow = 0.35 * h
         tiltoffset = 1./8. * w
-        
+
         # Start with main rectangle.
         codes = [Path.MOVETO] + [Path.LINETO]*4
         vertices = [
@@ -4727,7 +4140,7 @@ class SSimScreen(SSimBaseScreen):
             [llx+w, lly+h       ], [llx+tiltoffset,   lly+h       ],
             [llx,   lly+panellow]
             ]
-       
+
         poleleft = llx + 0.35*w
         poleright = poleleft + .15*w
         poleheight = panellow
@@ -4745,13 +4158,27 @@ class SSimScreen(SSimBaseScreen):
         # Finish with a drawing of vertical and horizontal lines on the box
         codes += ([Path.MOVETO] + [Path.LINETO]) * 5
         vertices += [
-            [llx +   spacing, lly + panellow], [llx+ tiltoffset +   spacing, lly+h],
-            [llx + 2*spacing, lly + panellow], [llx+ tiltoffset + 2*spacing, lly+h],
-            [llx + 3*spacing, lly + panellow], [llx+ tiltoffset + 3*spacing, lly+h],
-            [llx + 4*spacing, lly + panellow], [llx+ tiltoffset + 4*spacing, lly+h],
+            [llx +   spacing, lly + panellow],
+            [llx+ tiltoffset +   spacing, lly+h],
+            [llx + 2*spacing, lly + panellow],
+            [llx+ tiltoffset + 2*spacing, lly+h],
+            [llx + 3*spacing, lly + panellow],
+            [llx+ tiltoffset + 3*spacing, lly+h],
+            [llx + 4*spacing, lly + panellow],
+            [llx+ tiltoffset + 4*spacing, lly+h],
             [llx + tiltoffset/2., lly + panellow + halfpanhght],
             [llx + w - tiltoffset/2., lly + panellow + halfpanhght]
-            ]
+        ]
+        return vertices, codes
+
+    def __make_pv_patch(
+        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5., facecolor = None
+        ):
+
+        xpix, ypix = ax.transData.transform((x, y)).T
+
+        vertices, codes = self._pv_path_vertices(
+            xpix, ypix, w, h, xoffset, yoffset)
 
         if facecolor is None:
             facecolor = ax.get_facecolor()
@@ -4765,13 +4192,9 @@ class SSimScreen(SSimBaseScreen):
             edgecolor=c)
             )
         
-    def __make_battery_patch(
-        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5.,
-        facecolor = None, incl_plus_minus = True
-        ):
-        
-        xpix, ypix = ax.transData.transform((x, y)).T
-
+    @staticmethod
+    def _battery_path_vertices(xpix, ypix, w, h, xoffset, yoffset,
+                               incl_plus_minus=True):
         llx = xpix + xoffset - w/2.
         lly = ypix + yoffset
         
@@ -4800,6 +4223,18 @@ class SSimScreen(SSimBaseScreen):
                 [llx+5.*w/8.,lly+h/2.], [llx+7.*w/8., lly+   h/2.],
                 ]
 
+        return vertices, codes
+
+    def __make_battery_patch(
+        self, x, y, w, h, c, ax, xoffset = 0., yoffset = 5.,
+        facecolor = None, incl_plus_minus = True
+        ):
+
+        xpix, ypix = ax.transData.transform((x, y)).T
+
+        vertices, codes = self._battery_path_vertices(
+            xpix, ypix, w, h, xoffset, yoffset, incl_plus_minus)
+
         if facecolor is None:
             facecolor = ax.get_facecolor()
 
@@ -4811,49 +4246,51 @@ class SSimScreen(SSimBaseScreen):
             patches.PathPatch(Path(tverts, codes), facecolor=facecolor,
             edgecolor=c)
             )
-        
-    def __draw_storage_options(self, ax):
-                
-        gm = self.project.grid_model
-        
-        # make a mapping of all busses to receive batteries to the storage
-        # options that include them.  Also map colors to storage options.
+
+    def _draw_der(self, ax, storage=True, pv=True):
+        der_options = itertools.chain(
+            self.project.storage_options if storage else [],
+            self.project.pvsystems if pv else []
+        )
 
         # Without getting the limits here, things don't draw right.  IDK why.
-        ylim = ax.get_ylim()
+        _ = ax.get_ylim()
 
         w = 12
-        h = 6 
+        h = 6
         o = 2
         yo = 4
 
-        so_colors = {}
-        bat_busses = {}
-        self.cindex = 0
-                
-        seg_busses = self.all_bus_coords(gm)
-        
-        for so in self.project.storage_options:
-            so_colors[so] = self.colors[self.cindex]
-            self.cindex = (self.cindex + 1) % len(self.colors)
-            for b in so.busses:
-                if b not in seg_busses: continue
-                if b not in bat_busses:
-                    bat_busses[b] = [so]
-                else:
-                    bat_busses[b] += [so]
+        der_colors = {}
+        der_busses = defaultdict(list)
+        seg_busses = self.all_bus_coords(self.project.grid_model)
+        cindex = 0
 
-        # we know where to draw each battery and what color to make them.
-        for b, sos in bat_busses.items():
-            bx, by = [seg_busses[b][0], seg_busses[b][1]]
-            
-            # for i in range(len(sos)): self.__make_pv_patch(
-            #     bx, by, w, 8, so_colors[sos[i]], ax, i * o, yo + i * o                
-            #     )
-                
-            for i in range(len(sos)): self.__make_battery_patch(
-                bx, by, w, h, so_colors[sos[i]], ax, i * o, yo + i * o                
-                )
+        for der in der_options:
+            der_colors[der] = self.colors[cindex]
+            cindex = (cindex + 1) % len(self.colors)
+            for bus in der.busses:
+                if bus not in seg_busses:
+                    continue
+                der_busses[bus].append(der)
+
+        for bus, ders in der_busses.items():
+            bx, by = seg_busses[bus]
+            for i, der in enumerate(ders):
+                if isinstance(der, StorageOptions):
+                    draw_func = self.__make_battery_patch
+                elif isinstance(der, PVOptions):
+                    draw_func = self.__make_pv_patch
+                else:
+                    Logger.warning(
+                        f"Unexpected DER type '{type(der)}' "
+                        "encountered whild drawing map"
+                    )
+                    continue
+                draw_func(bx, by, w, h, der_colors[der], ax, i * o, yo + i * o)
+
+        if len(der_busses.keys()) > 0:
+            self.__make_plot_legend(ax, der_colors)
                 
     def __draw_fixed_pv_assets(self, ax):
                 
@@ -4881,23 +4318,43 @@ class SSimScreen(SSimBaseScreen):
             bx, by = [seg_busses[pv.bus][0], seg_busses[pv.bus][1]]            
             self.__make_pv_patch(bx, by, w, h, color, ax)
 
-    def __make_plot_legend(self, ax):
-
-        if len(self.project.storage_options) == 0:
-            return    
-
-        # The legend will show the storage options defined and have an
-        # indicator of their color.
-        self.cindex = 0
+    def __make_plot_legend(self, ax, der_colors):
         custom_lines = []
         names = []
                         
-        for so in self.project.storage_options:
-            c = self.colors[self.cindex]
-            self.cindex = (self.cindex + 1) % len(self.colors)
-            names += [so.name + f" ({len(so.busses)})"]
-            custom_lines += [Line2D([0], [0], color=c, lw=4)]
-            
+        for der, color in der_colors.items():
+            names.append(f"{der.name} ({len(der.busses)})")
+            if isinstance(der, PVOptions):
+                vertices, codes = self._pv_path_vertices(0, 0, 10, 6, 0, -2.5)
+                path = Path(vertices, codes)
+                custom_lines.append(
+                    Line2D(
+                        [0], [0],
+                        marker=path,
+                        color="w",
+                        lw=0,
+                        markersize=20,
+                        markerfacecolor="w",
+                        markeredgecolor=color
+                    )
+                )
+            elif isinstance(der, StorageOptions):
+                vertices, codes = self._battery_path_vertices(0, 0, 12, 6, 0, -2.5, True)
+                path = Path(vertices, codes)
+                custom_lines.append(
+                    Line2D(
+                        [0], [0],
+                        marker=path,
+                        color="w",
+                        lw=0,
+                        markersize=20,
+                        markerfacecolor="w",
+                        markeredgecolor=color
+                    )
+                )
+            else:
+                custom_lines.append(Line2D([0], [0], color=color, lw=4))
+
         ax.legend(custom_lines, names)
 
     def __get_line_segments(self, gm):
@@ -4976,13 +4433,12 @@ class SSimScreen(SSimBaseScreen):
         # Without doing the scatter here, things don't draw right.  IDK why.
         ax.scatter(x, y, marker="None")
         
-        if self.ids.show_storage_options.active:
-            self.__draw_storage_options(ax)
-            self.__make_plot_legend(ax)
-                   
-        #if self.ids.show_pv_assets.active:
-        self.__draw_fixed_pv_assets(ax)
-            
+        self._draw_der(
+            ax,
+            storage=self.ids.show_storage_options.active,
+            pv=self.ids.show_pv_options.active
+        )
+
         fig.tight_layout()
 
         self.curr_x_min, self.curr_x_max = (min(x), max(x))

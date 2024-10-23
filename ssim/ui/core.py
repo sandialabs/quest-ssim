@@ -1,6 +1,8 @@
 """Core classes and functions for the user interface."""
 from __future__ import annotations
-from copy import copy, deepcopy
+
+import csv
+import enum
 import functools
 import hashlib
 import itertools
@@ -9,18 +11,21 @@ import logging
 import os
 import shutil
 import subprocess
-from os import path, makedirs
-from pathlib import Path, PurePosixPath
 import tempfile
+from collections.abc import Iterable
+from copy import copy, deepcopy
+from os import makedirs, path
+from pathlib import Path, PurePosixPath
+from typing import Optional
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import pkg_resources
 import tomli
+
 from ssim import dssutil, grid
 from ssim.metrics import MetricManager, MetricTimeAccumulator
 from ssim.opendss import DSSModel
-
 
 # To Do
 #
@@ -57,6 +62,14 @@ def __eq_maybe_none(v1, v2) -> bool:
         return False  # we already know v1 is not None.
 
     return v1 == v2
+
+
+def _is_float(s):
+    try:
+        _ = float(s)
+        return True
+    except ValueError:
+        return False
 
 
 _DEFAULT_RELIABILITY = {
@@ -360,6 +373,14 @@ class Project:
         return self.storage_devices
 
     @property
+    def pv_names(self):
+        return set(system.name for system in self.pvsystems)
+
+    @property
+    def pv_options(self):
+        return self.pvsystems
+
+    @property
     def pv_assets(self):
         return [] if self._grid_model is None else self._grid_model.pvsystems
 
@@ -411,6 +432,9 @@ class Project:
         for so in self.storage_devices:
             ret += so.write_toml()
 
+        for pv in self.pvsystems:
+            ret += pv.write_toml()
+
         for mgrKey in self._metricMgrs:
             mgr = self._metricMgrs[mgrKey]
             ret += mgr.write_toml(mgrKey)
@@ -433,9 +457,15 @@ class Project:
 
         sodict = tomlData["storage-options"]
         for sokey in sodict:
-            so = StorageOptions(sokey, 3, [], [], [])
+            so = StorageOptions(sokey, [], [], [])
             so.read_toml(sokey, sodict[sokey])
             self.add_storage_option(so)
+
+        pvdict = tomlData.get("pv-options", {})
+        for pvname, pvoptions in pvdict.items():
+            pv = PVOptions(pvname, [], [])
+            pv.read_toml(pvname, pvoptions)
+            self.add_pv_option(pv)
 
         if "metrics" in tomlData:
             self.__read_metric_map(tomlData["metrics"])
@@ -582,28 +612,42 @@ class Project:
     def add_storage_option(self, storage_options):
         self.storage_devices.append(storage_options)
 
+    def add_pv_option(self, pv: PVOptions):
+        self.pvsystems.append(pv)
+
+    def remove_pv_option(self, pv: PVOptions):
+        self.pvsystems.remove(pv)
+
     def configurations(self):
         """Return an iterator over all grid configurations to be evaluated."""
-        for storage_configuration in self._storage_configurations():
-            storage_devices, inv_controls = _safe_unzip(storage_configuration)
-            inv_controls = list(
-                filter(lambda ic: ic is not None, inv_controls)
-            )
-            yield Configuration(
-                self._grid_model_path,
-                self._metricMgrs,
-                self.pvsystems,
-                storage_devices,
-                inv_controls,
-                reliability=self.reliability_params,
-                sim_duration=self.sim_duration
-            )
+        for pv_configuration in self._pv_configurations():
+            for storage_configuration in self._storage_configurations():
+                storage_devices, ess_inv_controls = _safe_unzip(storage_configuration)
+                pv_systems, pv_inv_controls = _safe_unzip(pv_configuration)
+                inv_controls = list(
+                    filter(lambda ic: ic is not None,
+                           itertools.chain(ess_inv_controls, pv_inv_controls))
+                )
+                yield Configuration(
+                    self._grid_model_path,
+                    self._metricMgrs,
+                    pv_systems,
+                    storage_devices,
+                    inv_controls,
+                    reliability=self.reliability_params,
+                    sim_duration=self.sim_duration
+                )
 
     def _storage_configurations(self):
         print(f"Project._storage_configurations() - device list: {self.storage_devices}")
         return itertools.product(
             *(storage_options.configurations()
               for storage_options in self.storage_devices)
+        )
+
+    def _pv_configurations(self):
+        return itertools.product(
+            *(pv_options.configurations() for pv_options in self.pvsystems)
         )
 
     def num_configurations(self):
@@ -622,238 +666,151 @@ class Project:
         self.reliability_params[name] = params
 
 
-class StorageControl:
-    """Container for information about how a storage device is controlled.
+class InverterControl:
+    """Container for information about autonomous inverter controls."""
 
-    Parameters
-    ----------
-    mode : str
-        Name of the control mode (valid choices are 'constantpf',
-        'voltvar', 'varwatt', 'vv_vw', or 'droop')
-    params : dict, optional
-        Control-specific parameters.  This dictionary, if provided, should contain
-        keys for control modes and each should be paired with a dictionary of parameters.
-    """
-
-    _INVERTER_CONTROLS = {'voltvar', 'voltwatt', 'varwatt', 'vv_vw',
-                          'constantpf'}
-
-    _EXTERNAL_CONTROLS = {'droop'}
+    @enum.unique
+    class Mode(str, enum.Enum):
+        VOLTVAR = "voltvar"
+        VOLTWATT = "voltwatt"
+        VARWATT = "varwatt"
+        VOLTVAR_VOLTWATT = "vv_vw"
+        CONSTPF = "constantpf"
+        UNCONTROLLED = "uncontrolled"
 
     _CURVE_NAME_X = {
-        "voltvar": ("volts",),
-        "voltwatt": ("volts",),
-        "varwatt": ("vars",),
-        "vv_vw": ("vv_volts", "vw_volts")
+        Mode.VOLTVAR: ("volts",),
+        Mode.VOLTWATT: ("volts",),
+        Mode.VARWATT: ("vars",),
+        Mode.VOLTVAR_VOLTWATT: ("vv_volts", "vw_volts")
     }
 
     _CURVE_NAME_Y = {
-        "voltvar": ("vars",),
-        "voltwatt": ("watts",),
-        "varwatt": ("watts",),
-        "vv_vw": ("vv_vars", "vw_watts")
+        Mode.VOLTVAR: ("vars",),
+        Mode.VOLTWATT: ("watts",),
+        Mode.VARWATT: ("watts",),
+        Mode.VOLTVAR_VOLTWATT: ("vv_vars", "vw_watts")
     }
 
     _CURVE_DESC = {
-        "voltvar": "Volt-Var",
-        "voltwatt": "Volt-Watt",
-        "varwatt": "Var-Watt",
-        "vv_vw": "Volt-Var + Var-Watt"
+        Mode.VOLTVAR: "Volt-Var",
+        Mode.VOLTWATT: "Volt-Watt",
+        Mode.VARWATT: "Var-Watt",
+        Mode.VOLTVAR_VOLTWATT: "Volt-Var + Var-Watt"
     }
 
-    # Required parameters for each control mode.
     _MODE_PARAMS = {
-        "droop": {"p_droop", "q_droop"},
-        "voltvar": {"volts", "vars"},
-        "voltwatt": {"volts", "watts"},
-        "varwatt": {"vars", "watts"},
-        "vv_vw": {"vv_volts", "vv_vars", "vw_volts", "vw_watts"},
-        "constantpf": {"pf_val"}
+        Mode.VOLTVAR: {"volts", "vars"},
+        Mode.VOLTWATT: {"volts", "watts"},
+        Mode.VARWATT: {"vars", "watts"},
+        Mode.VOLTVAR_VOLTWATT: {"vv_volts", "vv_vars", "vw_volts", "vw_watts"},
+        Mode.CONSTPF: {"pf_val"},
+        Mode.UNCONTROLLED: set()
     }
 
     _DEFAULT_PARAMS = {
-        "droop": {"p_droop": 500.0, "q_droop": -300.0},
-        "voltvar": {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
-                    "vars": [1.0, 1.0, 0.0, -1.0, -1.0]},
-        "voltwatt": {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
-                     "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
-        "varwatt": {"vars": [0.5, 0.95, 1.0, 1.05, 1.5],
-                    "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
-        "vv_vw": {"vv_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
-                  "vv_vars": [1.0, 1.0, 0.0, -1.0, -1.0],
-                  "vw_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
-                  "vw_watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
-        "constantpf": {"pf_val": 0.99}
+        Mode.VOLTVAR: {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                       "vars": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        Mode.VOLTWATT: {"volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                        "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        Mode.VARWATT: {"vars": [0.5, 0.95, 1.0, 1.05, 1.5],
+                       "watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        Mode.VOLTVAR_VOLTWATT: {"vv_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                                "vv_vars": [1.0, 1.0, 0.0, -1.0, -1.0],
+                                "vw_volts": [0.5, 0.95, 1.0, 1.05, 1.5],
+                                "vw_watts": [1.0, 1.0, 0.0, -1.0, -1.0]},
+        Mode.CONSTPF: {"pf_val": 0.99},
+        Mode.UNCONTROLLED: {}
     }
 
     def __init__(self, mode, params=None):
-        self.mode = mode
-        self.params = params or {mode: StorageControl.default_params(mode)}
-
-    @classmethod
-    def default_params(cls, mode):
-        """Return the default parameters for control mode `mode`.
-
-        Parameters
-        ----------
-        mode : str
-            Control mode for which to return defaults.
-
-        Returns
-        -------
-        dict
-            Dictionary of default control mode parameters.
-        """
-        return deepcopy(StorageControl._DEFAULT_PARAMS.get(mode, {}))
+        if isinstance(mode, str):
+            mode = InverterControl.Mode(mode)
+        elif not isinstance(mode, InverterControl.Mode):
+            raise ValueError("invalid mode")
+        self._mode = mode
+        self.params = deepcopy(params)
+        if self.params is None:
+            self.params = deepcopy(InverterControl._DEFAULT_PARAMS[self.mode])
 
     @property
-    def is_external(self):
-        return self.mode not in StorageControl._INVERTER_CONTROLS
+    def mode(self):
+        return self._mode
 
-    def get_invcontrol(self, storage_name):
-        """Return a specification of an InvControl implementing the control.
-
-        Parameters
-        ----------
-        storage_name : str
-            Name of the storage device the inverter control is to be
-            applied to.
-
-        Returns
-        -------
-        grid.InvControlSpecification
-
-        Raises
-        ------
-        ValueError
-            If the control mode cannot be implemented by an inverter
-            control.
-
-        """
-        if self.mode not in StorageControl._INVERTER_CONTROLS:
-            raise ValueError(
-                "Cannot convert external control to inverter control."
-            )
-        curve1, curve2 = self._active_curves()
-        return grid.InvControlSpecification(
-            name=f"{storage_name}_control",
-            der_list=[f"Storage.{storage_name}"],
-            inv_control_mode=self.mode,
-            function_curve_1=curve1,
-            function_curve_2=curve2,
-        )
-
-    def _active_curves(self):
-        x_names = StorageControl._CURVE_NAME_X[self.mode]
-        y_names = StorageControl._CURVE_NAME_Y[self.mode]
-        curves = tuple(
-            tuple(zip(self.active_params[x],
-                      self.active_params[y]))
-            for x, y in zip(x_names, y_names)
-        )
-        return curves[0], curves[1] if len(curves) == 2 else None
-
-    @property
-    def active_params(self):
-        """Return only the params relevant to the active mode.
-
-        Returns
-        -------
-        dict
-            Dictionary of parameters thar are relevant the the
-            currently active control mode.
-        """
-        return self.params[self.mode]
+    @mode.setter
+    def mode(self, value):
+        if isinstance(value, InverterControl.Mode):
+            self._mode = value
+        elif isinstance(value, str):
+            self._mode = InverterControl.Mode(value)
+        else:
+            raise ValueError("invalid mode")
 
     def __eq__(self, other):
-
-        if self.mode != other.mode: return False
-
+        if not isinstance(other, InverterControl):
+            return False
+        if self.mode is not other.mode:
+            return False
         smp = self.mode in self.params
         omp = self.mode in other.params
-        if smp != omp: return False
-
-        # if it's not in 1, it's not in either and we are done and equal.
-        if not smp: return True
-
-        # if we're here, then there are params for the mode in each of self and other
-        # compare them now, only for the chosen mode.
+        if smp != omp:
+            return False
+        if not smp:
+            return True
         return self.active_params == other.active_params
 
     def __hash__(self):
-        """Produces a hash value for this instance of a StorageControl.
-
-        This only takes into account the core properties of the object, not
-        values that store current state during usage.  This is so that inputs
-        can be found to be equal or not based only on object "genetics".
-
-        The value produced will be consistent across multiple invocations of
-        the python interpeter (non-salted).
-        """
         m = hashlib.sha256()
         m.update(self.mode.encode())
-
-        # Iterate in sorted order to make a functional rather than literal hash.
         if self.mode in self.params:
             for k, v in sorted(self.params[self.mode].items()):
                 m.update(k.encode())
                 m.update(repr(v).encode())
-
         h = m.digest()
         return int.from_bytes(h, byteorder='big', signed=False)
-    
+
     def write_toml(self, name: str) -> str:
-        """Writes the properties of this class instance to a string in TOML
-           format.
+        """Return a TOML strig representing this control prameter instance.
 
         Parameters
         ----------
         name : str
-            The name of the storage asset for which this is the control
-            configuration.
+            The name of the DER to which these control parameters apply.
 
         Returns
         -------
         str:
-            A TOML formatted string with the properties of this instance.
+            A TOML string with the properties of this instance.
         """
-        ret = f"\n\n[{name}.control-params]\n"
-        ret += f"mode = \'{self.mode}\'\n"
+        ret = ["", f"[{name}.control-params]", f"mode = '{self.mode}'"]
 
-        # ret += f"\n\n[{name}.control-mode.params]\n"
         for key in self.params:
-            ret += f"\n\n[{name}.control-params.{key}]\n"
-
+            ret += ["", f"[{name}.control-params.{key}]"]
             kmap = self.params[key]
             for pkey in kmap:
-                ret += f"\"{pkey}\" = {str(kmap[pkey])}\n"
-
-        return ret
+                ret += [f'"{pkey}" = {kmap[pkey]}']
+        return "\n".join(ret) + "\n"
 
     def read_toml(self, tomlData):
-        """Reads the properties of this class instance from a TOML formated dictionary.
+        """Initialize this instance from the values in `tomlDict`.
+
+        This is the counterpart to :py:method:`write_toml`.
 
         Parameters
-        -------
-        tomlData
-            A TOML formatted dictionary from which to read the properties of this class
-            instance.
+        ----------
+        tomlData : dict
+            A dictionary of values to be assigned to fields of this class.
         """
-        for key in tomlData:
-            if key == "mode":
-                self.mode = tomlData[key]
-            else:
-                self.params[key] = tomlData[key]
+        d = deepcopy(tomlData)
+        self.mode = d.pop("mode")
+        self.params = d
 
-    def validate(self) -> str:
-        if self.mode not in StorageControl._INVERTER_CONTROLS:
-            return None
+    def validate(self) -> Optional[str]:
         return self._check_curves()
 
     def _check_curves(self):
-        names_x = StorageControl._CURVE_NAME_X[self.mode]
-        names_y = StorageControl._CURVE_NAME_Y[self.mode]
-        curvedesc = StorageControl._CURVE_DESC[self.mode]
+        names_x, names_y = self._curve_names()
+        curvedesc = InverterControl._CURVE_DESC[self.mode]
         for name_x, name_y in zip(names_x, names_y):
             if name_x not in self.active_params:
                 return (f'Unable to find control param list named "{name_x}".'
@@ -867,7 +824,8 @@ class StorageControl:
             if error is not None:
                 return error
 
-    def _check_curve(self, curvedesc, xs, ys):
+    @staticmethod
+    def _check_curve(curvedesc, xs, ys):
         if not isinstance(xs, list):
             return (f'Expected a list of x-values for "{curvedesc}".'
                     ' Found value is not a list')
@@ -890,6 +848,437 @@ class StorageControl:
             return (f'There are duplicate x values in the "{curvedesc}" '
                     'control curve.  They must be unique')
 
+    def get_invcontrol(self, dertype: str, dername: str):
+        """Return an InvControl specification applied to `dername`
+
+        Parameters
+        ----------
+        dertype : str
+            OpenDSS DER type. One of 'Storage' or 'PVSystem'.
+        dername : str
+            Name of the DER that is to be controlled.
+
+        Returns
+        -------
+        grid.InvControlSpecification
+        """
+        if dertype.lower() not in {'storage', 'pvsystem'}:
+            raise ValueError(f"InvControl cannot control a '{dertype}'")
+        curve1, curve2 = self._active_curves()
+        return grid.InvControlSpecification(
+            name=f"{dertype}_{dername}_control",
+            der_list=[f"{dertype}.{dername}"],
+            inv_control_mode=self.mode,
+            function_curve_1=curve1,
+            function_curve_2=curve2
+        )
+
+    def _curve_names(self):
+        return (
+            InverterControl._CURVE_NAME_X[self.mode],
+            InverterControl._CURVE_NAME_Y[self.mode]
+        )
+
+    @property
+    def active_params(self):
+        if self.mode not in self.params:
+            self.params[self.mode] = {}
+        return self.params[self.mode]
+
+    def _active_curves(self):
+        x_names, y_names = self._curve_names()
+        curves = tuple(list(zip(self.active_params[x], self.active_params[y]))
+                       for x, y in zip(x_names, y_names))
+        if len(curves) == 2:
+            return curves[0], curves[1]
+        return curves[0], None
+
+    @staticmethod
+    def _get_default(mode, param):
+        return deepcopy(InverterControl._DEFAULT_PARAMS[mode][param])
+
+    def ensure_param(self, mode, param=None):
+        if isinstance(mode, str):
+            mode = InverterControl.Mode(mode)
+        params = InverterControl._MODE_PARAMS[mode]
+        if isinstance(param, str):
+            params = [param]
+        elif isinstance(param, Iterable):
+            params = param
+        if mode not in self.params:
+            self.params[mode] = {}
+        for param in params:
+            if param not in self.params[mode]:
+                self.params[mode][param] = self._get_default(mode, param)
+
+
+class StorageControl:
+    """Container for information about how a storage device is controlled.
+
+    Parameters
+    ----------
+    mode : str
+        Name of the control mode (valid choices are 'constantpf',
+        'voltvar', 'varwatt', 'vv_vw', or 'droop')
+    params : dict, optional
+        Control-specific parameters.  This dictionary, if provided, should contain
+        keys for control modes and each should be paired with a dictionary of parameters.
+    """
+
+    _DEFAULTS = {"droop": {"p_droop": 500.0, "q_droop": -300.0}}
+
+    def __init__(self, mode, params=None):
+        self._params = {} if params is None else deepcopy(params)
+        if mode == "droop":
+            self._mode = mode
+            self._invcontrol = None
+        else:
+            self._invcontrol = InverterControl(mode)
+            self._invcontrol.params = self._params
+            self._mode = "invcontrol"
+        self.ensure_param(mode)
+
+    def __eq__(self, other):
+        if not isinstance(other, StorageControl):
+            return False
+        if self._invcontrol != other._invcontrol:
+            return False
+        if self._mode != other._mode:
+            return False
+        return self._params[self._mode] == other._params[other._mode]
+
+    def __hash__(self):
+        m = hashlib.sha256()
+        m.update(self.mode.encode())
+        if self.mode in self.params:
+            for k, v in sorted(self.params[self.mode].items()):
+                m.update(k.encode())
+                m.update(repr(v).encode())
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
+
+    @property
+    def mode(self):
+        if self._mode == "invcontrol":
+            return self._invcontrol.mode
+        return self._mode
+
+    @mode.setter
+    def mode(self, value):
+        if value == "droop":
+            self._mode = "droop"
+            return
+        if self._invcontrol is None:
+            self._invcontrol = InverterControl(value)
+            self._invcontrol.params = self._params
+        self._invcontrol.mode = value
+        self._mode = "invcontrol"
+
+    @property
+    def params(self):
+        if self._mode == "invcontrol":
+            return self._invcontrol.params
+        return self._params
+
+    @property
+    def active_params(self):
+        if self._mode == "invcontrol":
+            return self._invcontrol.active_params
+        return self._params[self._mode]
+
+    @property
+    def is_external(self):
+        return self._mode != "invcontrol"
+
+    def ensure_param(self, mode, param=None):
+        """Ensure that a value is defined for `param`.
+
+        Parameters
+        ----------
+        mode : str
+            Name of the control mode
+        param : str or Iterable of str, optional
+            Name of the parameter(s) to ensure is defined. If None, then all
+            default parameters for `mode` will be checked.
+        """
+        if mode not in StorageControl._DEFAULTS:
+            self._invcontrol = self._invcontrol or InverterControl("voltvar")
+            self._invcontrol.params = self._params
+            return self._invcontrol.ensure_param(mode, param)
+        params = StorageControl._DEFAULTS[mode].keys()
+        if isinstance(param, str):
+            params = [param]
+        elif isinstance(param, Iterable):
+            params = param
+        if mode not in self._params:
+            self._params[mode] = {}
+        for param in params:
+            if param not in self._params[mode]:
+                self._params[mode][param] = self._get_default(mode, param)
+
+    @staticmethod
+    def _get_default(mode, param):
+        return deepcopy(StorageControl._DEFAULTS[mode][param])
+
+    def validate(self) -> Optional[str]:
+        if self._mode == "droop":
+            params = self._params.get("droop", {})
+            required_params = set(StorageControl._DEFAULTS["droop"].keys())
+            if set(params.keys()) != required_params:
+                missing = required_params - set(params.keys())
+                return "Missing parameters: " + ", ".join(missing)
+        if self._invcontrol is not None:
+            return self._invcontrol.validate()
+
+    def get_invcontrol(self, storage_name):
+        """Return a specification of an InvControl implementing the control.
+
+        Parameters
+        ----------
+        storage_name : str
+            Name of the storage device the inverter control is to be
+            applied to.
+
+        Returns
+        -------
+        grid.InvControlSpecification
+
+        Raises
+        ------
+        ValueError
+            If the control mode cannot be implemented by an inverter
+            control.
+
+        """
+        if self.is_external:
+            raise ValueError(
+                "Cannot convert external control to inverter control."
+            )
+        return self._invcontrol.get_invcontrol("Storage", storage_name)
+
+    def write_toml(self, name: str):
+        """Return a TOML string representing this control parameter instance.
+
+        Parameters
+        ----------
+        name : str
+            The name of the DER to which these control parameters apply.
+
+        Returns
+        -------
+        str :
+            A TOML string with the properties of the instance.
+        """
+        if not self.is_external:
+            return self._invcontrol.write_toml(name)
+        ret = ["", f"[{name}.control-params]", f"mode = '{self.mode}'"]
+        for key, params in self.params.items():
+            ret += ["", f'[{name}.control-params."{key}"]']
+            for pkey, pval in params.items():
+                ret += [f'"{pkey}" = {pval}']
+        return "\n".join(ret) + "\n"
+
+    def read_toml(self, tomlData):
+        """Initialize this instance from the values in `tomlData`.
+
+        Parameters
+        ----------
+        tomlData : dict
+            A dictionary of values to be assigned for control parameters.
+        """
+        d = deepcopy(tomlData)
+        mode = d.pop("mode")
+        self._params = d
+        if mode == "droop":
+            self.mode = mode
+            self._invcontrol = None
+        else:
+            self.mode = mode
+
+
+class PVOptions:
+    """Set of configuration options available for a specific PV system.
+
+    Parameters
+    ----------
+    name : str
+        Name of the system.
+    pmpp : iterable of float
+        Options for the maximum power that this system can generate. [kW]
+    busses : iterable of str
+        Busses where this device may be connected.
+    irradiance : str, optional
+        Path to a file containing the irradiance profile that should
+        be used by OpenDSS.
+    dcac_ratio : float, default 1.0
+        Ratio of the maximum DC power of the array to the maximum AC power
+        of the inverter.
+    control : PVControl, optional
+        Control settings for the PVSystems. Defaults to uncontrolled.
+    required : bool, default True
+        If True the device will be included in every configuration.
+    """
+
+    def __init__(self, name, pmpp, busses, irradiance=None,
+                 dcac_ratio=1.0, control=None, required=True):
+        self.name = name
+        self.pmpp = set(pmpp)
+        self.busses = set(busses)
+        self.irradiance = irradiance
+        self.dcac_ratio = dcac_ratio
+        self.control = control
+        self.required = required
+
+    def __eq__(self, other):
+        if not isinstance(other, PVOptions):
+            return False
+        return all([
+            self.name == other.name,
+            self.pmpp == other.pmpp,
+            self.busses == other.busses,
+            self.irradiance == other.irradiance,
+            self.dcac_ratio == other.dcac_ratio,
+            self.control == other.control,
+            self.required == other.required
+        ])
+
+    def __hash__(self):
+        m = hashlib.sha256()
+        m.update(repr(self.name).encode())
+        m.update(repr(sorted(self.pmpp)).encode())
+        m.update(repr(sorted(self.busses)).encode())
+        if self.irradiance is not None:
+            m.update(self.irradiance.encode())
+        m.update(repr(self.dcac_ratio).encode())
+        if self.control is not None:
+            m.update(repr(hash(self.control)).encode())
+        m.update(repr(self.required).encode())
+        h = m.digest()
+        return int.from_bytes(h, byteorder='big', signed=False)
+
+    def write_toml(self):
+        """Return a TOML string representing this object."""
+        buslist = list("'" + bus + "'" for bus in self.busses)
+        return "\n".join(
+            ["",
+             f'[pv-options."{self.name}"]',
+             f"pmpp = [{', '.join(map(str, self.pmpp))}]",
+             f"dcac_ratio = {self.dcac_ratio}",
+             # TODO f"control = ???"
+             f"busses = [{', '.join(buslist)}]",
+             f"required = {str(self.required).lower()}"]
+            + ([f"irradiance = '{self.irradiance}'"]
+               if self.irradiance is not None else [])
+            + [""]
+        ) + self._control_toml()
+
+    def _control_toml(self):
+        if self.control is None:
+            return ""
+        return self.control.write_toml(f'pv-options."{self.name}"') + "\n"
+
+    def read_toml(self, name: str, toml_data: dict):
+        """Set the attributes of this instance using `toml_data`"""
+        self.name = name
+        self.pmpp = set(toml_data["pmpp"])
+        self.busses = set(toml_data["busses"])
+        self.dcac_ratio = toml_data["dcac_ratio"]
+        self.irradiance = toml_data["irradiance"]
+        self.required = toml_data["required"]
+        if "control-params" in toml_data:
+            self.control = InverterControl("uncontrolled")
+            self.control.read_toml(toml_data["control-params"])
+
+    def validate_name(self):
+        if is_valid_opendss_name(self.name):
+            return None
+        return "name invalid"
+
+    def validate_pmpp(self):
+        if all(pmpp > 0.0 for pmpp in self.pmpp):
+            return None
+        return "pmpp must be greater than 0"
+
+    def validate_dcac_ratio(self):
+        # 2 is sort of arbitrary, and technically we don't actually need an
+        # upper bound, but I also don't trust OpenDSS to handle values >= 2.
+        if 0 < self.dcac_ratio < 2:
+            return None
+        return "DC/AC ratio must be between 0 and 2 (exclusive)"
+
+    def validate_busses(self):
+        if len(self.busses) > 0:
+            return None
+        return "No busses selected"
+
+    def validate_irradiance(self):
+        if self.irradiance is not None:
+            return self._validate_irradiance_data()
+        return "You must select an irraiadnce profile"
+
+    def _validate_irradiance_data(self):
+        try:
+            with open(self.irradiance, "r") as f:
+                reader = csv.reader(f)
+                for row in reader:
+                    if len(row) == 0 or len(row) > 2:
+                        return (
+                            "Invalid irradiance data. "
+                            "There must be 1 to 2 entries per row"
+                        )
+                    if not all(_is_float(x) for x in row):
+                        return "Invalid irradiance data"
+        except OSError:
+            return "Irradiance file could not be read"
+        return None
+
+    def validate_controls(self):
+        # TODO (wfv) make sure that the voltwatt curves are greater then 0 if
+        #      enabled.
+        pass
+
+    def add_bus(self, bus: str):
+        """Add `bus` to the set of busses where the PV system may be placed."""
+        self.busses.add(bus)
+
+    def add_pmpp(self, pmpp: float):
+        """Add `pmpp` to the set of maximum powers the PV system can output."""
+        # XXX The corresponding method on StorageOptions returns True if the
+        #     value was added and False if it was not (because it already
+        #     existed in the set). I'm not sure why it behaves like this so I'm
+        #     not going to do the same here. If I need that behavior once the
+        #     UI components are implemented it will be easy to add at that
+        #     time.
+        self.pmpp.add(pmpp)
+
+    @property
+    def num_configurations(self):
+        cfgs = len(self.busses) * len(self.pmpp)
+        if self.required:
+            return cfgs
+        return cfgs + 1
+
+    def configurations(self):
+        """Rerturn a generator that yields all possible configurations."""
+        inv_control = None
+        if self.control is not None and self.control.mode != "uncontrolled":
+            inv_control = self.control.get_invcontrol("PVSystem", self.name)
+        for bus in self.busses:
+            for pmpp in self.pmpp:
+                yield (
+                    grid.PVSpecification(
+                        self.name,
+                        bus,
+                        pmpp,
+                        kva_rated=pmpp / self.dcac_ratio,
+                        phases=None,
+                        irradiance_profile=self.irradiance,
+                    ),
+                    inv_control
+                )
+        if not self.required:
+            yield None, None
+
 
 class StorageOptions:
     """Set of configuration options available for a specific device.
@@ -898,8 +1287,6 @@ class StorageOptions:
     ----------
     name : str
         Name of the device.
-    num_phases: int
-        Number of phases this device must be connected to.
     power : iterable of float
         Options for maximum power capacity of the device. [kW]
     duration : iterable of float
@@ -925,7 +1312,7 @@ class StorageOptions:
         evaluated.
     """
 
-    def __init__(self, name, num_phases, power, duration, busses,
+    def __init__(self, name, power, duration, busses,
                  min_soc=0.2,
                  max_soc=0.8,
                  initial_soc=0.5,
@@ -933,7 +1320,6 @@ class StorageOptions:
                  control=None,
                  required=True):
         self.name = name
-        self.phases = num_phases
         self.power = set(power)
         self.duration = set(duration)
         self.busses = set(busses)
@@ -947,7 +1333,6 @@ class StorageOptions:
     def __eq__(self, other):
 
         return self.name == other.name and \
-            self.phases == other.phases and \
             self.min_soc == other.min_soc and \
             self.max_soc == other.max_soc and \
             self.initial_soc == other.initial_soc and \
@@ -974,7 +1359,6 @@ class StorageOptions:
            m.update(repr(hash(self.control)).encode())
 
         m.update(repr(self.name).encode())
-        m.update(repr(self.phases).encode())
         m.update(repr(self.min_soc).encode())
         m.update(repr(self.max_soc).encode())
         m.update(repr(self.initial_soc).encode())
@@ -996,7 +1380,6 @@ class StorageOptions:
         """
         tag = f"storage-options.\"{self.name}\""
         ret = f"\n\n[{tag}]\n"
-        ret += f"phases = {str(self.phases)}\n"
         ret += f"required = {str(self.required).lower()}\n"
         ret += f"min_soc = {str(self.min_soc)}\n"
         ret += f"max_soc = {str(self.max_soc)}\n"
@@ -1020,7 +1403,6 @@ class StorageOptions:
             A TOML formatted dictionary from which to read the properties of this class
             instance.
         """
-        self.phases = tomlData["phases"]
         self.required = tomlData["required"]
         self.min_soc = tomlData["min_soc"]
         self.max_soc = tomlData["max_soc"]
@@ -1491,17 +1873,12 @@ class Configuration:
             if ess is None:
                 h.update(b"None")
             else:
-                h.update(
-                    bytes(
-                        str((ess.name,
-                             ess.bus,
-                             ess.phases,
-                             ess.kwh_rated,
-                             ess.kw_rated,
-                             ess.controller)),
-                        "utf-8"
-                    )
-                )
+                h.update(bytes(str(ess.to_dict()), "utf-8"))
+        for pv in self.pvsystems:
+            if pv is None:
+                h.update(b"None")
+            else:
+                h.update(bytes(str(pv.to_dict()), "utf-8"))
         return str(h.hexdigest())
 
     def evaluate(self, basepath="."):
@@ -1568,7 +1945,7 @@ class Configuration:
     def _configure_pv(self, config):
         config["pvsystem"] = list(
             pv.to_dict()
-            for pv in self.pvsystems
+            for pv in self.pvsystems if pv is not None
         )
         return config
 
