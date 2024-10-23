@@ -715,7 +715,8 @@ class SSimApp(MDApp):
         super().__init__(*args, **kwargs)
         
     def on_start(self):
-        Clock.schedule_once(lambda dt: self.load_initial_file(dt), 3)
+        if len(sys.argv) >= 2:
+            Clock.schedule_once(lambda dt: self.load_initial_file(dt), 3)
 
     def load_initial_file(self, dt):
         if len(sys.argv) < 2: return

@@ -248,7 +248,7 @@ class Project:
         can be found to be equal or not based only on object "genetics".
 
         The value produced will be consistent across multiple invocations of
-        the python interpeter (non-salted).
+        the python interpreter (non-salted).
         """
         m = hashlib.sha256()
 
