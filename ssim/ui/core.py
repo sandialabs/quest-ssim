@@ -1945,7 +1945,7 @@ class Configuration:
     def _configure_pv(self, config):
         config["pvsystem"] = list(
             pv.to_dict()
-            for pv in self.pvsystems
+            for pv in self.pvsystems if pv is not None
         )
         return config
 
