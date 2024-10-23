@@ -1027,7 +1027,10 @@ class DSSModel:
             Initial operating state of the device.
 
         """
-        phases = phases or len(self.available_phases(bus))
+        nodes = self.available_phases(bus)
+        if phases is None:
+            bus = ".".join([bus] + [str(n) for n in nodes])
+            phases = len(nodes)
         device = Storage(name, bus, device_parameters, phases, state)
         self._storage[name] = device
         return device
@@ -1054,7 +1057,10 @@ class DSSModel:
             Additional parameters. Keys must be valid OpenDSS PVSystem object
             parameters.
         """
-        phases = phases or len(self.available_phases(bus))
+        nodes = self.available_phases(bus)
+        if phases is None:
+            bus = ".".join([bus] + [str(n) for n in nodes])
+            phases = len(nodes)
         system = PVSystem(name, bus, phases, pmpp_kw, kva_rating,
                           system_parameters)
         self._pvsystems[name] = system
