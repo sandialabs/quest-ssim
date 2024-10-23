@@ -1,8 +1,9 @@
 """Storage Sizing and Placement Kivy application"""
+import inspect
 import itertools
+import logging
 import math
 import os
-from pickle import NONE
 import re
 from collections import defaultdict
 from contextlib import ExitStack
@@ -10,78 +11,72 @@ from copy import deepcopy
 from math import cos, hypot
 from threading import Thread
 from typing import List
-from ssim.opendss import DSSModel
 
-import kivy
-import matplotlib as mpl
-from matplotlib.path import Path
-import matplotlib.pyplot as plt
-from matplotlib.lines import Line2D
-import matplotlib.patches as patches
-import matplotlib.colors as mplcolors
-
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 import dss.plot
+import kivy
+import kivy.garden
+import matplotlib as mpl
+import matplotlib.colors as mplcolors
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 import opendssdirect as dssdirect
 import pandas as pd
-import logging
-from importlib_resources import files, as_file
+from importlib_resources import as_file, files
 from kivy.clock import Clock
 from kivy.core.text import LabelBase
-from kivy.logger import Logger, LOG_LEVELS
+from kivy.core.window import Window
+from kivy.logger import LOG_LEVELS, Logger
 from kivy.metrics import dp
 from kivy.properties import ObjectProperty, StringProperty
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.floatlayout import FloatLayout
-from kivy.uix.popup import Popup
 from kivy.uix.button import Button
+from kivy.uix.checkbox import CheckBox
+from kivy.uix.floatlayout import FloatLayout
+from kivy.uix.label import Label
+from kivy.uix.popup import Popup
 from kivy.uix.progressbar import ProgressBar
 from kivy.uix.recycleview import RecycleView
 from kivy.uix.recycleview.views import RecycleDataViewBehavior
 from kivy.uix.screenmanager import Screen, ScreenManager
 from kivy.uix.textinput import TextInput
-from kivy.core.window import Window
 from kivymd.app import MDApp
 from kivymd.uix.gridlayout import MDGridLayout
 from kivymd.uix.label import MDLabel
-from kivy.uix.label import Label
-from kivymd.uix.list import IRightBodyTouch, OneLineAvatarIconListItem
 from kivymd.uix.list import (
-    TwoLineAvatarIconListItem,
-    OneLineIconListItem,
-    TwoLineIconListItem,
-    ThreeLineIconListItem,
     ILeftBodyTouch,
+    MDList,
+    OneLineIconListItem,
     OneLineRightIconListItem,
-    MDList
+    ThreeLineIconListItem,
+    TwoLineAvatarIconListItem,
+    TwoLineIconListItem
 )
 from kivymd.uix.menu import MDDropdownMenu
 from kivymd.uix.selectioncontrol import MDCheckbox
-from kivy.uix.checkbox import CheckBox
 from kivymd.uix.tab import MDTabsBase
 from kivymd.uix.textfield import MDTextField
 from matplotlib.collections import LineCollection
-from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
+from matplotlib.lines import Line2D
+from matplotlib.offsetbox import OffsetImage
+from matplotlib.path import Path
+
 import ssim.ui
+from ssim.metrics import ImprovementType, Metric, MetricTimeAccumulator
+from ssim.opendss import DSSModel
 from ssim.ui import (
     Configuration,
-    Project,
-    StorageControl,
     InverterControl,
-    StorageOptions,
+    Project,
     PVOptions,
-    ProjectResults,
+    StorageOptions,
     is_valid_opendss_name
 )
-from ssim.ui.kivy.xygrid import XYGridView
 from ssim.ui.kivy import util
 
-import kivy.garden
-import inspect
 kivy.garden.garden_system_dir = os.path.join(
     os.path.dirname(inspect.getfile(ssim.ui)), "libs/garden"
 )
-from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg, NavigationToolbar2Kivy
+from kivy.garden.matplotlib.backend_kivyagg import FigureCanvasKivyAgg
 
 _FONT_FILES = {
     "exo_regular": "Exo2-Regular.ttf",
@@ -1434,6 +1429,84 @@ class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         Clock.schedule_once(
             lambda dt: refocus_text_field(self.ids.device_name), 0.05
             )
+
+    def on_selection_changed(self, bus, selected):
+        if self.options is None:
+            return
+        for b in self.ids.bus_list.data:
+            if b["text"] == bus:
+                b["active"] = selected
+        if selected:
+            self.options.add_bus(bus)
+        else:
+            self.options.remove_bus(bus)
+
+    def apply_bus_filters(self):
+        self.reload_bus_list()
+
+    def open_bus_filters(self):
+        content = BusSearchPanelContent()
+
+        content.load_voltage_checks(self.project.grid_model.all_base_voltages())
+
+        content.apply_filters(self._bus_filters)
+
+        popup = Popup(
+            title="Filter Busses",
+            content=content,
+            auto_dismiss=False,
+            size_hint=(0.7, 0.7),
+            background_color=(224, 224, 224),
+            title_color=(0, 0, 0),
+        )
+
+        def apply(*args):
+            self._bus_filters = content.extract_filters()
+            self.apply_bus_filters()
+            popup.dismiss()
+
+        def clear(*args):
+            self._bus_filters = BusFilters()
+            self.apply_bus_filters()
+            popup.dismiss()
+
+        content.ids.okBtn.bind(on_press=apply)
+        content.ids.clearBtn.bind(on_press=clear)
+        content.ids.cancelBtn.bind(on_press=popup.dismiss)
+        popup.open()
+
+    def on_bus_filter_applied(self, instance, value):
+        self.reload_bus_list()
+
+    def check_bus_filters(self, bus) -> bool:
+        return self._bus_filters.test_bus(bus, self.project, self.options.busses)
+
+    def check_need_bus_filtering(self) -> bool:
+        return self._bus_filters is not None and not self._bus_filters.is_empty()
+
+    def reload_bus_list(self):
+        need_filter = self.check_need_bus_filtering()
+
+        bus_data = []
+        for bus in self.project.bus_names:
+            if not need_filter or self.check_bus_filters(bus):
+                phases = str(self.project.phases(bus))
+                kv = str(DSSModel.nominal_voltage(bus))
+                bus_data += [
+                    {
+                        "text": bus,
+                        "secondary_text": phases + ", " + kv + " kV",
+                        "active": bus in self.options.busses,
+                        "owner": self,
+                    }
+                ]
+
+        self.ids.bus_list.data = bus_data
+
+        filtertxt = self._bus_filters.summary()
+        self.ids.filter_busses_btn.text = "Filter Busses"
+        if filtertxt:
+            self.ids.filter_busses_btn.text += " " + filtertxt
 
     def _check_name(self, textfield):
         if not textfield.text_valid():
@@ -3841,7 +3914,7 @@ class SSimScreen(SSimBaseScreen):
     curr_x_max = 0.0
     curr_y_min = 0.0
     curr_y_max = 0.0
-    
+
     def on_kv_post(self, base_widget):
         self.refresh_grid_plot()
 
@@ -3849,8 +3922,7 @@ class SSimScreen(SSimBaseScreen):
         Logger.debug("button pressed: %s", message)
 
     def dismiss_popup(self):
-        self._popup.dismiss()
-
+        if self._popup: self._popup.dismiss()
         
     def _show_no_grid_file_popup(dismiss_screen=None, manager=None):
         """Show a popup dialog warning that no grid model file is selected.
@@ -4007,6 +4079,18 @@ class SSimScreen(SSimBaseScreen):
         dssdirect.Circuit.SetActiveBus(bus)
         return dssdirect.Bus.X(), dssdirect.Bus.Y()
 
+    def all_bus_coords(self, gm) -> dict:
+        if len(gm.bus_names) == 0:
+            return None
+
+        seg_busses = {}
+
+        for bus in gm.bus_names:
+            bc = self.bus_coords(bus)
+            seg_busses[self.get_raw_bus_name(bus)] = bc
+
+        return seg_busses
+
     def line_bus_coords(self, line):
         bus1, bus2 = self.line_busses(line)
         return [self.bus_coords(bus1), self.bus_coords(bus2)]
@@ -4158,16 +4242,16 @@ class SSimScreen(SSimBaseScreen):
         )
 
         # Without getting the limits here, things don't draw right.  IDK why.
-        ylim = ax.get_ylim()
+        _ = ax.get_ylim()
 
         w = 12
-        h = 6 
+        h = 6
         o = 2
         yo = 4
 
         der_colors = {}
         der_busses = defaultdict(list)
-        seg_busses = self.__get_line_segment_busses(self.project.grid_model)
+        seg_busses = self.all_bus_coords(self.project.grid_model)
         cindex = 0
 
         for der in der_options:
@@ -4265,30 +4349,24 @@ class SSimScreen(SSimBaseScreen):
         lines = gm.line_names
         if len(lines) == 0: return None
         
-        return [line for line in gm.line_names
+        return [line for line in lines
             if (0., 0.) not in self.line_bus_coords(line)]
     
     def __get_line_segment_busses(self, gm, seg_lines=None):
         if seg_lines is None:
             seg_lines = self.__get_line_segments(gm)
         
+        if len(seg_lines) == 0:
+            return self.all_bus_coords()
+
         seg_busses = {}
         
-        if len(seg_lines) == 0:
-            busses = gm.bus_names
-            if len(busses) == 0:
-                return None
-            
-            for bus in busses:
-                bc = self.bus_coords(bus)
-                seg_busses[self.get_raw_bus_name(bus)] = bc
-        else:            
-            for line in seg_lines:
-                bus1, bus2 = self.line_busses(line)
-                bc1 = self.bus_coords(bus1)
-                bc2 = self.bus_coords(bus2)
-                seg_busses[self.get_raw_bus_name(bus1)] = bc1
-                seg_busses[self.get_raw_bus_name(bus2)] = bc2
+        for line in seg_lines:
+            bus1, bus2 = self.line_busses(line)
+            bc1 = self.bus_coords(bus1)
+            bc2 = self.bus_coords(bus2)
+            seg_busses[self.get_raw_bus_name(bus1)] = bc1
+            seg_busses[self.get_raw_bus_name(bus2)] = bc2
 
         return seg_busses
     
@@ -4309,7 +4387,6 @@ class SSimScreen(SSimBaseScreen):
 
     def draw_plot_using_dss_plot(self):        
         gm = self.project.grid_model
-        
         if gm is None:
             self.ids.grid_diagram.display_plot_error(
                 "There is no current grid model."
