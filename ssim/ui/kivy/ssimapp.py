@@ -1899,6 +1899,9 @@ class DERConfigurationScreen(SSimBaseScreen):
         self.ids.delete_storage.bind(
             on_release=self.delete_ess
         )
+        self.ids.delete_pv.bind(
+            on_release=self.delete_pv
+        )
 
     def load_project_data(self):
         self.ids.ess_list.clear_widgets()
@@ -1951,6 +1954,15 @@ class DERConfigurationScreen(SSimBaseScreen):
         self.ids.ess_list.add_widget(
             StorageListItem(ess, self)
         )
+
+    def delete_pv(self, button):
+        to_remove = []
+        for pv_list_item in self.ids.pv_list.children:
+            if pv_list_item.selected:
+                to_remove.append(pv_list_item)
+                self.project.remove_pv_option(pv_list_item.pv)
+        for widget in to_remove:
+            self.ids.pv_list.remove_widget(widget)
 
     def delete_ess(self, button):
         to_remove = []
