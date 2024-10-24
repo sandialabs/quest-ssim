@@ -2988,7 +2988,7 @@ class MetricConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         """
         self.ids.metriclist.clear_widgets()
         self.reset_metric_list_label()
-        manager = self.project.get_manager(self._currentMetricCategory)
+        manager = self.project.get_metric_manager(self._currentMetricCategory)
 
         if manager is None: return
 
@@ -3662,7 +3662,7 @@ class RunSimulationScreen(SSimBaseScreen):
         self._update_configurations_to_eval()
 
     def _evaluate(self):
-        """Initiates evaluation of configurations that are currelty selected.
+        """Initiates evaluation of configurations that are currently selected.
         """
         checkpoint = self.project.save_checkpoint()
 
