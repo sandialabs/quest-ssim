@@ -1,6 +1,7 @@
 #:include common.kv
 
-
+#:import XYGridView ssim.ui.kivy.xygrid.XYGridView
+#:import ControlTabs ssim.ui.kivy.control.ControlTabs
 #:import MDBoxLayout kivymd.uix.boxlayout.MDBoxLayout
 #:import MDDropdownMenu kivymd.uix.menu.MDDropdownMenu
 #:import MDDropDownItem kivymd.uix.dropdownitem.MDDropDownItem
@@ -420,7 +421,7 @@
                     on_press: root.select_grid_model()
 
                 Button:
-                    text: "select storage"
+                    text: "select DER"
                     on_press: root.open_der_configuration()
 
                 Button:
@@ -468,7 +469,7 @@
                         active: True
                         on_active: root.changed_show_bus_labels(self.active)
                         
-                    MDLabel
+                    MDLabel:
                         id: show_storage_option
                         size_hint_x: None
                         width: 170
@@ -480,6 +481,19 @@
                         width: 30
                         active: True
                         on_active: root.changed_show_storage_options(self.active)
+
+                    MDLabel:
+                        id: show_pv_option
+                        size_hint_x: None
+                        width: 170
+                        text: "Show PV Options"
+
+                    CheckBox:
+                        id: show_pv_options
+                        size_hint_x: None
+                        width: 30
+                        active: True
+                        on_active: root.changed_show_pv_options(self.active)
 
 
 <DERConfigurationScreen>:
@@ -532,6 +546,17 @@
                     MDList:
                         id: pv_list
 
+                Button:
+                    id: new_pv
+                    size_hint: (1.0, 0.1)
+                    text: "New PV System"
+                    on_press: root.new_pv_system()
+
+                Button:
+                    id: delete_pv
+                    size_hint: (1.0, 0.1)
+                    text: "Delete PV System"
+
         BoxLayout:
             orientation: "horizontal"
             size_hint_y: None
@@ -556,6 +581,15 @@
         icon: "pencil"
 
 
+<PVListitem>:
+    LeftCheckBox:
+        id: selected
+
+    IconRightWidget:
+        id: edit
+        icon: "pencil"
+
+
 <ResultsVariableListItemWithCheckbox>:
     id: results_variable_list
 
@@ -571,8 +605,6 @@
         id: metrics_selected
         listItem: root
 
-
-<PVListitem>:
 
 <ResultsListItem>:
     size_hint: 1.0, 0.5
@@ -604,9 +636,10 @@
         id: selected
         on_active: root.mark(self, self.active)
 
-<DroopTabContent@BoxLayout>
+<DroopTabContent>
     orientation: "vertical"
     padding: 5
+    title: "Droop"
 
     TextFieldFloat:
         id: p_value
@@ -619,9 +652,10 @@
     BoxLayout:
         size_hint: (1.0, 0.8)
 
-<ConstPFTabContent@BoxLayout>
+<ConstPFTabContent>
     orientation: "vertical"
     padding: 5
+    title: "Constant Power Factor"
 
     TextFieldFloat:
         id: pf_value
@@ -634,6 +668,7 @@
     orientation: "vertical"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Volt-Var"
 
     BoxLayout:
         orientation: "horizontal"
@@ -700,6 +735,7 @@
     orientation: "vertical"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Volt-Watt"
 
     BoxLayout:
         orientation: "horizontal"
@@ -766,6 +802,7 @@
     orientation: "vertical"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Var-Watt"
 
     BoxLayout:
         orientation: "horizontal"
@@ -833,6 +870,7 @@
     orientation: "horizontal"
     size_hint: (1.0, 1.0)
     padding: 5
+    title: "Volt-Var & Volt-Watt"
 
     BoxLayout:
         orientation: "vertical"
@@ -965,6 +1003,15 @@
         size_hint_x: 0.5
 
 
+<NoControl>:
+    padding: 4
+    title: "Uncontrolled"
+
+    Label:
+        id: ucmodelabel
+        text: "Uncontrolled"
+
+
 <StorageControlConfigurationScreen>:
     name: "configure-storage-controls"
     on_enter: self.set_mode_label_text()
@@ -996,52 +1043,10 @@
         BoxLayout:
             size_hint: (1.0, 0.2)
 
-            MDTabs:
-                id: control_tabs
+            ControlTabs:
+                id: tabs
                 lock_swiping: True
-                on_tab_switch: root.on_tab_switch(*args)
-
-                StorageControlModelTab:
-                    id: droop_tab
-                    title: "Droop"
-
-                    DroopTabContent:
-                        id: droop_tab_content
-
-                StorageControlModelTab:
-                    id: vv_tab
-                    title: "Volt-Var"
-
-                    VoltVarTabContent:
-                        id: vv_tab_content
-
-                StorageControlModelTab:
-                    id: vw_tab
-                    title: "Volt-Watt"
-
-                    VoltWattTabContent:
-                        id: vw_tab_content
-
-                StorageControlModelTab:
-                    id: var_watt_tab
-                    title: "Var-Watt"
-
-                    VarWattTabContent:
-                        id: var_watt_tab_content
-
-                StorageControlModelTab:
-                    id: vv_vw_tab
-                    title: "Volt-Var & Volt-Watt"
-
-                    VoltVarVoltWattTabContent:
-                        id: vv_vw_tab_content
-
-                StorageControlModelTab:
-                    id: const_pf_tab
-                    title: "Constant Power Factor"
-
-                    ConstPFTabContent:
-                        id: const_pf_tab_content
+                enabled_controls: ["droop", "voltvar", "voltwatt", "varwatt", "vv_vw", "constantpf"]
 
         BoxLayout:
             size_hint_y: None
@@ -1115,25 +1120,136 @@
                             id: duration_list
 
             BoxLayout:
+                id: right_box
+                orientation: "vertical"
+                padding: 5
+                spacing: 10
+
+                FilterableBusList:
+                    id: select_busses
+
+                BoxLayout:
+                    size_hint_y: None
+                    height: 25
+                    orientation: "horizontal"
+                    padding: [0, 0, 20, 0]
+
+                    MDLabel:
+                        id: required_label
+                        text: "Required?"
+
+                    MDSwitch:
+                        id: required
+                        active: False
+                        size_hint: [0.08, 1.0]
+
+                Button:
+                    text: "Edit Control Parameters"
+                    size_hint_y: None
+                    height: 30
+                    on_press: root.edit_control_params()
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: "horizontal"
+
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
+
+<PVControlConfigurationScreen>:
+    name: "configure-pv-controls"
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: 5
+
+        # TODO may want to expose the OpenDSS "%cutin" & "%cutout" parameters here
+
+        Label:
+            id: mode_label
+            markup: True
+            text: "Select a control mode for this PV system:"
+            color: C(hex_black)
+            size_hint_y: None
+            height: 25
+
+        BoxLayout:
+            size_hint: (1.0, 0.2)
+
+            ControlTabs:
+                id: tabs
+                lock_swiping: True
+                enabled_controls: ["uncontrolled", "voltvar", "voltwatt", "varwatt", "vv_vw", "constantpf"]
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+            orientation: "horizontal"
+
+            Button:
+                text: "back"
+                on_press: root.cancel()
+
+            Button:
+                text: "save"
+                on_press: root.save()
+
+
+<PVConfigurationScreen>:
+    id: "configure-pv"
+
+    BoxLayout:
+        orientation: "vertical"
+        padding: 5
+
+        BoxLayout:
+            orientation: "horizontal"
+            padding: 5
+
+            BoxLayout:
+                orientation: "vertical"
+                padding: 5
+
+                TextFieldOpenDSSName:
+                    id: device_name
+                    hint_text: "Device Name"
+                    helper_text_mode: "on_error"
+                    helper_text: "invalid name"
+
+                TextFieldPositiveFloat:
+                    id: pmpp_input
+                    hint_text: "PV System Max AC Power (kW)"
+
+                MDScrollView:
+                    EditableSetList:
+                        id: pmpp_list
+
+                MDLabel:
+                    id: irradiance_path
+                    text: "Select a file containing the irradiance profile"
+
+                Button:
+                    id: select_irradiance
+                    size_hint_y: None
+                    height: 30
+                    text: "Select irradiance profile"
+
+            BoxLayout:
                 id: bus_list_box
                 orientation: "vertical"
                 padding: 5
                 spacing: 10
 
-                MDLabel:
-                    text: "Select possible busses"
-                    size_hint: (1.0, 0.05)
-                    underline: True
+                FilterableBusList:
+                    id: select_busses
 
-                Button:
-                    id: filter_busses_btn
-                    text: "Filter Busses"
-                    size_hint: (1.0, 0.05)
-                    on_press: root.open_bus_filters()
-
-                BusRecycleView:
-                    id: bus_list
-                    
                 BoxLayout:
                     size_hint_y: None
                     height: 25
@@ -1429,7 +1545,29 @@
         touch_multiselect: False
 
 
-<BusRecycleView>:
+<FilterableBusList@BoxLayout>:
+    id: bus_list_box
+    orientation: "vertical"
+    padding: 5
+    spacing: 10
+
+    MDLabel:
+        text: "Select possible busses"
+        size_hint: (1.0, 0.05)
+        underline: True
+
+    Button:
+        id: filter_busses_btn
+        text: "Filter Busses"
+        size_hint: (1.0, 0.05)
+        on_press: root.open_bus_filters()
+
+    BusRecycleView:
+        id: bus_list
+        project: root.project
+
+
+<BusRecycleView@RecycleView>:
     viewclass: 'BusListItem'
     padding: [0, 0, 10, 0]
     
@@ -2019,6 +2157,30 @@
         text_color: 1, 0, 0, 1
         on_release:
             root.delete_item(the_list_item)
+
+
+<SelectFileDialog>:
+    BoxLayout:
+        size: root.size
+        pos: root.pos
+        orientation: "vertical"
+
+        FileChooserListView:
+            id: filechooser
+            path: "."
+
+        BoxLayout:
+            size_hint_y: None
+            height: 30
+
+            Button:
+                text: "Cancel"
+                on_release: root.cancel()
+
+            Button:
+                text: "Ok"
+                on_release: root.load(filechooser.path, filechooser.selection)
+
 
 <SelectGridDialog>:
     BoxLayout:
