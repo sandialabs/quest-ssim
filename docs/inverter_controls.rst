@@ -122,7 +122,7 @@ each specific inverter function which can either be associated with controlling 
 limiting active power or both.
 
 Common Parameters for All Inverter Functions
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The common parameters that need to be defined for *all* inverter functions are:
 
 #. ``der_list``: List of DER units to be controlled by the defined inverter controller. If this parameter is not specified, all the DER units in the model will be controlled by the defined inverter controller. ::

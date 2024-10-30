@@ -139,7 +139,7 @@ A detailed description of these control modes can be found at ``docs/inverter_co
         ]
 
 ``"reliability"``:
-^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^
 This field sets up the parameters for reliability studies. Default values are used as these are not very 
 relevant to the voltage regulation example being presented in the paper.
 
