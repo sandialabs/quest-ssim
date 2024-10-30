@@ -18,6 +18,8 @@ jobs:
         pip install sphinx
     - name: Build HTML
       run: sphinx-build -vvv -b html docs _build
+      env:
+        MPLBACKEND: agg
     - name: Deply to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
       if: github.ref == 'refs/head/master'
