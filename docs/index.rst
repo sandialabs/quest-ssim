@@ -3,8 +3,8 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Welcome to storage-sim's documentation!
-=======================================
+QuEST-SSim
+==========
 
 .. toctree::
    :maxdepth: 2
@@ -13,16 +13,23 @@ Welcome to storage-sim's documentation!
    api
    ems
    configuration
+   inverter_controls
    metrics
+   demo_examples
+
+Installation
+------------
+
+The SSim package is available on pypi. You can install it via::
+
+  pip install quest-ssim
 
 Running the simulation
 ----------------------
-Use Helics CLI to run the simulator. HELICS CLI can be installed with::
 
-  pip install git+git://github.com/GMLC-TDC/helics-cli.git@main
-
-An example configuration is provided in ``examples/federation.json`` (shown
-below):
+You may launch the GUI with the ``ssim`` command, or use HELICS CLI to run the
+simulator directly. An example configuration for the HELICS CLI is provided in
+``examples/demo_670/federation.json`` (shown below):
 
 .. literalinclude:: ../examples/demo_670/federation.json
 
