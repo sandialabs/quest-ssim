@@ -15,6 +15,7 @@ jobs:
     - name: Install Dependencies
       run: |
         pip install .
+        pip install -U matplotlib
         pip install sphinx
     - name: Build HTML
       run: sphinx-build -vvv -b html docs _build
