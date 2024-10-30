@@ -75,8 +75,8 @@ the storage asset is assumed to be placed at Bus 814 (Note that: in the actual f
 other storage assets as well but the controller parameters are set to 0.0 essentially disabling them. This 
 is done so that the same file can be repurposed for all the cases with simple modifications to the controller
 parameters only.) Various parameters of the storage assets are defined here which are self-explanatory based on the 
-field names. Of particular interest is the field ``"controller"``. This allows custom storage controllers to be 
-assigned to the storage asset. In this particular case, a ``"droop"``controller is used. This controller is already
+field names. Of particular interest is the field ``"controller"`` . This allows custom storage controllers to be 
+assigned to the storage asset. In this particular case, a ``"droop"`` controller is used. This controller is already
 available in the simulator. The necessary parameters for the controller is provided as dictionary through the ``"controller_params"`` 
 field. In this case, the active power droop coefficient ``"p_droop"`` and the reactive power droop coefficient ``"q_droop"`` are provided:: 
 
