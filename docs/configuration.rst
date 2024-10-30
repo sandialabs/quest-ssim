@@ -60,14 +60,13 @@ Example Grid Configuration File
 Federate Configuration
 ======================
 
-Each federate is initialized from a JSON configuration file. With the exception
-of the logger federate, each of federate must have its publications,
-subscriptions and endpoints specified in the config file. For storage devices
-the configuration looks like this:
+Federates are configured using JSON configuration files that are distributed
+with the SSim application. These files are found in the
+:py:mod:`ssim.federates` subpackage. The grid federate configuration, for
+example, is found in ``ssim/federates/grid.json``
 
-.. literalinclude:: ../examples/federate-config/s1.json
+.. literalinclude:: ../ssim/federates/grid.json
 
-For the grid federate (with two connected storage devices as shown in
-:ref:`grid_example`) the federate configuration looks like this:
-
-.. literalinclude:: ../examples/federate-config/grid-federate.json
+You should not need to change these configurations. Customizable parameters are
+exposed by the command line arguments of the federate programs and additional
+customization is performed automatically based on the details of the simulation.
