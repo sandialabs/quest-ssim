@@ -463,7 +463,7 @@ class Project:
         self.name = projdict["name"]
         self.set_grid_model(projdict["grid_model_path"])
         self._workdir = projdict.get("working_directory", ".")
-        self._version_manager.basedir = self._workdir
+        self._version_manager.basedir = os.path.join(self._workdir, self.name)
         self._current_checkpoint = None
 
         sodict = tomlData["storage-options"]
@@ -2194,7 +2194,7 @@ class Results:
 
     def __init__(self, config_dir):
         self.config_dir = config_dir
-
+        
     def _extract_data(self, csv_file):
         df_extracted_data = pd.read_csv(self.config_dir / csv_file)
         # extract column names

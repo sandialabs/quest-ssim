@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import re
+import sys
 from collections import defaultdict
 from contextlib import ExitStack
 from copy import deepcopy
@@ -2780,7 +2781,7 @@ class RunSimulationScreen(SSimBaseScreen):
         """Apply selected filters to the configurations list.
         """
         # clear the selected configurations and configurations
-        # to evalulate lists
+        # to evaluate lists
         self.selected_configurations.clear()
         self.configurations_to_eval.clear()
         # perform the filtering based on user selections
@@ -2790,7 +2791,7 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def clear_config_filters(self):
         # clear the selected configurations and configurations
-        # to evalulate lists
+        # to evaluate lists
         self.selected_configurations.clear()
         self.configurations_to_eval.clear()
         # clear all the filters
@@ -2815,7 +2816,7 @@ class RunSimulationScreen(SSimBaseScreen):
         """Performs filtering and repopulates the
            list filtered_configurations.
         """
-        # reset filtered_configurations List everytime a new filtering
+        # reset filtered_configurations List every time a new filtering
         # action is performed
         filter_condition_kW = None
         filter_condition_kWh = None
