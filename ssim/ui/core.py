@@ -34,7 +34,7 @@ from ssim.opendss import DSSModel
 #    - iterator over storage locations
 #    - set of metrics for all configurations
 #    - how is each storage device controlled?
-# 1.5. Gereric MetricConfiguration class?
+# 1.5. Generic MetricConfiguration class?
 # 2. Add basic Configuration implementation
 # 3. Implement Configuration.evaluate()
 
@@ -163,7 +163,7 @@ class VersionManager:
         self.basedir = basedir
 
     def checkpoint_dir(self, project_hash):
-        """Return the checpoint directory for `project_hash`."""
+        """Return the checkpoint directory for `project_hash`."""
         h = f"{project_hash:x}"
         return Path(os.path.join(self.basedir, h))
 
@@ -221,19 +221,21 @@ class Project:
         self._grid_model_path = None
         self._grid_model = None
         self._input_file_path = None
+        self._workdir = "."
         self.storage_devices = []
         self.pvsystems = []
         self._metricMgrs = {}
         self.reliability_params = _DEFAULT_RELIABILITY
         self.version = version
-        self._version_manager = VersionManager(name)
+        self._version_manager = VersionManager(os.path.join(self._workdir, name))
         self._current_checkpoint = None
 
     def __eq__(self, other):
 
         # Should input file path be included?  Maybe not.
         if self.name != other.name or \
-            not __eq_maybe_none(self._grid_model_path == other._grid_model_path):  # or \
+            not __eq_maybe_none(self._grid_model_path == other._grid_model_path) or \
+            not __eq_maybe_none(self._workdir == other._workdir):  # or \
             # not __eq_maybe_none(self._input_file_path == other._input_file_path):
             return False;
 
@@ -261,7 +263,7 @@ class Project:
         can be found to be equal or not based only on object "genetics".
 
         The value produced will be consistent across multiple invocations of
-        the python interpeter (non-salted).
+        the python interpreter (non-salted).
         """
         m = hashlib.sha256()
 
@@ -271,6 +273,9 @@ class Project:
             m.update(self._model_fingerprint.encode())
         elif self._grid_model_path is not None:
             m.update(self._grid_model_path.encode())
+            
+        if self._workdir is not None:
+            m.update(self._workdir.encode())
 
         self.storage_devices.sort(key=lambda x: x.name)
         for so in self.storage_devices:
@@ -337,10 +342,14 @@ class Project:
         """Return a :py:class:`ProjectResults` object for the current project
         version."""
         return ProjectResults(self._version_manager.checkpoint_dir(hash(self)))
-
+    
     @property
-    def base_dir(self):
-        return Path(os.path.abspath(self.name))
+    def working_dir(self):
+        return Path(self._workdir)
+
+    # @property
+    # def base_dir(self):
+    #     return Path(os.path.abspath(self.name))
 
     @property
     def bus_names(self):
@@ -453,6 +462,8 @@ class Project:
         projdict = tomlData["Project"]
         self.name = projdict["name"]
         self.set_grid_model(projdict["grid_model_path"])
+        self._workdir = projdict.get("working_directory", ".")
+        self._version_manager.basedir = os.path.join(self._workdir, self.name)
         self._current_checkpoint = None
 
         sodict = tomlData["storage-options"]
@@ -478,7 +489,7 @@ class Project:
     def __read_metric_map(self, mdict: dict):
         """Reads the metrics information out of the supplied dictionary.
 
-        The dictionary keys should be manager names and the values shoudl be
+        The dictionary keys should be manager names and the values should be
         the dictionaries that can be passed to the MetricManager.read_toml
         method.
                 
@@ -486,10 +497,10 @@ class Project:
         -------
         mdict: dict
             A TOML formatted dictionary from which to read the properties of
-            the metric managers to be contined in this class.
+            the metric managers to be continued in this class.
         """
         for ckey in mdict:
-            cat_mgr = self.get_manager(ckey)
+            cat_mgr = self.get_metric_manager(ckey)
             if cat_mgr is None:
                 cat_mgr = MetricManager()
                 self._metricMgrs[ckey] = cat_mgr
@@ -522,7 +533,7 @@ class Project:
         metric : MetricTimeAccumulator
             The metric to add to this project keyed on the supplied category and key.
         """
-        cat_mgr = self.get_manager(category)
+        cat_mgr = self.get_metric_manager(category)
         if cat_mgr is None:
             cat_mgr = MetricManager()
             self._metricMgrs[category] = cat_mgr
@@ -546,7 +557,7 @@ class Project:
             supplied category does not map to an existing metric manager or if key
             does not map to a metric in the identified manager.
         """
-        cat_mgr = self.get_manager(category)
+        cat_mgr = self.get_metric_manager(category)
         if cat_mgr is None: return False
         return cat_mgr.remove_accumulator(key)
 
@@ -567,7 +578,7 @@ class Project:
             not map to an existing metric manager or if key does not map to a metric
             in the identified manager.
         """
-        cat_mgr = self.get_manager(category)
+        cat_mgr = self.get_metric_manager(category)
         if cat_mgr is None: return None
         return cat_mgr.get_accumulator(key)
 
@@ -583,7 +594,7 @@ class Project:
         """Removes all PV options from this project."""
         self.pvsystems.clear()
 
-    def get_manager(self, category: str) -> MetricManager:
+    def get_metric_manager(self, category: str) -> MetricManager:
         """Retrieves the metric manager identified by the supplied category.
 
         Parameters
@@ -746,6 +757,28 @@ class InverterControl:
         else:
             raise ValueError("invalid mode")
 
+    def _active_curves(self):
+        x_names = StorageControl._CURVE_NAME_X[self.mode]
+        y_names = StorageControl._CURVE_NAME_Y[self.mode]
+        curves = tuple(
+            tuple(zip(self.active_params[x],
+                      self.active_params[y]))
+            for x, y in zip(x_names, y_names)
+        )
+        return curves[0], curves[1] if len(curves) == 2 else None
+
+    @property
+    def active_params(self):
+        """Return only the params relevant to the active mode.
+
+        Returns
+        -------
+        dict
+            Dictionary of parameters thar are relevant the the
+            currently active control mode.
+        """
+        return self.params[self.mode]
+
     def __eq__(self, other):
         if not isinstance(other, InverterControl):
             return False
@@ -760,6 +793,15 @@ class InverterControl:
         return self.active_params == other.active_params
 
     def __hash__(self):
+        """Produces a hash value for this instance of an InverterControl.
+
+        This only takes into account the core properties of the object, not
+        values that store current state during usage.  This is so that inputs
+        can be found to be equal or not based only on object "genetics".
+
+        The value produced will be consistent across multiple invocations of
+        the python interpeter (non-salted).
+        """
         m = hashlib.sha256()
         m.update(self.mode.encode())
         if self.mode in self.params:
@@ -1301,7 +1343,7 @@ class StorageOptions:
         Maximum state of charge this device will be allowed to
         charge to.
     initial_soc : float, default 0.5
-        State of charge at the begining of the simulation.
+        State of charge at the beginning of the simulation.
     soc_model : str, optional
         External model used for device state of charge.
     control : StorageControl, optional
@@ -1351,7 +1393,7 @@ class StorageOptions:
         can be found to be equal or not based only on object "genetics".
 
         The value produced will be consistent across multiple invocations of
-        the python interpeter (non-salted).
+        the python interpreter (non-salted).
         """        
         m = hashlib.sha256()
         
@@ -1484,7 +1526,7 @@ class StorageOptions:
     def name_valid(self) -> bool:
         """Tests to see if the name stored in this class is valid.
 
-        To be valid, the name must be a vaild OpenDSS name.  See the
+        To be valid, the name must be a valid OpenDSS name.  See the
         is_valid_opendss_name function for more details.
 
         Returns
@@ -1533,7 +1575,7 @@ class StorageOptions:
     def validate_name(self) -> str:
         """Checks to see that the name stored in this class is valid.
 
-        To be valid, the name must be a vaild OpenDSS name.  See the
+        To be valid, the name must be a valid OpenDSS name.  See the
         name_valid property for more details.
 
         Returns
@@ -1743,7 +1785,7 @@ class MetricCongifuration:
         can be found to be equal or not based only on object "genetics".
 
         The value produced will be consistent across multiple invocations of
-        the python interpeter (non-salted).
+        the python interpreter (non-salted).
         """
         m = hashlib.sha256()
 
@@ -1789,7 +1831,7 @@ class Configuration:
         """Compares this instance of a Configuration to another for functional
         equality.
 
-        Funcitonal equality means "effectively equal", not necessarily literaly equal.
+        Functional equality means "effectively equal", not necessarily literally equal.
         As an example, in some cases, it may not matter if the order of some objects
         in a collection be the same, as long as there is an equivalent object in each.
 
@@ -1835,7 +1877,7 @@ class Configuration:
         can be found to be equal or not based only on object "genetics".
 
         The value produced will be consistent across multiple invocations of
-        the python interpeter (non-salted).
+        the python interpreter (non-salted).
         """
         m = hashlib.sha256()
 
@@ -1980,7 +2022,7 @@ class Configuration:
 
     def _configure_federates(self, config):
         # specify the EMS federate ?
-        # lookup and specify the path(s) the the federate config files
+        # lookup and specify the path(s) to the federate config files
         config["federates"] = [
                                   _federate_spec(
                                       "metrics",
@@ -2127,7 +2169,7 @@ class ProjectResults:
             fig = plt.figure()
             plt.plot(config_count, metric_value)
             plt.xlabel('Configuration ID')
-            plt.ylabel('Accumated Metric')
+            plt.ylabel('Accumulated Metric')
             plt.title('Comparison of Metric for Different Configurations')
             config_count += 1
             return fig
@@ -2152,7 +2194,7 @@ class Results:
 
     def __init__(self, config_dir):
         self.config_dir = config_dir
-
+        
     def _extract_data(self, csv_file):
         df_extracted_data = pd.read_csv(self.config_dir / csv_file)
         # extract column names
@@ -2176,7 +2218,7 @@ class Results:
 
     def pde_loading(self):
         """Returns name of the columns (power delivery elements with
-        the OpenDSS model) and the loading of the power delievery elements
+        the OpenDSS model) and the loading of the power delivery elements
         as a pandas dataframe."""
         pde_elements, pde_loading = self._extract_data("pde_loading.csv")
         return pde_elements, pde_loading

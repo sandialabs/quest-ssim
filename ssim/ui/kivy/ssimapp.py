@@ -5,6 +5,7 @@ import logging
 import math
 import os
 import re
+import sys
 from collections import defaultdict
 from contextlib import ExitStack
 from copy import deepcopy
@@ -712,6 +713,17 @@ class SSimApp(MDApp):
     def __init__(self, *args, **kwargs):
         self.project = Project("unnamed")
         super().__init__(*args, **kwargs)
+        
+    def on_start(self):
+        if len(sys.argv) >= 2:
+            Clock.schedule_once(lambda dt: self.load_initial_file(dt), 3)
+
+    def load_initial_file(self, dt):
+        if len(sys.argv) < 2: return
+        
+        screen = self.root.current_screen
+        if hasattr(screen, 'load_toml_file'):
+            screen.load_toml_file('', [sys.argv[1]])
 
     def build(self):
         Window.size = (1000, 800)
@@ -2385,7 +2397,7 @@ class MetricConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         """
         self.ids.metriclist.clear_widgets()
         self.reset_metric_list_label()
-        manager = self.project.get_manager(self._currentMetricCategory)
+        manager = self.project.get_metric_manager(self._currentMetricCategory)
 
         if manager is None: return
 
@@ -2769,7 +2781,7 @@ class RunSimulationScreen(SSimBaseScreen):
         """Apply selected filters to the configurations list.
         """
         # clear the selected configurations and configurations
-        # to evalulate lists
+        # to evaluate lists
         self.selected_configurations.clear()
         self.configurations_to_eval.clear()
         # perform the filtering based on user selections
@@ -2779,7 +2791,7 @@ class RunSimulationScreen(SSimBaseScreen):
 
     def clear_config_filters(self):
         # clear the selected configurations and configurations
-        # to evalulate lists
+        # to evaluate lists
         self.selected_configurations.clear()
         self.configurations_to_eval.clear()
         # clear all the filters
@@ -2804,7 +2816,7 @@ class RunSimulationScreen(SSimBaseScreen):
         """Performs filtering and repopulates the
            list filtered_configurations.
         """
-        # reset filtered_configurations List everytime a new filtering
+        # reset filtered_configurations List every time a new filtering
         # action is performed
         filter_condition_kW = None
         filter_condition_kWh = None
@@ -3059,7 +3071,7 @@ class RunSimulationScreen(SSimBaseScreen):
         self._update_configurations_to_eval()
 
     def _evaluate(self):
-        """Initiates evaluation of configurations that are currelty selected.
+        """Initiates evaluation of configurations that are currently selected.
         """
         checkpoint = self.project.save_checkpoint()
 
@@ -3926,6 +3938,10 @@ class SSimScreen(SSimBaseScreen):
     curr_x_max = 0.0
     curr_y_min = 0.0
     curr_y_max = 0.0
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._popup = None
 
     def on_kv_post(self, base_widget):
         self.refresh_grid_plot()

@@ -37,6 +37,6 @@ def test_Project_hash():
     for so in storage_options:
         p.add_storage_option(so)
     
-    assert hash(p.get_manager("bus voltage")) == 1422217286034778408
+    assert hash(p.get_metric_manager("bus voltage")) == 1422217286034778408
     assert hash(storage_options[0]) == 1703104687242851934
     assert hash(p) == 1827343610290675985
