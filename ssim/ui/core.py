@@ -793,7 +793,7 @@ class InverterControl:
         return self.active_params == other.active_params
 
     def __hash__(self):
-        """Produces a hash value for this instance of a StorageControl.
+        """Produces a hash value for this instance of an InverterControl.
 
         This only takes into account the core properties of the object, not
         values that store current state during usage.  This is so that inputs
