@@ -484,7 +484,7 @@ class Project:
         self.reliability_params = tomlData.get(
             "reliability",
             _DEFAULT_RELIABILITY
-            )
+        )
         
     def __read_metric_map(self, mdict: dict):
         """Reads the metrics information out of the supplied dictionary.
