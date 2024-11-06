@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Welcome to storage-sim’s documentation! &#8212; storage-sim  documentation</title>
+    <title>QuEST-SSim &#8212; storage-sim  documentation</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
     <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
     <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
@@ -34,8 +34,8 @@
 
           <div class="body" role="main">
             
-  <section id="welcome-to-storage-sim-s-documentation">
-<h1>Welcome to storage-sim’s documentation!<a class="headerlink" href="#welcome-to-storage-sim-s-documentation" title="Link to this heading">¶</a></h1>
+  <section id="quest-ssim">
+<h1>QuEST-SSim<a class="headerlink" href="#quest-ssim" title="Link to this heading">¶</a></h1>
 <div class="toctree-wrapper compound">
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
@@ -59,21 +59,38 @@
 <li class="toctree-l2"><a class="reference internal" href="configuration.html#federate-configuration">Federate Configuration</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="inverter_controls.html">Inverter Controls Overview</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="inverter_controls.html#inverter-controls-implemented-by-configuring-der-parameters">Inverter Controls Implemented by Configuring DER Parameters</a></li>
+<li class="toctree-l2"><a class="reference internal" href="inverter_controls.html#inverter-controls-implemented-by-defining-an-controller">Inverter Controls Implemented by Defining an Controller</a></li>
+<li class="toctree-l2"><a class="reference internal" href="inverter_controls.html#references">References</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="metrics.html">Metrics</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="metrics.html#normalization">Normalization</a></li>
 <li class="toctree-l2"><a class="reference internal" href="metrics.html#overall-process">Overall Process</a></li>
 </ul>
 </li>
+<li class="toctree-l1"><a class="reference internal" href="demo_examples.html">Instructions on Running Demo Examples</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="demo_examples.html#required-files">Required Files</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demo_examples.html#setting-up-grid-config-json-file">Setting up <cite>grid_config</cite> JSON file:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demo_examples.html#setting-up-federate-config-json-file">Setting up <cite>federate_config</cite> JSON file:</a></li>
+<li class="toctree-l2"><a class="reference internal" href="demo_examples.html#running-the-simulation-from-the-cli">Running the simulation from the CLI</a></li>
+</ul>
+</li>
 </ul>
 </div>
-<section id="running-the-simulation">
-<h2>Running the simulation<a class="headerlink" href="#running-the-simulation" title="Link to this heading">¶</a></h2>
-<p>Use Helics CLI to run the simulator. HELICS CLI can be installed with:</p>
-<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">git</span><span class="o">+</span><span class="n">git</span><span class="p">:</span><span class="o">//</span><span class="n">github</span><span class="o">.</span><span class="n">com</span><span class="o">/</span><span class="n">GMLC</span><span class="o">-</span><span class="n">TDC</span><span class="o">/</span><span class="n">helics</span><span class="o">-</span><span class="n">cli</span><span class="o">.</span><span class="n">git</span><span class="nd">@main</span>
+<section id="installation">
+<h2>Installation<a class="headerlink" href="#installation" title="Link to this heading">¶</a></h2>
+<p>The SSim package is available on pypi. You can install it via:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">pip</span> <span class="n">install</span> <span class="n">quest</span><span class="o">-</span><span class="n">ssim</span>
 </pre></div>
 </div>
-<p>An example configuration is provided in <code class="docutils literal notranslate"><span class="pre">examples/federation.json</span></code> (shown
-below):</p>
+</section>
+<section id="running-the-simulation">
+<h2>Running the simulation<a class="headerlink" href="#running-the-simulation" title="Link to this heading">¶</a></h2>
+<p>You may launch the GUI with the <code class="docutils literal notranslate"><span class="pre">ssim</span></code> command, or use HELICS CLI to run the
+simulator directly. An example configuration for the HELICS CLI is provided in
+<code class="docutils literal notranslate"><span class="pre">examples/demo_670/federation.json</span></code> (shown below):</p>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
   <span class="s2">&quot;federates&quot;</span><span class="p">:</span> <span class="p">[</span>
     <span class="p">{</span>
@@ -84,25 +101,25 @@ below):</p>
     <span class="p">},</span>
     <span class="p">{</span>
       <span class="s2">&quot;directory&quot;</span><span class="p">:</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
-      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;storage-federate S1 --hours 1025 grid.json ../federate-config/generic-storage.json&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;storage-federate S1 --hours 1025 grid.json ../../ssim/federates/storage.json&quot;</span><span class="p">,</span>
       <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
       <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;s1&quot;</span>
     <span class="p">},</span>
     <span class="p">{</span>
       <span class="s2">&quot;directory&quot;</span><span class="p">:</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
-      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;grid-federate --hours 1025 grid.json ../federate-config/grid-federate.json&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;grid-federate --hours 1025 grid.json ../../ssim/federates/grid.json&quot;</span><span class="p">,</span>
       <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
       <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;grid&quot;</span>
     <span class="p">},</span>
     <span class="p">{</span>
       <span class="s2">&quot;directory&quot;</span><span class="p">:</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
-      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;reliability-federate --hours 1025 grid.json ../federate-config/reliability.json&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;reliability-federate --hours 1025 grid.json ../../ssim/federates/reliability.json&quot;</span><span class="p">,</span>
       <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
       <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;reliability&quot;</span>
     <span class="p">},</span>
     <span class="p">{</span>
       <span class="s2">&quot;directory&quot;</span><span class="p">:</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span>
-      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;logger-federate --hours 1025 grid.json ../federate-config/logger.json&quot;</span><span class="p">,</span>
+      <span class="s2">&quot;exec&quot;</span><span class="p">:</span> <span class="s2">&quot;logger-federate --hours 1025 grid.json ../../ssim/federates/logger.json&quot;</span><span class="p">,</span>
       <span class="s2">&quot;host&quot;</span><span class="p">:</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
       <span class="s2">&quot;name&quot;</span><span class="p">:</span> <span class="s2">&quot;logger&quot;</span>
     <span class="p">}</span>
@@ -175,7 +192,9 @@ For example:</p>
 <li class="toctree-l1"><a class="reference internal" href="api.html">Public API Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ems.html">Energy Management System</a></li>
 <li class="toctree-l1"><a class="reference internal" href="configuration.html">Simulation Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="inverter_controls.html">Inverter Controls Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="metrics.html">Metrics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="demo_examples.html">Instructions on Running Demo Examples</a></li>
 </ul>
 
 <div class="relations">

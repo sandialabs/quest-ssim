@@ -108,7 +108,7 @@ ssim.federates.logger
    :show-inheritance:
    
 ssim.federates.metrics
-^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: ssim.federates.metrics
    :members:
