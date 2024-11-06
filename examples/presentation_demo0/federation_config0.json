@@ -1,0 +1,54 @@
+{
+  "broker": true,
+  "federates": [
+    {
+      "directory": ".",
+      "exec": "storage-federate S814 --hours 24 grid_config0.json ../../ssim/federates/storage.json",
+      "host": "localhost",
+      "name": "s814"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S828 --hours 24 grid_config0.json ../../ssim/federates/storage.json",
+      "host": "localhost",
+      "name": "s828"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S860 --hours 24 grid_config0.json ../../ssim/federates/storage.json",
+      "host": "localhost",
+      "name": "s860"
+    },
+    {
+      "directory": ".",
+      "exec": "storage-federate S840 --hours 24 grid_config0.json ../../ssim/federates/storage.json",
+      "host": "localhost",
+      "name": "s840"
+    },
+    {
+      "directory": ".",
+      "exec": "grid-federate --hours 24 grid_config0.json ../../ssim/federates/grid.json",
+      "host": "localhost",
+      "name": "grid"
+    },
+    {
+      "directory": ".",
+      "exec": "reliability-federate --hours 24 grid_config0.json ../../ssim/federates/reliability.json",
+      "host": "localhost",
+      "name": "reliability"
+    },
+    {
+      "directory": ".",
+      "exec": "logger-federate --hours 24 --show-plots grid_config0.json ../../ssim/federates/logger.json",
+      "host": "localhost",
+      "name": "logger"
+    },
+    {
+      "directory": ".",
+      "exec": "metrics-federate grid_config0.json ../../ssim/federates/metrics.json",
+      "host": "localhost",
+      "name": "metrics"
+    }
+  ],
+  "name": "ssim_demo"
+}
