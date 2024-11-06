@@ -1,6 +1,9 @@
 name: "Build & Deploy Documentation"
 
-on: push
+on: 
+  push:
+    branches:
+      master
 
 jobs:
   build:
@@ -20,12 +23,12 @@ jobs:
     - name: weird matplotlib fix
       run: python -c "import matplotlib.pyplot as plt"
     - name: Build HTML
-      run: sphinx-build -vvv -b html docs _build
+      run: sphinx-build -b html docs _build
       env:
         MPLBACKEND: agg
-    - name: Deply to GitHub Pages
+    - name: Deploy to GitHub Pages
       uses: peaceiris/actions-gh-pages@v3
-      if: github.ref == 'refs/head/master'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_dir: _build
+        publish_branch: gh-pages
