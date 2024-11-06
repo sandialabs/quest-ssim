@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Metrics &#8212; storage-sim  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="Simulation Configuration" href="configuration.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="metrics">
+<h1>Metrics<a class="headerlink" href="#metrics" title="Link to this heading">¶</a></h1>
+<p>Calculation of metrics indicating the quality of a grid configuration is done
+by a custom helics federate that communicates with other federates as needed
+to get calculated values for quantities of interest.</p>
+<p>In the context of this application, a metric consists of</p>
+<ol class="arabic simple">
+<li><p>A value generated periodically during the course of a simulation that is of interest to a user.</p></li>
+<li><p>A set of inputs that indicate the user’s goals for that value.</p></li>
+</ol>
+<p>As an example, a user may indicate that they are interested in the voltage
+level at a particular bus.  That satisfies item 1 above.  To stipulate their
+goals for it, they may indicate that they would like the voltage to remain as
+close to 1 p.u. as possible.  That satisfies item 2 above.</p>
+<p>The metrics framework allows for three types of metric valuations, also
+referred to as “sense” or “improvement type”.  Those are</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">Minimize</span></code> which indicates that a value is better the smaller it becomes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Maximize</span></code> which indicates that a value is better the larger it becomes</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">Seek</span> <span class="pre">Value</span></code> which indicates that a specific value is sought and the closer
+to it the better.</p></li>
+</ul>
+<p>The SSIM metric system must allow for simultaneous evaluation of many,
+potentially hundreds, of metrics and to support direct comparison of
+different grid configurations to determine which is better.  This allows
+search algorithms to perform optimization and supports users who may not be
+able to account for hundreds of individual measures manually when deciding
+whether or not a solution is good.</p>
+<p>To further complicate the situation, many metrics must be accumulated over
+time.  Take the example of bus voltage above.  When doing a grid simulation
+over a long period of time with changing conditions
+(loading, generation, etc.), the voltage at the bus will vary up and down.
+It may at times be within tolerances while at others, be out of tolerances.
+The metric system must be able to accumulate the “fitness” of a measure such
+as voltage that varies with time and support comparison with other time
+varying or non-time varying measures.</p>
+<p>While it is challenging enough to compare multiple similar metrics between
+two different configurations, it can become an impossible task to manually
+decide which is a better configuration when there are many, very different
+metrics all being tracked.  For example, perhaps a user is interested in
+voltage, frequency, reliability, resilience measures, service provision,
+operational characteristics of grid assets, load service levels, etc. all
+at the same time.  The metric system must allow for sensible evaluation of
+configurations over all those performance dimensions to determine which
+solutions are better that which others.</p>
+<section id="normalization">
+<h2>Normalization<a class="headerlink" href="#normalization" title="Link to this heading">¶</a></h2>
+<p>In order to compare across metrics of different kinds, units, and scales, a
+normalization process is used.  This process results in a unitless, scaled
+value that can be compared on an equivalent basis to the values calculated for
+other metrics.  Without a process such as this, attempting to aggregate metric
+values together to create an overall fitness would result in the
+disproportionate emphasis on those metrics with greater scale.</p>
+<p>For example, if per-unit voltage is on the order of 1, and cost is on the order
+of millions of dollars, simpy adding raw values together would result in no
+concern for voltage and all empahsis being placed on improving cost.</p>
+<p>To solve this problem, the following normalization scheme is implemented in
+SSIM.</p>
+<p>A family of functional forms representing the normalization method exists, 1
+for each of the improvement types (minimize, maximize, and seek value).
+Starting with maximization, the equation(s) used, when plotted, produce a curve
+as shown below.</p>
+<img alt="_images/maxnorm.png" src="_images/maxnorm.png" />
+<p>This curve consists of 3 quadratic sections; the section below the limit, the
+section between the limit and objective, and the section above the objective.
+Each section is C0 and C1 constrained with any other section to which it joins.
+There are parameters that can be adjusted to control the details of the shape
+of the curve.  Though they are not controllable in SSIM, for completeness and
+to give information needed for the equations below, the are</p>
+<p>A -Impacts the curvature below the limit</p>
+<p>B -Sets the slope at the limit</p>
+<p>C -Sets the normalized value (y value) at the limit</p>
+<p>G -Impacts the curvature above the objective</p>
+<p>The shape of this curve is deliberate.  It has several features that make it
+desirable for use in the context of optimization.  They include</p>
+<ol class="arabic simple">
+<li><p>It is continuous (except in the case of the seek value for which there is a discontinuity at the objective value).</p></li>
+<li><p>It has a monotonically decreasing slope as the raw response value gets better (effects a diminishing returns scenario and enables sensible trade-offs)</p></li>
+<li><p>It effects the desired behavior of penalizing unacceptable values more heavily than it rewards exceptionally good values.</p></li>
+<li><p>It is parameterizable particularly in how quickly quality drops as one moves further below the limit or further above the objective.</p></li>
+</ol>
+<p>For minimization, the process is exactly the same but the curve is mirrored
+such that the limit is above the objective and the curve goes from higher
+values on the left to lower values on the right.</p>
+<p>The equations that define the 3 portions of the curve are defined below.  Prior to computing these equations, a pre-normalization is applied to the raw value (x) as follows.</p>
+<div class="math notranslate nohighlight">
+\[\bar{x}=\frac{x-L}{O-L}\]</div>
+<p>Where L is the limit and O is the objective.  The section of the curve used is determined by the value of x relative to the limit and objective.  The equations are as follows:</p>
+<p>If x is below the limit:</p>
+<div class="math notranslate nohighlight">
+\[\frac{-A{\bar{x}}^{\ \mathbf{2}}}{\mathbf{2}}+B\bar{x}+C\]</div>
+<p>If x is between the limit and objective:</p>
+<div class="math notranslate nohighlight">
+\[\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}\sqrt{\bar{x}+\left[\frac{\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}}{\mathbf{2}B}\right]^\mathbf{2}}+C-\frac{\left[\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}\right]^\mathbf{2}}{\mathbf{2}B}\]</div>
+<p>If x is above the objective:</p>
+<div class="math notranslate nohighlight">
+\[G\sqrt{\bar{x}+\frac{G^\mathbf{2}\left[\left(\frac{\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}}{\mathbf{2}B}\right)^\mathbf{2}+\mathbf{1}\right]}{\left(\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}\right)^\mathbf{2}}-\mathbf{1}}-G\sqrt{\frac{G^\mathbf{2}\left[\left(\frac{\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}}{\mathbf{2}B}\right)^\mathbf{2}+\mathbf{1}\right]}{\left(\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}\right)^\mathbf{2}}}+\mathbf{1}\]</div>
+<p>The above can be simplified with the following definitions:</p>
+<div class="math notranslate nohighlight">
+\[D=\sqrt{B\left(\frac{C^\mathbf{2}-\mathbf{2}C+\mathbf{1}}{C+B-\mathbf{1}}\right)}\]</div>
+<div class="math notranslate nohighlight">
+\[F=\left(\frac{D}{\mathbf{2}B}\right)^\mathbf{2}\]</div>
+<div class="math notranslate nohighlight">
+\[H=\frac{G^\mathbf{2}\left[F+\mathbf{1}\right]}{D^\mathbf{2}}\]</div>
+<div class="math notranslate nohighlight">
+\[\psi=\frac{D^\mathbf{2}}{\mathbf{2}B}\]</div>
+<div class="math notranslate nohighlight">
+\[\varphi=G\sqrt{H}\]</div>
+<p>Then:</p>
+<p>If x is between the limit and objective:</p>
+<div class="math notranslate nohighlight">
+\[D\sqrt{\bar{x}+F}+C-\psi\]</div>
+<p>If x is above the objective:</p>
+<div class="math notranslate nohighlight">
+\[G\sqrt{\bar{x}+H-\mathbf{1}}-\varphi+\mathbf{1}\]</div>
+</section>
+<section id="overall-process">
+<h2>Overall Process<a class="headerlink" href="#overall-process" title="Link to this heading">¶</a></h2>
+<p>Given the normalization process detailed above, one can not only normalize
+individual values, but one can apply a process of integration of those
+normalized values over time to arrive at a value that indicates total, overall
+fitness over time and over multiple metrics.  The resulting value has no
+physical interpretation and is therefore only useful for comparison purposes.</p>
+<p>Stated another way, one can compute the total fitness for each of multiple
+configurations of a distribution grid and use that total fitness value to sort
+the configurations by how good they are. The phrase “how good they are” should
+be interpreted as meaning “how well they meet your metric objectives overall”.</p>
+<p>Overall fitness is computed as the sum of all normalized response values over
+all metrics over all time</p>
+<div class="math notranslate nohighlight">
+\[F=\sum_{metrics}{n_m\ast \Delta t}\;\;\;\;\;\; \forall \; \Delta t \; in \; simulation \; duration\]</div>
+<p>where <span class="math notranslate nohighlight">\(n_m\)</span> is the normalized value for the metric in the time period
+<span class="math notranslate nohighlight">\(\Delta t\)</span>.</p>
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">storage-sim</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="api.html">Public API Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ems.html">Energy Management System</a></li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Simulation Configuration</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Metrics</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#normalization">Normalization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#overall-process">Overall Process</a></li>
+</ul>
+</li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="configuration.html" title="previous chapter">Simulation Configuration</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2021, John P. Eddy, William F. Vining, Ujjwol Tamrakar.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/metrics.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

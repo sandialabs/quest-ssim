@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="./">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Energy Management System &#8212; storage-sim  documentation</title>
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=d1102ebc" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=686e5160" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
+    <script src="_static/documentation_options.js?v=5929fcd5"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Simulation Configuration" href="configuration.html" />
+    <link rel="prev" title="Public API Overview" href="api.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <section id="energy-management-system">
+<h1>Energy Management System<a class="headerlink" href="#energy-management-system" title="Link to this heading">¶</a></h1>
+<p>The energy management system is implemented as a helics message federate
+that communicates with storage controllers, the reliability federate, and
+the grid federate.</p>
+<p>It receives information about the state of charge of the storage
+devices, the status of generators, and the status of loads connected
+to the grid and sends messages to each storage controller and to the
+gird federate containing set-points for storaged devices and
+dispatchable generators.</p>
+<p>The EMS als receives reliability events in order to track isolated
+sections of the grid (e.g. PV systems, storage devices, and loads that
+are disconnected from the grid and therefore should be excluded from
+the dispatch decisions) or other failures that should be accounted for
+in dispatch decisions.</p>
+<section id="helics-interface">
+<h2>HELICS Interface<a class="headerlink" href="#helics-interface" title="Link to this heading">¶</a></h2>
+<p>The EMS federate provides two endpoints to which other federated can
+send messages. Reliability messages are received on the
+“ems/reliability” endpoint and status messages for components such as
+generators or storage devices are received on the “ems/control”
+endpoint. The “ems/control” endpoint is also the source of messages
+sent from the EMS federate to dispatch storage and generators, or to
+perform other control actions in the grid.</p>
+<p>Status messages, sent to the EMS federate, are JSON representations of
+dataclasses that inherit from <a class="reference internal" href="#ssim.grid.StatusMessage" title="ssim.grid.StatusMessage"><code class="xref py py-class docutils literal notranslate"><span class="pre">ssim.grid.StatusMessage</span></code></a>. See
+<a class="reference internal" href="#status-messages"><span class="std std-ref">Status Messages</span></a> for more information.</p>
+<section id="grid-federate-endpoints">
+<h3>Grid Federate Endpoints<a class="headerlink" href="#grid-federate-endpoints" title="Link to this heading">¶</a></h3>
+<p>The following global endpoints are used by the grid federate for
+communication with the EMS federate.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;load.control&quot;</span></code> Single endpoint used to send load status messages to
+the EMS. A separate message is send for each load.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;pvsystem.{name}.control&quot;</span></code> Sends status of a PV system to the EMS
+(one endpoint per PV system).</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;generator.{name}.control&quot;</span></code> Sends status of generators to the ems
+(one endpoint per generator).</p></li>
+</ul>
+</section>
+<section id="storage-controller-endpoints">
+<h3>Storage Controller Endpoints<a class="headerlink" href="#storage-controller-endpoints" title="Link to this heading">¶</a></h3>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;storage.{name}.control&quot;</span></code> Sends status of a storage device to the
+EMS and receives control messaged from the EMS.</p></li>
+</ul>
+</section>
+<section id="ems-interface-overview">
+<h3>EMS Interface Overview<a class="headerlink" href="#ems-interface-overview" title="Link to this heading">¶</a></h3>
+<p>The diagram below shows an overview of the endpoints described above.</p>
+digraph ems_helics {
+graph [rankdir=LR];
+node [style=rounded];
+
+ems [label=&quot;EMS&quot;; shape=record; style=rounded];
+s1 [label=&quot;&lt;f0&gt; s1 controller| &lt;control&gt; storage.s1.control | &lt;soc&gt; soc&quot;;
+    shape=record; style=rounded];
+grid [label=&quot;grid federate | &lt;total_load&gt; total power | &lt;pv1&gt; pvsystem.pv1.control | ... | &lt;gen1&gt; generator.gen1.control | ... | &lt;load&gt; load.control | &lt;s1_soc&gt; storage.s1.soc | &lt;other&gt; ...&quot;;
+      shape=record];
+reliability [label=&quot;reliability federate&quot;; shape=record];
+clone [label=&quot;cloning filter&quot;; shape=ellipse];
+
+ems -&gt; s1:control [label=&quot;power setpoint&quot;];
+grid:s1_soc -&gt; s1:soc;
+grid:load -&gt; ems [label=&quot;load status*&quot;];
+grid:pv1 -&gt; ems [label=&quot;pv1 status&quot;];
+grid:gen1 -&gt; ems [label=&quot;gen1 status&quot;];
+grid:total_load -&gt; ems;
+s1:control -&gt; ems [label=&quot;soc&quot;];
+reliability -&gt; clone [label=&quot;failure/restoration events&quot;];
+clone -&gt; {ems grid:other};
+}
+</section>
+</section>
+<section id="status-messages">
+<span id="id1"></span><h2>Status Messages<a class="headerlink" href="#status-messages" title="Link to this heading">¶</a></h2>
+<p>The following dataclasses are used to represent status messages sent
+from other federates to the EMS.</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ssim.grid.StorageStatus">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ssim.grid.</span></span><span class="sig-name descname"><span class="pre">StorageStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">soc</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ssim.grid.StorageStatus" title="Link to this definition">¶</a></dt>
+<dd><p>Status of a storage system.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.StorageStatus.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#ssim.grid.StorageStatus.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.StorageStatus.soc">
+<span class="sig-name descname"><span class="pre">soc</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.StorageStatus.soc" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ssim.grid.PVStatus">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ssim.grid.</span></span><span class="sig-name descname"><span class="pre">PVStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kvar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ssim.grid.PVStatus" title="Link to this definition">¶</a></dt>
+<dd><p>Status of a PV System.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.PVStatus.kvar">
+<span class="sig-name descname"><span class="pre">kvar</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.PVStatus.kvar" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.PVStatus.kw">
+<span class="sig-name descname"><span class="pre">kw</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.PVStatus.kw" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.PVStatus.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#ssim.grid.PVStatus.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ssim.grid.GeneratorStatus">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ssim.grid.</span></span><span class="sig-name descname"><span class="pre">GeneratorStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kvar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">operating_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">online</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ssim.grid.GeneratorStatus" title="Link to this definition">¶</a></dt>
+<dd><p>Status of a Fossil Generator.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.GeneratorStatus.kvar">
+<span class="sig-name descname"><span class="pre">kvar</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.GeneratorStatus.kvar" title="Link to this definition">¶</a></dt>
+<dd><p>Reactive power output from the generator.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.GeneratorStatus.kw">
+<span class="sig-name descname"><span class="pre">kw</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.GeneratorStatus.kw" title="Link to this definition">¶</a></dt>
+<dd><p>Real power output from the generator</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.GeneratorStatus.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#ssim.grid.GeneratorStatus.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.GeneratorStatus.online">
+<span class="sig-name descname"><span class="pre">online</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#ssim.grid.GeneratorStatus.online" title="Link to this definition">¶</a></dt>
+<dd><p>True if the generator is online and can respond to dispatch commands.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.GeneratorStatus.operating_time">
+<span class="sig-name descname"><span class="pre">operating_time</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.GeneratorStatus.operating_time" title="Link to this definition">¶</a></dt>
+<dd><p>Cumulative time the generator has been in operation. [hours]</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="ssim.grid.LoadStatus">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ssim.grid.</span></span><span class="sig-name descname"><span class="pre">LoadStatus</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kw</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kvar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ssim.grid.LoadStatus" title="Link to this definition">¶</a></dt>
+<dd><p>Status of a single load</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.LoadStatus.kvar">
+<span class="sig-name descname"><span class="pre">kvar</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.LoadStatus.kvar" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.LoadStatus.kw">
+<span class="sig-name descname"><span class="pre">kw</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#ssim.grid.LoadStatus.kw" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="ssim.grid.LoadStatus.name">
+<span class="sig-name descname"><span class="pre">name</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#ssim.grid.LoadStatus.name" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<p>Each status message class inherits from</p>
+<dl class="py class">
+<dt class="sig sig-object py" id="ssim.grid.StatusMessage">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">ssim.grid.</span></span><span class="sig-name descname"><span class="pre">StatusMessage</span></span><a class="headerlink" href="#ssim.grid.StatusMessage" title="Link to this definition">¶</a></dt>
+<dd><p>Base class for status messages.</p>
+<p>Provides methods for serializing status messages to JSON strings
+and for de-serializing JSON strings to status messages.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="ssim.grid.StatusMessage.from_json">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">jsonstr</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#ssim.grid.StatusMessage.from_json" title="Link to this definition">¶</a></dt>
+<dd><p>Parse a JSON string and return the status message it represents.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>jsonstr</strong> (<em>str</em>) – String containing the JSON representation of a status message.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p><a class="reference internal" href="#ssim.grid.StatusMessage" title="ssim.grid.StatusMessage">StatusMessage</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="ssim.grid.StatusMessage.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#ssim.grid.StatusMessage.to_json" title="Link to this definition">¶</a></dt>
+<dd><p>Get a JSON representation of the status message.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Returns<span class="colon">:</span></dt>
+<dd class="field-odd"><p>JSON encoding of the status message.</p>
+</dd>
+<dt class="field-even">Return type<span class="colon">:</span></dt>
+<dd class="field-even"><p>str</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">storage-sim</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="api.html">Public API Overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Energy Management System</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#helics-interface">HELICS Interface</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#status-messages">Status Messages</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="configuration.html">Simulation Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="metrics.html">Metrics</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="api.html" title="previous chapter">Public API Overview</a></li>
+      <li>Next: <a href="configuration.html" title="next chapter">Simulation Configuration</a></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2021, John P. Eddy, William F. Vining, Ujjwol Tamrakar.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.1.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+      |
+      <a href="_sources/ems.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
