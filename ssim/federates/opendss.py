@@ -1,6 +1,7 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
 import csv
+import time
 from pathlib import Path
 
 from helics import (
@@ -14,6 +15,58 @@ from ssim.grid import GridSpecification, PVStatus, BusVoltageStatus
 from ssim.opendss import DSSModel
 from ssim.ems import GeneratorControlMessage
 from ssim.federates import timing
+
+
+class EMSInterface:
+    """Wrapper around HELICS endpoints for communication with an EMS.
+
+    This wrapper masks whether or not an EMS exists and silently drops outgoing
+    messages when there is no EMS present in the federation.
+
+    """
+
+    def __init__(self, federate: HelicsCombinationFederate):
+        time.sleep(1)  # XXX (wfv) recommended by the HELICS query example
+        endpoints = federate.query("broker", "endpoints")
+        if endpoints == "#invalid":
+            raise RuntimeError("attempted invalid HELICS query")
+        self._federate = federate
+        self._endpoints = {}
+        self._control_endpoint = None
+        if "ems/control" in endpoints:
+            self._control_endpoint = "ems/control"
+
+    def register_endpoint(self, endpoint: str, isglobal: bool = True):
+        """Attempt to register `endpoint` if the EMS is running."""
+        if self._control_endpoint is None:
+            return
+        if isglobal:
+            self._endpoints[endpoint] = self._federate.register_global_endpoint(endpoint)
+        else:
+            self._endpoints[endpoint] = self._federate.register_endpoint(endpoint)
+
+    def send(self, message: str, source: str, dest: str = "ems/control"):
+        """Send a message to 'ems/control'.
+
+        Parameters
+        ----------
+        message : str
+            The message to be sent.
+        source : str
+            The name of the source endpoint used to send the message.
+        dest : str, default "ems/control"
+            The name of the destination endpoint for the message.
+        """
+        if source in self._endpoints:
+            self._endpoints[source].send_data(message, destination=dest)
+
+    def receive(self, endpoint: str):
+        """Get all messages available on `endpoint`."""
+        if endpoint not in self._endpoins:
+            return
+        ep = self._endpoints[endpoint]
+        while ep.has_message():
+            yield ep.get_message()
 
 
 class ReliabilityInterface:
@@ -49,12 +102,14 @@ class GeneratorInterface:
     ----------
     federate : HelicsCombinationFederate
     generator : opendss.Generator
+    ems : EMSInterface
     """
 
-    def __init__(self, federate, generator):
+    def __init__(self, federate, generator, ems: EMSInterface):
         self._federate = federate
+        self._ems = ems
         self.generator = generator
-        self.control_endpoint = federate.register_global_endpoint(
+        self._ems.register_endpoint(
             f"generator.{generator.name.lower()}.control"
         )
         self.reliability_endpoint = federate.get_endpoint_by_name(
@@ -62,8 +117,9 @@ class GeneratorInterface:
 
     def update(self):
         """Update inputs for the generator."""
-        while self.control_endpoint.has_message():
-            message = self.control_endpoint.get_message()
+        for message in self._ems.receive(
+                f"generator.{self.generator.name.lower()}.control"
+        ):
             gen_control = GeneratorControlMessage.from_json(message.data)
             if gen_control.action == "on":
                 self.generator.turn_on()
@@ -75,9 +131,7 @@ class GeneratorInterface:
 
     def publish(self):
         status_json = self.generator.status.to_json()
-        self.control_endpoint.send_data(
-            status_json, destination="ems/control"
-        )
+        self._ems.send(status_json, f"generator.{self.generator.name.lower()}.control")
         self.reliability_endpoint.send_data(
             status_json, destination="reliability/reliability"
         )
@@ -150,13 +204,14 @@ class PVInterface:
         HELICS federate handle.
     pvsystem : PVSystem
         PVSystem instance providing access to the opendss model.
+    ems : EMSInterface
+        Interface for the HELICS connection to the ems federate.
     """
-    def __init__(self, federate, pvsystem):
+    def __init__(self, federate, pvsystem, ems):
         self._federate = federate
         self._system = pvsystem
-        self._control_endpoint = federate.register_global_endpoint(
-            f"pvsystem.{pvsystem.name}.control"
-        )
+        self._ems = ems
+        self._ems.register_endpoint(f"pvsystem.{pvsystem.name}.control")
 
     def update(self):
         """Update PVSystem model in response to federate input.
@@ -177,8 +232,8 @@ class PVInterface:
             self._system.kw,
             self._system.kvar
         )
-        self._control_endpoint.send_data(
-            status.to_json(), "ems/control"
+        self._ems.send(
+            status.to_json(), f"pvsystem.{self._system.name.lower()}.control"
         )
 
 
@@ -226,11 +281,10 @@ class LoadInterface:
     federate : HelicsFederate
         HELICS federate handle.
     """
-    def __init__(self, federate, model):
+    def __init__(self, federate, model, ems):
         self._federate = federate
-        self._control_endpoint = federate.register_global_endpoint(
-            "load.control"
-        )
+        self._ems = ems
+        self._ems.register_endpoint("load.control")
         self._model = model
 
     def update(self):
@@ -242,9 +296,7 @@ class LoadInterface:
         pass
 
     def _send_to_ems(self, status):
-        self._control_endpoint.send_data(
-            status.to_json(), "ems/control"
-        )
+        self._ems.send(status.to_json(), "load.control")
 
     def publish(self):
         """Send status updates to the EMS federate control endpoint"""
@@ -278,7 +330,7 @@ class GridFederate:
         g_spec = GridSpecification.from_json(grid_file)
         self._grid_model = DSSModel.from_grid_spec(g_spec)
         self.busses_to_measure = set(bus["name"] for bus in g_spec.busses_to_measure)
-
+        ems = EMSInterface(federate)
         self._federate = federate
         self._storage_interface = [
             StorageInterface(federate, device)
@@ -286,13 +338,13 @@ class GridFederate:
         ]
         self._event_log = EventLog()
         self._pv_interface = [
-            PVInterface(federate, device)
+            PVInterface(federate, device, ems)
             for device in self._grid_model.pvsystems.values()
         ]
         self._reliability = ReliabilityInterface(federate)
-        self._load_interface = LoadInterface(federate, self._grid_model)
+        self._load_interface = LoadInterface(federate, self._grid_model, ems)
         self._generator_interface = [
-            GeneratorInterface(federate, generator)
+            GeneratorInterface(federate, generator, ems)
             for generator in self._grid_model.generators.values()
         ]
         self.metrics_endpoint = federate.get_endpoint_by_name(
