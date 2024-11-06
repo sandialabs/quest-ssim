@@ -1,0 +1,34 @@
+name: "Build & Deploy Documentation"
+
+on: 
+  push:
+    branches:
+      master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5 
+      with:
+        python-version: '3.10'
+    - name: Install Dependencies
+      run: |
+        pip install .
+        pip install -U matplotlib
+        pip install sphinx
+    - name: weird matplotlib fix
+      run: python -c "import matplotlib.pyplot as plt"
+    - name: Build HTML
+      run: sphinx-build -b html docs _build
+      env:
+        MPLBACKEND: agg
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: _build
+        publish_branch: gh-pages
