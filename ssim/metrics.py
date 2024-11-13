@@ -294,10 +294,11 @@ class Metric:
             A newly created metric made using the properties in the supplied
             TOML dictionary.
         """
-        lower_limit = None if "lower_limit" not in tomlData else tomlData["lower_limit"]
-        upper_limit = None if "upper_limit" not in tomlData else tomlData["upper_limit"]
-        objective = tomlData["objective"]
-        impType = ImprovementType.parse(tomlData["sense"])
+        lower_limit = tomlData.get("lower_limit")
+        upper_limit = tomlData.get("upper_limit")
+        objective = tomlData.get("objective")
+        impType = tomlData.get("sense")
+        if impType: impType = ImprovementType.parse(impType)
         return Metric(lower_limit, upper_limit, objective, impType)
 
     def write_toml(self, category, key) -> str:
@@ -1156,10 +1157,11 @@ class MetricManager:
             A TOML formatted dictionary from which to read the properties of this class
             instance.
         """
-        if "values" in tomlData:
-            for mDict in tomlData["values"]:
+        values = tomlData.get("values")
+        if values:
+            for mDict in values:
                 mta = MetricTimeAccumulator.read_toml(mDict)
-                name = mDict["name"]
+                name = mDict.get("name", "unnamed")
                 self.add_accumulator(name, mta)
 
     @property
