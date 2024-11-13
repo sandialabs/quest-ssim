@@ -154,7 +154,7 @@ def _controller(federate, controller, hours):
         How long to run the controller.
     """
     federate.log_message(f"storage starting ({hours})", HelicsLogLevel.TRACE)
-    control_endpoint = federate.get_endpoint_by_name(
+    control_endpoint = federate.endpoints.get(
         f"storage.{federate.name.lower()}.control"
     )
     schedule = timing.schedule(federate, controller.next_update, hours * 3600)
@@ -167,9 +167,10 @@ def _controller(federate, controller, hours):
         ].double
         federate.log_message(f"voltage: {voltage}", HelicsLogLevel.TRACE)
         federate.log_message(f"soc: {soc}", HelicsLogLevel.TRACE)
-        controller.apply_control(
-            pending_messages(control_endpoint)
-        )
+        pending = []
+        if control_endpoint is not None:
+            pending = pending_messages(control_endpoint)
+        controller.apply_control(pending)
         power = controller.step(time, voltage, soc)
         if power is not None:
             federate.log_message(
@@ -177,7 +178,8 @@ def _controller(federate, controller, hours):
                 HelicsLogLevel.TRACE
             )
             federate.publications[f"{federate.name}/power"].publish(power)
-        _send_soc_to_ems(soc, time, federate)
+        if control_endpoint is not None:
+            _send_soc_to_ems(soc, time, federate)
 
 
 class CycleController(StorageController):
@@ -327,13 +329,14 @@ def _start_controller(name, federate_config_skeleton, grid_config, hours):
     federate_config = _complete_config(name, federate_config_skeleton)
     print(f"federate config: {federate_config}")
     federate = helicsCreateCombinationFederateFromConfig(federate_config)
-    federate.register_global_endpoint(
-        f"storage.{federate.name.lower()}.control"
-    )
     spec = GridSpecification.from_json(grid_config)
     device = spec.get_storage_by_name(federate.name)
     federate.log_message(f"loaded device: {device}", HelicsLogLevel.TRACE)
     controller = _get_controller(device)
+    if isinstance(controller, ExternalController):
+        federate.register_global_endpoint(
+            f"storage.{federate.name.lower()}.control"
+        )
     federate.enter_executing_mode()
     _controller(federate, controller, hours)
     federate.disconnect()
