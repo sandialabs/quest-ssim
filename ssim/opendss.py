@@ -230,7 +230,7 @@ class PVSystem:
         # temporarily attaches a PQ monitor to each PV system
         # no need to merge this edit, we will add the functionality to add
         # monitors later
-        monitor_name = "Mon_" + name
+        monitor_name = "pvsystem_" + name
         element_name = "PVSystem." + name
         dssutil.run_command(f"new monitor.{monitor_name}",
                             {"element": element_name, "terminal": 1,
@@ -1001,7 +1001,7 @@ class DSSModel:
             self._loading_recorder.to_csv(output_dir / "pde_loading.csv")
         # Save the data recorded by any internal OpenDSS monitors
         for monitor in self.monitors():
-            monitor.to_csv(directory=output_dir)
+            monitor.to_csv(directory=output_dir, filename=f"monitor_{monitor.name}.csv")
 
     def monitors(self):
         for monitor_name in dssdirect.Monitors.AllNames():
