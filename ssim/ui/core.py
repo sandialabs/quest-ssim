@@ -434,7 +434,9 @@ class Project:
         ret = "[Project]\n"
         ret += f"name = \'{self.name}\'\n"
         ret += f"version = {self.version}\n"
-        ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
+
+        if self._grid_model_path:
+            ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
 
         ret += self._reliability_to_toml()
 
@@ -460,18 +462,22 @@ class Project:
             this class instance.
         """
         projdict = tomlData["Project"]
-        self.name = projdict["name"]
-        self.set_grid_model(projdict["grid_model_path"])
+        self.name = projdict.get("name", "unnamed")
+        self.set_grid_model(projdict.get("grid_model_path"))
         self._workdir = projdict.get("working_directory", ".")
         self._version_manager.basedir = os.path.join(self._workdir, self.name)
         self._current_checkpoint = None
 
-        sodict = tomlData["storage-options"]
-        for sokey in sodict:
-            so = StorageOptions(sokey, [], [], [])
-            so.read_toml(sokey, sodict[sokey])
+        # Allow for a case where there are no storage options and no such block
+        # exists in the file.
+        sodict = tomlData.get("storage-options", {})
+        for soname, soptions in sodict.items():
+            so = StorageOptions(soname, [], [], [])
+            so.read_toml(soname, soptions)
             self.add_storage_option(so)
-
+            
+        # Allow for a case where there are no PV options and no such block
+        # exists in the file.
         pvdict = tomlData.get("pv-options", {})
         for pvname, pvoptions in pvdict.items():
             pv = PVOptions(pvname, [], [])
@@ -1223,10 +1229,10 @@ class PVOptions:
         """Set the attributes of this instance using `toml_data`"""
         self.name = name
         self.pmpp = set(toml_data["pmpp"])
-        self.busses = set(toml_data["busses"])
-        self.dcac_ratio = toml_data["dcac_ratio"]
-        self.irradiance = toml_data["irradiance"]
-        self.required = toml_data["required"]
+        self.busses = set(toml_data.get("busses", []))
+        self.dcac_ratio = toml_data.get("dcac_ratio", 1.0)
+        self.irradiance = toml_data.get("irradiance")
+        self.required = toml_data.get("required", False)
         if "control-params" in toml_data:
             self.control = InverterControl("uncontrolled")
             self.control.read_toml(toml_data["control-params"])
@@ -1256,7 +1262,7 @@ class PVOptions:
     def validate_irradiance(self):
         if self.irradiance is not None:
             return self._validate_irradiance_data()
-        return "You must select an irraiadnce profile"
+        return "You must select an irradiance profile"
 
     def _validate_irradiance_data(self):
         try:
@@ -1445,13 +1451,13 @@ class StorageOptions:
             A TOML formatted dictionary from which to read the properties of this class
             instance.
         """
-        self.required = tomlData["required"]
-        self.min_soc = tomlData["min_soc"]
-        self.max_soc = tomlData["max_soc"]
-        self.initial_soc = tomlData["initial_soc"]
-        self.busses = set(tomlData["busses"])
-        self.power = set(tomlData["power"])
-        self.duration = set(tomlData["duration"])
+        self.required = tomlData.get("required", False)
+        self.min_soc = tomlData.get("min_soc", 0.2)
+        self.max_soc = tomlData.get("max_soc", 0.8)
+        self.initial_soc = tomlData.get("initial_soc", 0.8)
+        self.busses = set(tomlData.get("busses", {}))
+        self.power = set(tomlData.get("power", {}))
+        self.duration = set(tomlData.get("duration", {}))
 
         if "control-params" in tomlData:
             self.control.read_toml(tomlData["control-params"])

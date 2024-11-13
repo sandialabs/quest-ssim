@@ -3194,7 +3194,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
             # columns to plot
             columns_to_plot = self.selected_metric_items[config_key]
 
-            # select the susbset of data based on 'columns_to_plot'
+            # select the subset of data based on 'columns_to_plot'
             selected_data = data_metrics[columns_to_plot]
             x_data = data_metrics.loc[:, 'time']
             x_data_voltage = all_bus_voltages.loc[:, 'time']
@@ -3228,7 +3228,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
     def update_metrics_figure(self):
         """ Places the metrics figure in the UI canvas.
         """
-        # check if atleast one variable is selected for plotting
+        # check if at least one variable is selected for plotting
         if self._check_metrics_list_selection():
             self._show_error_popup('No Metrics(s) Selected!', 
                                    'Please select metrics(s) from the \
@@ -3296,7 +3296,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
 
     def _show_error_popup(self, title_str, msg):
         """A generic popup dialog box to show errors within the 
-           visualiation screen.
+           visualization screen.
         
         Parameters
         ----------
@@ -3390,7 +3390,7 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         # corresponding configurations
         simulation_results = {}
         for result in self.project_results.results():
-            # configuraiton directory of the result
+            # configuration directory of the result
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
             simulation_results[config_dir] = result
 
@@ -3599,7 +3599,7 @@ class ResultsDetailScreen(SSimBaseScreen):
     def update_figure(self):
         """ Places the details figure in the UI canvas.
         """
-        # check if atleast one variable is selected for plotting
+        # check if at least one variable is selected for plotting
         if self._check_list_selection():
             self._show_error_popup('No Variable(s) Selected!', 
                                    'Please select variable(s) from the \
@@ -3656,7 +3656,7 @@ class ResultsDetailScreen(SSimBaseScreen):
 
     def _show_error_popup(self, title_str, msg):
         """A generic popup dialog box to show errors within the 
-        visualiation screen.
+        visualization screen.
         
         Parameters
         ----------
@@ -3766,7 +3766,7 @@ class ResultsDetailScreen(SSimBaseScreen):
         # corresponding configurations
         simulation_results = {}
         for result in self.project.current_checkpoint.results().results():
-            # configuraiton directory of the result
+            # configuration directory of the result
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
             simulation_results[config_dir] = result
 
@@ -3807,7 +3807,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             self.x_data = list(self.variable_data.loc[:, 'time'])
 
             for item in self.list_items:
-                # do not add 'time' to the variable liist
+                # do not add 'time' to the variable list
                 if item == 'time':
                     continue
                 else:
@@ -4049,7 +4049,7 @@ class SSimScreen(SSimBaseScreen):
         chooser = LoadSSIMTOMLDialog(
             load=self.load_toml_file, cancel=self.dismiss_popup)
 
-        self._popup = Popup(title="select SSIM TOML file", content=chooser)
+        self._popup = Popup(title="Select SSIM TOML File", content=chooser)
         self._popup.open()
 
     def write_to_toml(self):
@@ -4300,7 +4300,7 @@ class SSimScreen(SSimBaseScreen):
                 else:
                     Logger.warning(
                         f"Unexpected DER type '{type(der)}' "
-                        "encountered whild drawing map"
+                        "encountered while drawing map"
                     )
                     continue
                 draw_func(bx, by, w, h, der_colors[der], ax, i * o, yo + i * o)
@@ -4656,7 +4656,7 @@ class LineReliabilityParams(ReliabilityModelTab):
         Parameters
         ----------
         params : dict
-            Distionary with optional keys 'enabled', 'mtbf', 'min_repair', and
+            Dictionary with optional keys 'enabled', 'mtbf', 'min_repair', and
             'max_repair'.
         """
         self.ids.enabled.active = params.get("enabled", False)
@@ -4670,7 +4670,7 @@ class SwitchReliabilityParams(ReliabilityModelTab):
 
     @property
     def enabled(self):
-        """Return True if the switch reliability mdoel is enabled."""
+        """Return True if the switch reliability model is enabled."""
         return self.ids.enabled.active
 
     def validate(self):
