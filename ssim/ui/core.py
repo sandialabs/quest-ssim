@@ -434,7 +434,9 @@ class Project:
         ret = "[Project]\n"
         ret += f"name = \'{self.name}\'\n"
         ret += f"version = {self.version}\n"
-        ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
+
+        if self._grid_model_path:
+            ret += f"grid_model_path = \'{self._grid_model_path}\'\n"
 
         ret += self._reliability_to_toml()
 
@@ -460,18 +462,22 @@ class Project:
             this class instance.
         """
         projdict = tomlData["Project"]
-        self.name = projdict["name"]
-        self.set_grid_model(projdict["grid_model_path"])
+        self.name = projdict.get("name", "unnamed")
+        self.set_grid_model(projdict.get("grid_model_path"))
         self._workdir = projdict.get("working_directory", ".")
         self._version_manager.basedir = os.path.join(self._workdir, self.name)
         self._current_checkpoint = None
 
-        sodict = tomlData["storage-options"]
-        for sokey in sodict:
-            so = StorageOptions(sokey, [], [], [])
-            so.read_toml(sokey, sodict[sokey])
+        # Allow for a case where there are no storage options and no such block
+        # exists in the file.
+        sodict = tomlData.get("storage-options", {})
+        for soname, soptions in sodict.items():
+            so = StorageOptions(soname, [], [], [])
+            so.read_toml(soname, soptions)
             self.add_storage_option(so)
-
+            
+        # Allow for a case where there are no PV options and no such block
+        # exists in the file.
         pvdict = tomlData.get("pv-options", {})
         for pvname, pvoptions in pvdict.items():
             pv = PVOptions(pvname, [], [])
