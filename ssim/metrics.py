@@ -1157,12 +1157,11 @@ class MetricManager:
             A TOML formatted dictionary from which to read the properties of this class
             instance.
         """
-        values = tomlData.get("values")
-        if values:
-            for mDict in values:
-                mta = MetricTimeAccumulator.read_toml(mDict)
-                name = mDict.get("name", "unnamed")
-                self.add_accumulator(name, mta)
+        values = tomlData.get("values", [])
+        for mDict in values:
+            mta = MetricTimeAccumulator.read_toml(mDict)
+            name = mDict.get("name", "unnamed")
+            self.add_accumulator(name, mta)
 
     @property
     def all_metrics(self) -> dict:

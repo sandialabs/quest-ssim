@@ -505,8 +505,6 @@ class Project:
             A TOML formatted dictionary from which to read the properties of
             the metric managers to be continued in this class.
         """
-        if not mdict: return
-
         for ckey in mdict:
             cat_mgr = self.get_metric_manager(ckey)
             if cat_mgr is None:
