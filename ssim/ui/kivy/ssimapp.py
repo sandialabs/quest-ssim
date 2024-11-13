@@ -3487,6 +3487,17 @@ class ResultsDetailScreen(SSimBaseScreen):
     def dismiss_popup(self):
         self._popup.dismiss()
 
+    def _all_pv_power(self, result):
+        pv_data = []
+        for pv in self.project.pv_names:
+            _, pv_power = result.pvsystem_power(pv)
+            # The monitor output is negative for power out, but we want positive here
+            pv_power = pv_power.set_index("time")
+            pv_power *= -1.0
+            pv_power.columns = [f"{pv}_{col}" for col in pv_power.columns]
+            pv_data.append(pv_power)
+        return pd.concat(pv_data, axis=1)
+
     def _create_figure(self):
         """Creates instance of matplotlib figure based on selections 
         made in the UI.
@@ -3531,11 +3542,16 @@ class ResultsDetailScreen(SSimBaseScreen):
             new_col_names = [item + '_voltage' for item in data_storage_voltage.columns]
             data_storage_voltage.columns = new_col_names
 
+            all_pv_power = self._all_pv_power(result)
+
             # combine all data into a single dataframe
             data = pd.concat(
                 [data_storage_state, data_storage_voltage, all_bus_voltage],
                 axis=1
             )
+            data = pd.concat(
+                [data.set_index("time"), all_pv_power], axis=1, sort=True
+            ).reset_index()
             config_dir = os.path.basename(os.path.normpath(result.config_dir))
             config_key = self.config_id_to_name[config_dir]
             
@@ -3778,6 +3794,7 @@ class ResultsDetailScreen(SSimBaseScreen):
             storage_state_headers, storage_state_data = current_result.storage_state()
             storage_voltage_headers, storage_voltage_data = current_result.storage_voltages()
             bus_voltage_headers, bus_voltage_data = current_result.bus_voltages()
+
             
             # remove 'time' from the header list and pandas data frame to prevent
             # duplication
@@ -3793,11 +3810,12 @@ class ResultsDetailScreen(SSimBaseScreen):
             # represent voltage, append string '_voltage' to each label
             storage_voltage_headers = [item + '_voltage' for item in storage_voltage_headers]
             bus_voltage_headers = [item + '_bus_voltage' for item in bus_voltage_headers]
-
+            pv_headers = list(self._all_pv_power(current_result).columns)
             self.list_items = (
                 storage_state_headers
                 + storage_voltage_headers
                 + bus_voltage_headers
+                + pv_headers
             )
             self.variable_data = pd.concat(
                 [storage_state_data, storage_voltage_data, bus_voltage_data],
