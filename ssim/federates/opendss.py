@@ -1,7 +1,6 @@
 """Federate for OpenDSS grid simulation."""
 import argparse
 import csv
-import time
 from pathlib import Path
 
 from helics import (
@@ -25,15 +24,11 @@ class EMSInterface:
 
     """
 
-    def __init__(self, federate: HelicsCombinationFederate):
-        time.sleep(1)  # XXX (wfv) recommended by the HELICS query example
-        endpoints = federate.query("broker", "endpoints")
-        if endpoints == "#invalid":
-            raise RuntimeError("attempted invalid HELICS query")
+    def __init__(self, federate: HelicsCombinationFederate, config: GridSpecification):
         self._federate = federate
         self._endpoints = {}
         self._control_endpoint = None
-        if "ems/control" in endpoints:
+        if config.ems is not None:
             self._control_endpoint = "ems/control"
 
     def register_endpoint(self, endpoint: str, isglobal: bool = True):
@@ -41,7 +36,9 @@ class EMSInterface:
         if self._control_endpoint is None:
             return
         if isglobal:
-            self._endpoints[endpoint] = self._federate.register_global_endpoint(endpoint)
+            self._endpoints[endpoint] = self._federate.register_global_endpoint(
+                endpoint
+            )
         else:
             self._endpoints[endpoint] = self._federate.register_endpoint(endpoint)
 
@@ -330,7 +327,7 @@ class GridFederate:
         g_spec = GridSpecification.from_json(grid_file)
         self._grid_model = DSSModel.from_grid_spec(g_spec)
         self.busses_to_measure = set(bus["name"] for bus in g_spec.busses_to_measure)
-        ems = EMSInterface(federate)
+        ems = EMSInterface(federate, g_spec)
         self._federate = federate
         self._storage_interface = [
             StorageInterface(federate, device)

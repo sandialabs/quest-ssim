@@ -129,7 +129,7 @@ class EMSFederate:
 
 def _create_ems(grid_spec):
     if grid_spec.ems is None:
-        return CompositeHeuristicEMS(grid_spec)
+        raise ValueError("no ems configured")
     if grid_spec.ems.ems_type == 'composite-heuristic':
         return CompositeHeuristicEMS(grid_spec)
     raise ValueError(f"Unknown ems type: {grid_spec.ems.ems_type}."
