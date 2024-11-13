@@ -1,4 +1,4 @@
--"""Storage Sizing and Placement Kivy application"""
+"""Storage Sizing and Placement Kivy application"""
 import inspect
 import itertools
 import logging
