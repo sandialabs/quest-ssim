@@ -1400,6 +1400,7 @@ class ResultsDetailListRecycleView2(RecycleView):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
 
+
 class StorageConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
     """Configure a single energy storage device."""
 
@@ -2114,9 +2115,35 @@ class MessagePopupContent(BoxLayout):
     pass
 
 
-class MetricListItem(TwoLineAvatarIconListItem):
+class MetricsInfoPopupContent(BoxLayout):
     pass
 
+
+class MetricListItem(TwoLineAvatarIconListItem):
+
+    def on_touch_up(self, touch):
+        if touch.is_double_tap and not self.__has_popup():
+            if self.collide_point(*touch.pos):
+                self.__show_metric_details_popup()
+
+    def __show_metric_details_popup(self):
+        content = MetricsInfoPopupContent()
+
+        self.popup = Popup(
+            title='Details for ' + self.text, content=content,
+            auto_dismiss=False, size_hint=(0.4, 0.4)
+        )
+        content.ids.msg_label.text = str(self.secondary_text)
+        content.ids.dismissBtn.bind(on_press=self.dismiss_popup)
+        self.popup.open()
+
+    def dismiss_popup(self, *_args, **kwargs):
+        if self.__has_popup():
+            self.popup.dismiss(_args, kwargs)
+            self.popup = None
+
+    def __has_popup(self):
+        return hasattr(self, "popup") and self.popup
 
 class MetricConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
     _selBusses = []
@@ -2404,7 +2431,7 @@ class MetricConfigurationScreen(SSimBaseScreen, CheckedListItemOwner):
         list = self.ids.metriclist
         list.active = False
         for key, m in manager.all_metrics.items():
-            txt = self._currentMetricCategory + " Metric for " + key
+            txt = self._currentMetricCategory + " Metric for Bus \"" + key + "\""
             deets = ""
 
             if m.metric.improvement_type == ImprovementType.Minimize:
