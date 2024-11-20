@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('..'))
 # -- Project information -----------------------------------------------------
 
 project = 'storage-sim'
-copyright = '2021, John P. Eddy, William F. Vining, Ujjwol Tamrakar'
+copyright = '2024 National Technology & Engineering Solutions of Sandia, LLC'
 author = 'John P. Eddy, William F. Vining, Ujjwol Tamrakar'
 
 
