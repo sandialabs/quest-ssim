@@ -3172,6 +3172,20 @@ class ResultsVisualizeScreen(SSimBaseScreen):
         _current_checkpoint_base_dir = \
             self.project.current_checkpoint.results().base_dir
 
+        if not os.path.isdir(_current_checkpoint_base_dir):
+            content = MessagePopupContent()
+            popup = Popup(
+                title="No Results",
+                content=content,
+                auto_dismiss=False,
+                size_hint=(0.4, 0.4)
+            )
+            content.ids.msg_label.text = "No results found for this project"
+            content.ids.dismissBtn.bind(on_press=popup.dismiss)
+            self.manager.current = "run-sim"
+            popup.open()
+            return
+
         # a list that keep track of configurations that have
         # been evaluated
         _evaluated_configs = []       
