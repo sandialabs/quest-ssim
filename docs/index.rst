@@ -16,6 +16,7 @@ QuEST-SSim
    inverter_controls
    metrics
    demo_examples
+   changelog
 
 Installation
 ------------
