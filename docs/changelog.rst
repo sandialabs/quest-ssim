@@ -26,6 +26,8 @@ Change Log
   of the file chooser dialogue.
 * Added the ability to configure the base directory where all files will be
   written via the TOML project file.
+* Added :ref:`instructions for running the examples <demo-examples>`
+  to the documentation.
 
 .. _changelog-100beta3:
 

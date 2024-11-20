@@ -1,3 +1,5 @@
+.. _demo-examples:
+
 Instructions on Running Demo Examples
 =====================================
 
