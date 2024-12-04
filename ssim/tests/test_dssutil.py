@@ -96,15 +96,11 @@ def test_lock_unlock_switch(simple_circuit):
     assert not dssdirect.SwtControls.IsLocked()
 
 
+@pytest.mark.parametrize("repeat", range(10))
 def test_fingerprint(model_dir, grid_model_path, irradiance_path,
-                     wind_path, tmp_path_factory):
+                     wind_path, tmp_path_factory, repeat):
     # compute hash directly from list of files
-    export_dir = tmp_path_factory.mktemp("grid_export")
-    h = hashlib.sha256()
-    dssutil.run_command("clear")
-    dssutil.load_model(grid_model_path)
-    dssutil.export(model_dir, export_dir)
-    FILES = (
+    DSS_FILES = sorted([
         "BusCoords.dss",
         "BusVoltageBases.DSS",
         "Capacitor.DSS",
@@ -121,8 +117,17 @@ def test_fingerprint(model_dir, grid_model_path, irradiance_path,
         "TCC_Curve.DSS",
         "Transformer.DSS",
         "Vsource.dss",
-        "zavwind.csv"
-    )
+    ])
+    DATA_FILES = [
+        "irradiance.csv",
+        "zavwind.csv",
+    ]
+    FILES = DSS_FILES + DATA_FILES
+    export_dir = tmp_path_factory.mktemp("grid_export")
+    h = hashlib.sha256()
+    dssutil.run_command("clear")
+    dssutil.load_model(grid_model_path)
+    dssutil.export(model_dir, export_dir)
     for fname in FILES:
         p = export_dir / fname
         h.update(p.read_bytes())

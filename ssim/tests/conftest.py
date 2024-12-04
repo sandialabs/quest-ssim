@@ -15,6 +15,8 @@ new loadshape.year 24 1.0 ! same as day for now
 new loadshape.wind 2400 0.00027777 ! unit must be hours 1.0/3600.0 = .0002777
 ~ csvfile=zavwind.csv action=normalize ! wind turbine characteristic
 
+new loadshape.extra 24 1.0 csvfile=irradiance.csv ! not used, just needed for testing fingerprint
+
 ! define a linecode for the lines - unbalanced 336 MCM ACSR connection
 new linecode.336matrix nphases=3 ! horizontal flat construction
 ~ rmatrix=(0.0868455 | 0.0298305 0.0887966 | 0.0288883 0.0298305 0.0868455)

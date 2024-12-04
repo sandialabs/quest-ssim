@@ -375,7 +375,7 @@ def fingerprint(model_path):
     # Get a list of the cannonical file names and read them in
     h = hashlib.sha256()
     datafiles = set()
-    for dssfile in os.listdir(model_path):
+    for dssfile in sorted(os.listdir(model_path)):
         _, ext = path.splitext(dssfile)
         if ext.lower() != ".dss":
             continue
@@ -384,7 +384,7 @@ def fingerprint(model_path):
         with open(dssfile, 'rb') as f:
             h.update(f.read())
     # find the datafiles referenced by each file and hash the contents
-    for datafile in datafiles:
+    for datafile in sorted(list(datafiles)):
         with open(path.join(model_path, datafile), 'rb') as f:
             h.update(f.read())
     # return the final complete hash.
