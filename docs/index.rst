@@ -25,6 +25,13 @@ The SSim package is available on pypi. You can install it via::
 
   pip install quest-ssim
 
+
+Quick Start
+-----------
+
+A quick start guide describing how to launch, configure, and run the
+simulator is available on `OSTI <https://www.osti.gov/servlets/purl/2430055>`_.
+
 Running the simulation
 ----------------------
 
