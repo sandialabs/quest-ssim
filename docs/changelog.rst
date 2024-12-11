@@ -7,7 +7,7 @@ Change Log
 1.0.0.beta4
 -----------
 
-.. note:: In progress
+December 12, 2024
 
 * Enhancements to configuration filtering.
 * Replaced results lists with ``RecycleView`` to improve UI performance.
