@@ -1,0 +1,45 @@
+name: "Build & Deploy to PyPI"
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    - name: Install Dependencies
+      run: |
+        pip install .
+        pip install build
+    - name: Build wheel and sdist
+      run: python -m build
+    - name: Store wheel and sdist as artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+  publish:
+    name: upload package(s) to pypi
+    needs:
+    - build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/quest-ssim
+    permissions:
+      id-token: write
+    steps:
+    - name: Download dist artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
