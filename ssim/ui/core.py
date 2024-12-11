@@ -2249,6 +2249,26 @@ class Results:
             storage_buses, storage_voltages = [], []
         return storage_buses, storage_voltages
 
+    def pvsystem_power(self, name: str):
+        """Return the power output of a PV system.
+
+        Parameters
+        ----------
+        name : str
+            Name of the PV System.
+
+        Returns
+        -------
+        measurands : array like
+            The names of the values in each column
+        powers : array like
+            Power for each measurand [kW]
+        """
+        pv_power_file = f"monitor_pvsystem_{name.lower()}.csv"
+        if (self.config_dir / pv_power_file).is_file():
+            return self._extract_data(pv_power_file)
+        return [], []
+
     def metrics_log(self):
         """Returns name of columns of the logged metrics, the accumulated value
         of the metric, and the time-series log as a pandas dataframe."""
